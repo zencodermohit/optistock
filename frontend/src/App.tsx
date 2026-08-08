@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/lib/auth";
+import { Alerts } from "@/pages/Alerts";
 import { EventStream } from "@/pages/EventStream";
 import { Inventory } from "@/pages/Inventory";
 import { Login } from "@/pages/Login";
@@ -83,16 +84,7 @@ export default function App() {
             />
           }
         />
-        <Route
-          path="alerts"
-          element={
-            <Placeholder
-              title="Alerts"
-              description="Low stock, overdue orders and detected anomalies."
-              building="Week 4. The alerts table and its de-duplication rules already exist in the database."
-            />
-          }
-        />
+        <Route path="alerts" element={<Alerts />} />
         <Route path="system/events" element={<EventStream />} />
       </Route>
 

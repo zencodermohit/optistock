@@ -88,6 +88,27 @@ services:
     networks:
       - optistock-net
 
+  consumers:
+    # Reacts to events: raises alerts, resolves them when stock recovers.
+    # Separate from the relay because they fail differently -- the relay is
+    # plumbing that must never stop, consumers run business rules that change
+    # often. Restarting one should not interrupt the other.
+    build: .
+    container_name: optistock-consumers
+    command: ["python", "-m", "app.workers.consumers"]
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Scaling this is safe: members of a Redis consumer group split the stream
+    # between them, so each event is still handled exactly once across replicas.
+    restart: unless-stopped
+    networks:
+      - optistock-net
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: optistock-pgadmin

@@ -6,7 +6,7 @@
  * removes the chance of drifting out of sync with the backend.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
@@ -84,6 +84,7 @@ export const keys = {
   traces: (days: number) => ["inventory", "traces", days] as const,
   events: (limit: number) => ["events", limit] as const,
   outboxHealth: () => ["events", "health"] as const,
+  alerts: (params?: unknown) => ["alerts", params] as const,
   warehouses: () => ["warehouses"] as const,
   recommendations: () => ["recommendations"] as const,
 };
@@ -153,6 +154,47 @@ export function useInventoryTraces(days = 30) {
         `/inventory/traces?days=${days}`,
       ),
     staleTime: 60_000,
+  });
+}
+
+export interface Alert {
+  id: string;
+  alert_type: string;
+  severity: "info" | "warning" | "critical";
+  status: "open" | "resolved" | "dismissed";
+  subject_type: string;
+  subject_id: string;
+  title: string;
+  detail: Record<string, unknown>;
+  triggered_by_event_id: string | null;
+  created_at: string;
+  resolved_at: string | null;
+  dismissed_at: string | null;
+}
+
+export interface AlertPage extends Paginated<Alert> {
+  open_counts: Record<string, number>;
+}
+
+export function useAlerts(params: { status?: string; severity?: string } = {}) {
+  return useQuery({
+    queryKey: keys.alerts(params),
+    queryFn: () => api<AlertPage>(`/alerts/${queryString({ limit: 100, ...params })}`),
+    placeholderData: (previous) => previous,
+    // Alerts are raised by a background consumer, not by anything this tab did,
+    // so the page has to go looking for them.
+    refetchInterval: 10_000,
+  });
+}
+
+export function useDismissAlert() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (alertId: string) =>
+      api<Alert>(`/alerts/${alertId}/dismiss`, { method: "POST" }),
+    // Refetch rather than patch the cache: dismissing changes the open counts
+    // and can change which page of results the row belongs to.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
   });
 }
 

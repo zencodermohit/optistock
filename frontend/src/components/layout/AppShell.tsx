@@ -20,6 +20,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { Mark } from "@/components/ui/Mark";
 import { useAuth } from "@/lib/auth";
+import { useAlerts } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 /**
@@ -34,6 +35,9 @@ interface NavItem {
   icon: LucideIcon;
   /** Match this path exactly. Without it "/" stays active on every route. */
   end?: boolean;
+  /** Show the open-alert count here. Alerts arrive from a background consumer,
+   *  so the one place they must be visible is the page you are NOT on. */
+  showAlertCount?: boolean;
 }
 
 interface NavGroup {
@@ -61,7 +65,12 @@ const NAV: NavGroup[] = [
     heading: "Intelligence",
     items: [
       { to: "/insights", label: "Insights", icon: Sparkles },
-      { to: "/alerts", label: "Alerts", icon: AlertTriangle },
+      {
+        to: "/alerts",
+        label: "Alerts",
+        icon: AlertTriangle,
+        showAlertCount: true,
+      },
     ],
   },
   {
@@ -99,6 +108,15 @@ export function AppShell() {
 }
 
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  // Polled here rather than on the alerts page, because the whole point is to
+  // be visible from wherever you are. Shares a cache key with the page, so
+  // opening it costs no extra request.
+  const alerts = useAlerts({ status: "open" });
+  const counts = alerts.data?.open_counts ?? {};
+  const criticalAlerts = counts.critical ?? 0;
+  const openAlerts =
+    criticalAlerts + (counts.warning ?? 0) + (counts.info ?? 0);
+
   return (
     <aside
       className={cn(
@@ -130,7 +148,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
               <p className="eyebrow mb-2 px-2">{group.heading}</p>
             )}
             <ul className="space-y-0.5">
-              {group.items.map(({ to, label, icon: Icon, end }) => (
+              {group.items.map(({ to, label, icon: Icon, end, showAlertCount }) => (
                 <li key={to}>
                   <NavLink
                     to={to}
@@ -151,6 +169,18 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                   >
                     <Icon className="h-4 w-4 shrink-0" />
                     {label}
+                    {showAlertCount && openAlerts > 0 && (
+                      <span
+                        className={cn(
+                          "ml-auto rounded-sm px-1.5 py-0.5 font-mono text-2xs font-medium",
+                          criticalAlerts > 0
+                            ? "bg-danger-soft text-danger"
+                            : "bg-warning-soft text-warning",
+                        )}
+                      >
+                        {openAlerts}
+                      </span>
+                    )}
                   </NavLink>
                 </li>
               ))}
