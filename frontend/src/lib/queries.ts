@@ -86,6 +86,8 @@ export const keys = {
   outboxHealth: () => ["events", "health"] as const,
   alerts: (params?: unknown) => ["alerts", params] as const,
   overview: (days: number) => ["dashboard", "overview", days] as const,
+  suggestions: () => ["insights", "recommendations"] as const,
+  accuracy: () => ["insights", "accuracy"] as const,
   warehouses: () => ["warehouses"] as const,
   recommendations: () => ["recommendations"] as const,
 };
@@ -155,6 +157,69 @@ export function useInventoryTraces(days = 30) {
         `/inventory/traces?days=${days}`,
       ),
     staleTime: 60_000,
+  });
+}
+
+export interface Suggestion {
+  id: string;
+  product_id: string;
+  warehouse_id: string;
+  sku: string;
+  product_name: string;
+  warehouse_name: string;
+  abc_class: string | null;
+  suggested_action: string;
+  suggested_quantity: number;
+  quantity_on_hand: number;
+  estimated_cost: number;
+  confidence_score: number;
+  evidence: Record<string, string | number>;
+  business_reasoning: string;
+  source: string;
+  created_at: string;
+}
+
+export interface AccuracySummary {
+  scored: number;
+  pending: number;
+  weighted_ape: number | null;
+  mae: number | null;
+  within_20_pct: number | null;
+  total_forecast: number;
+  total_actual: number;
+}
+
+export interface ScoredForecast {
+  id: string;
+  sku: string;
+  product_name: string;
+  warehouse_name: string;
+  forecast_quantity: number;
+  actual_quantity: number;
+  absolute_error: number;
+  error: number;
+  direction: "over" | "under" | "exact";
+  horizon_days: number;
+  horizon_end: string;
+  confidence_score: number;
+}
+
+export function useSuggestions() {
+  return useQuery({
+    queryKey: keys.suggestions(),
+    queryFn: () => api<Paginated<Suggestion>>("/insights/recommendations?limit=100"),
+  });
+}
+
+export function useForecastAccuracy() {
+  return useQuery({
+    queryKey: keys.accuracy(),
+    queryFn: () =>
+      api<{
+        summary: AccuracySummary;
+        lookback_days: number;
+        worst: ScoredForecast[];
+      }>("/insights/accuracy"),
   });
 }
 

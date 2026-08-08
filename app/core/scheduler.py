@@ -6,6 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import app.models  # noqa: F401  — completes the ORM registry for standalone runs
 from app.core.database import SessionLocal
 from app.modules.analytics.abc_analysis import run_abc_analysis
+from app.modules.analytics.accuracy import persist_forecast_runs, score_due_forecasts
 from app.modules.analytics.forecast import run_demand_forecast
 from app.modules.analytics.persistence import (
     persist_abc_classes,
@@ -33,7 +34,12 @@ def run_nightly_analytics() -> dict:
     while nothing was computed and nothing was stored.
     """
     logger.info("=== NIGHTLY ANALYTICS: START ===")
-    summary = {"products_classified": 0, "recommendations_created": 0}
+    summary = {
+        "products_classified": 0,
+        "recommendations_created": 0,
+        "forecasts_recorded": 0,
+        "forecasts_scored": 0,
+    }
 
     run_nightly_etl()
 
@@ -46,6 +52,12 @@ def run_nightly_analytics() -> dict:
         summary["recommendations_created"] = persist_reorder_recommendations(
             db, forecast_df
         )
+        # Record tonight's predictions, then grade the ones whose window has
+        # closed. Scoring runs before the new batch would be equally correct;
+        # after is chosen so a forecast is never scored on the same night it
+        # was made, which cannot happen but would be silent if it did.
+        summary["forecasts_recorded"] = persist_forecast_runs(db, forecast_df)
+        summary["forecasts_scored"] = score_due_forecasts(db)
         db.commit()
     except Exception:
         db.rollback()

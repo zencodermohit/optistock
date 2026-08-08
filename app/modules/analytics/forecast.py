@@ -74,8 +74,17 @@ def run_demand_forecast(
     df = df.copy()
     df["sale_date"] = pd.to_datetime(df["sale_date"], utc=True)
 
-    cutoff = (as_of or datetime.now(timezone.utc)) - timedelta(days=lookback_days)
-    window = df[df["sale_date"] >= cutoff]
+    now = as_of or datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=lookback_days)
+
+    # BOTH bounds. The upper one used to be missing, which is invisible in
+    # production -- there are no sales from the future -- and silently wrong
+    # anywhere `as_of` is moved into the past. A backtest at eight weeks ago was
+    # summing eighty-six days of sales and dividing by the thirty-day window,
+    # inflating velocity by nearly three times. It was the accuracy tracking
+    # that made this visible: forecasts totalled 30,516 units against 15,989
+    # actually sold.
+    window = df[(df["sale_date"] >= cutoff) & (df["sale_date"] < now)]
     if window.empty:
         logger.info("[ANALYTICS] No sales inside the lookback window.")
         return pd.DataFrame(columns=RESULT_COLUMNS)

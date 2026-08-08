@@ -217,6 +217,16 @@ python -m app.workers.rebuild_projections          # all history
 python -m app.workers.rebuild_projections --days 90
 ```
 
+Forecast accuracy works the same way. The nightly job records one batch of
+predictions per night and scores each once its horizon has elapsed, so a fresh
+system reports no accuracy until it has run for longer than a forecast horizon.
+This replays the forecast backwards through the data lake instead, and the
+results are genuinely out-of-sample — only the passage of time is simulated:
+
+```bash
+python -m app.workers.backfill_forecasts --weeks 8 --replace
+```
+
 ---
 
 ## 🔐 Environment Variables

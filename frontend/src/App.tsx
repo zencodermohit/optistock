@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/lib/auth";
 import { Alerts } from "@/pages/Alerts";
 import { EventStream } from "@/pages/EventStream";
+import { Insights } from "@/pages/Insights";
 import { Inventory } from "@/pages/Inventory";
 import { Login } from "@/pages/Login";
 import { Overview } from "@/pages/Overview";
@@ -66,16 +67,7 @@ export default function App() {
             />
           }
         />
-        <Route
-          path="insights"
-          element={
-            <Placeholder
-              title="Insights"
-              description="Reorder recommendations, anomalies and forecast accuracy."
-              building="Week 5. Every recommendation will expand into the arithmetic that produced it."
-            />
-          }
-        />
+        <Route path="insights" element={<Insights />} />
         <Route path="alerts" element={<Alerts />} />
         <Route path="system/events" element={<EventStream />} />
       </Route>

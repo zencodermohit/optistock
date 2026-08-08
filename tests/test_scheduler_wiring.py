@@ -72,11 +72,22 @@ def test_nightly_analytics_commits_its_results(monkeypatch):
     )
     monkeypatch.setattr(scheduler, "persist_abc_classes", lambda db, df: 7)
     monkeypatch.setattr(scheduler, "persist_reorder_recommendations", lambda db, df: 3)
+    # Recording and scoring forecasts runs in the same transaction as the rest.
+    # Stubbed here too: this test is about the commit boundary, and a real
+    # scoring pass against a MagicMock session would fail for reasons that have
+    # nothing to do with what is being asserted.
+    monkeypatch.setattr(scheduler, "persist_forecast_runs", lambda db, df, **kwargs: 5)
+    monkeypatch.setattr(scheduler, "score_due_forecasts", lambda db: 2)
     monkeypatch.setattr(scheduler, "SessionLocal", lambda: session)
 
     summary = scheduler.run_nightly_analytics()
 
-    assert summary == {"products_classified": 7, "recommendations_created": 3}
+    assert summary == {
+        "products_classified": 7,
+        "recommendations_created": 3,
+        "forecasts_recorded": 5,
+        "forecasts_scored": 2,
+    }
     session.commit.assert_called_once()
     session.close.assert_called_once()
 

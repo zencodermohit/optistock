@@ -37,6 +37,7 @@ from app.modules.alerts.router import router as alerts_router
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.events.router import router as events_router
 from app.modules.ingest.router import router as ingest_router
+from app.modules.insights.router import router as insights_router
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -145,3 +146,4 @@ app.include_router(alerts_router)
 app.include_router(dashboard_router)
 app.include_router(events_router)
 app.include_router(ingest_router)
+app.include_router(insights_router)
