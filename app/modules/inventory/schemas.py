@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 
 # -----------------------------------------
@@ -23,13 +23,28 @@ class InventoryAdjustmentCreate(BaseModel):
 
 
 class InventoryResponse(BaseModel):
-    """Schema for returning the current stock level."""
+    """A stock level, with enough context to render without further lookups.
+
+    The names are denormalised into the response on purpose. Returning bare
+    foreign keys would force the client to fetch every product and warehouse
+    just to label a table — an N+1 moved from the server to the browser, which
+    is the worse place for it.
+    """
 
     id: UUID
     product_id: UUID
     warehouse_id: UUID
     quantity: int
     last_counted_at: datetime
+
+    sku: str
+    product_name: str
+    warehouse_name: str
+    category: Optional[str] = None
+    abc_class: Optional[str] = None
+    reorder_point: int
+    #: Computed server-side so every client agrees on what "low" means.
+    is_low: bool
 
     model_config = ConfigDict(from_attributes=True)
 

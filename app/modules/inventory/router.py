@@ -24,17 +24,23 @@ def get_inventory_levels(
     warehouse_id: Optional[UUID] = Query(
         None, description="Filter by a specific warehouse"
     ),
+    search: Optional[str] = Query(None, description="Match on product SKU or name"),
+    low_only: bool = Query(
+        False, description="Only lines at or below their reorder point"
+    ),
     db: Session = Depends(get_db),
     # Any logged-in user can view stock levels
     current_user: dict = Depends(get_current_user),
 ):
-    """Get paginated inventory levels across warehouses."""
+    """Get paginated inventory levels across warehouses, lowest stock first."""
     service = InventoryService(db)
     items, total = service.get_inventory(
         company_id=UUID(current_user["company_id"]),
         skip=skip,
         limit=limit,
         warehouse_id=warehouse_id,
+        search=search,
+        low_only=low_only,
     )
 
     return {"total": total, "skip": skip, "limit": limit, "data": items}
@@ -68,8 +74,12 @@ def manual_inventory_adjustment(
             reference_id=f"Reason: {adjustment.reason}",
         )
         db.commit()
-        db.refresh(result)
-        return result
+        # Re-read through the enriched query so the caller gets a row shaped
+        # exactly like the ones in the list response and can swap it in place.
+        return service.get_inventory_line(
+            inventory_id=result.id,
+            company_id=UUID(current_user["company_id"]),
+        )
     except OptiStockException as e:
         db.rollback()
         # e.g., "Cannot deduct 100 units. Only 50 available."

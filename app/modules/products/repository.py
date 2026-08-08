@@ -25,11 +25,34 @@ class ProductRepository:
         )
 
     def list_by_company(
-        self, company_id: UUID, skip: int = 0, limit: int = 100
+        self,
+        company_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        abc_class: Optional[str] = None,
+        status: Optional[str] = None,
     ) -> Tuple[List[Product], int]:
+        """Filtering happens here, in SQL, not in the client.
+
+        The endpoint caps a page at 100 rows, so a client filtering the page it
+        already holds would be searching a truncated catalogue and reporting
+        confidently wrong counts. Filter first, paginate the result.
+        """
         query = self.db.query(Product).filter(Product.company_id == company_id)
+
+        if search:
+            pattern = f"%{search}%"
+            query = query.filter(
+                Product.sku.ilike(pattern) | Product.name.ilike(pattern)
+            )
+        if abc_class:
+            query = query.filter(Product.abc_class == abc_class.upper())
+        if status:
+            query = query.filter(Product.status == status)
+
         total = query.count()
-        products = query.offset(skip).limit(limit).all()
+        products = query.order_by(Product.sku).offset(skip).limit(limit).all()
         return products, total
 
     def create(self, product_in: ProductCreate, company_id: UUID) -> Product:

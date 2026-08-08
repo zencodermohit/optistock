@@ -30,9 +30,22 @@ class ProductService:
         return self.repo.create(product_in, company_id)
 
     def list_products(
-        self, company_id: UUID, skip: int = 0, limit: int = 100
+        self,
+        company_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+        abc_class: str | None = None,
+        status: str | None = None,
     ) -> Tuple[List[Product], int]:
-        return self.repo.list_by_company(company_id=company_id, skip=skip, limit=limit)
+        return self.repo.list_by_company(
+            company_id=company_id,
+            skip=skip,
+            limit=limit,
+            search=search,
+            abc_class=abc_class,
+            status=status,
+        )
 
     def get_product(self, product_id: UUID, company_id: UUID) -> Product:
         product = self.repo.get_by_id(product_id, company_id)

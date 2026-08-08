@@ -1,0 +1,201 @@
+/* ==========================================================================
+   OptiStock design system — "Editorial"
+   Warm light neutrals, serif display type, one terracotta accent.
+
+   Everything visual is a token. Screens never hard-code a hex, a font stack or
+   a radius; they compose tokens. That is what keeps twenty screens looking like
+   one product instead of twenty.
+   ========================================================================== */
+
+@import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/inter";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+@import "tailwindcss";
+
+@theme {
+  /* --- Neutrals -----------------------------------------------------------
+     Warm rather than grey. A cream canvas with white cards reads as considered;
+     pure #FFF on #F9FAFB reads as a bootstrap template. */
+  --color-canvas: #faf9f6;
+  --color-surface: #ffffff;
+  --color-sunken: #f4f2ed;
+  --color-border: #e7e3da;
+  --color-border-strong: #d8d2c6;
+
+  /* --- Ink ---------------------------------------------------------------
+     Near-black with a warm cast, never #000 — pure black on cream vibrates. */
+  --color-ink: #1c1a17;
+  --color-ink-muted: #6e675e;
+  --color-ink-subtle: #9c948a;
+  --color-ink-inverse: #faf9f6;
+
+  /* --- Accent ------------------------------------------------------------
+     Exactly one. Terracotta carries every primary action, active nav state and
+     focus ring. A second accent is how a palette starts to look accidental. */
+  --color-accent: #c2410c;
+  --color-accent-hover: #9a3412;
+  --color-accent-soft: #fcefe7;
+  --color-accent-border: #f0d3c2;
+
+  /* --- Semantic ----------------------------------------------------------
+     Each has a solid (text/icon) and a soft (background) so badges and banners
+     never need opacity guesswork. */
+  --color-success: #15803d;
+  --color-success-soft: #ebf7ef;
+  --color-warning: #b45309;
+  --color-warning-soft: #fdf4e3;
+  --color-danger: #b3261e;
+  --color-danger-soft: #fbedec;
+  --color-info: #1d4ed8;
+  --color-info-soft: #edf2fe;
+
+  /* --- Type --------------------------------------------------------------
+     Three faces, three jobs. Fraunces for display only; Inter for everything
+     you read; Plex Mono for every number, so digits are the same width and
+     columns line up down the page. */
+  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Dashboards read at 14px, not 16px — more information per screen without
+     feeling cramped. */
+  --text-2xs: 0.6875rem; /* 11 — table meta, axis labels */
+  --text-xs: 0.75rem; /* 12 — labels, badges */
+  --text-sm: 0.8125rem; /* 13 — table body */
+  --text-base: 0.875rem; /* 14 — body */
+  --text-lg: 1rem; /* 16 — card titles */
+  --text-xl: 1.25rem; /* 20 — section headings */
+  --text-2xl: 1.5rem; /* 24 — page titles */
+  --text-3xl: 2rem; /* 32 — hero metrics */
+  --text-4xl: 2.75rem; /* 44 — the one big number */
+
+  /* --- Shape -------------------------------------------------------------- */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+
+  /* --- Elevation ----------------------------------------------------------
+     Warm-tinted, not black. A neutral-black shadow on a cream surface looks
+     like dirt; tinting it to the canvas hue keeps it clean. */
+  --shadow-xs: 0 1px 2px 0 rgb(28 26 23 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(28 26 23 / 0.06), 0 1px 2px -1px rgb(28 26 23 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(28 26 23 / 0.08), 0 2px 4px -2px rgb(28 26 23 / 0.04);
+  --shadow-lg: 0 12px 28px -8px rgb(28 26 23 / 0.12), 0 4px 8px -4px rgb(28 26 23 / 0.06);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Fraunces ships optical-size, softness and "wonk" axes. Dialled slightly
+     soft and un-wonky so headings feel warm rather than quirky. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-variation-settings: "SOFT" 20, "WONK" 0;
+    letter-spacing: -0.015em;
+    color: var(--color-ink);
+  }
+
+  /* One visible focus treatment, everywhere. Never remove it without a
+     replacement — keyboard users navigate by it. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: var(--color-accent-soft);
+    color: var(--color-accent-hover);
+  }
+
+  /* Scrollbars, so long tables don't punch a grey hole in a warm page. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 999px;
+    border: 2px solid var(--color-canvas);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-subtle);
+  }
+}
+
+@layer utilities {
+  /* Every number in a table or metric gets this. Tabular figures are equal
+     width, so digits stack in a column and the eye can compare them. Without
+     it, "1,111" is visibly narrower than "8,888" and the column looks ragged. */
+  .tnum {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Small uppercase label above a metric or section. */
+  .eyebrow {
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-subtle);
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Skeleton sheen. Respects reduced-motion below. */
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.6),
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+}
+
+/* Users who ask their OS for less motion get less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from typing import Optional
 from uuid import UUID
 from app.core.dependencies import get_current_user, RequireRole
 from app.core.rate_limit import limiter
@@ -34,11 +35,25 @@ def get_product_service(db: Session = Depends(get_db)) -> ProductService:
 def list_products(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    search: Optional[str] = Query(None, description="Match on SKU or product name"),
+    abc_class: Optional[str] = Query(
+        None,
+        pattern="^[ABCabc]$",
+        description="Revenue class from the nightly Pareto analysis",
+    ),
+    status: Optional[str] = Query(None, description="active | archived | discontinued"),
     service: ProductService = Depends(get_product_service),
     current_user: dict = Depends(get_current_user),
 ):
+    """List products. Filtering is applied before pagination, so `total`
+    reflects the filtered set rather than the page."""
     products, total = service.list_products(
-        company_id=current_user["company_id"], skip=skip, limit=limit
+        company_id=current_user["company_id"],
+        skip=skip,
+        limit=limit,
+        search=search,
+        abc_class=abc_class,
+        status=status,
     )
     return {"total": total, "skip": skip, "limit": limit, "data": products}
 
