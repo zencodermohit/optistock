@@ -3,6 +3,7 @@ import logging
 from apscheduler.schedulers import SchedulerAlreadyRunningError
 from apscheduler.schedulers.background import BackgroundScheduler
 
+import app.models  # noqa: F401  — completes the ORM registry for standalone runs
 from app.core.database import SessionLocal
 from app.modules.analytics.abc_analysis import run_abc_analysis
 from app.modules.analytics.forecast import run_demand_forecast
