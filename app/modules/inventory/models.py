@@ -33,6 +33,21 @@ class Inventory(Base):
     )
     last_counted_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
+    # Threshold that fires a low-stock alert. Lives here rather than on Product
+    # because (product, warehouse) is the grain at which the question "am I low
+    # on stock?" is actually asked — a busy warehouse needs a bigger buffer than
+    # a quiet one. 0 means "not configured", so nothing alerts until someone
+    # sets a real number.
+    reorder_point = Column(
+        Integer,
+        CheckConstraint(
+            "reorder_point >= 0", name="ck_inventory_reorder_point_non_negative"
+        ),
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
     __table_args__ = (
         UniqueConstraint("product_id", "warehouse_id", name="uix_product_warehouse"),
     )

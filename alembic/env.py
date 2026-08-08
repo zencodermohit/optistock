@@ -13,6 +13,9 @@ from app.modules.reconciliation.models import Reconciliation, ReconciliationItem
 from app.modules.users.models import User
 from app.modules.recommendations.models import Recommendation
 from app.modules.audit.models import AuditLog
+from app.modules.events.models import EventOutbox
+from app.modules.alerts.models import Alert
+from app.modules.analytics.models import ForecastRun
 from alembic import context
 from app.core.database import Base
 from app.modules.companies.models import Company
