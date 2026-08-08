@@ -2,10 +2,14 @@ import { Loader2, Lock, Mail } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
+import { StockMark } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Mark } from "@/components/ui/Mark";
+import { Trace } from "@/components/ui/Trace";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 export function Login() {
   const { signIn, isAuthenticated } = useAuth();
@@ -46,11 +50,9 @@ export function Login() {
       <div className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <div className="mb-9">
-            <div className="mb-6 flex items-center gap-2">
-              <div className="h-6 w-6 rounded-md bg-accent" />
-              <span className="font-display text-lg font-semibold tracking-tight">
-                OptiStock
-              </span>
+            <div className="mb-6 flex items-center gap-2.5">
+              <Mark size={22} />
+              <span className="font-display text-xl font-semibold">OptiStock</span>
             </div>
             <h1 className="text-3xl leading-tight font-semibold">Welcome back</h1>
             <p className="mt-2 text-base text-ink-muted">
@@ -101,37 +103,118 @@ export function Login() {
         </div>
       </div>
 
-      {/* Editorial panel. Hidden on small screens — it is atmosphere, not content. */}
+      {/* A specimen of the thing itself, rather than a claim about it. Hidden on
+          small screens: the form is the job here, this is the argument. */}
       <div className="relative hidden overflow-hidden bg-sunken lg:block">
-        <div className="absolute inset-0 flex flex-col justify-center px-14">
-          <blockquote className="max-w-md">
-            <p className="font-display text-3xl leading-snug font-medium text-balance">
-              Every stock movement, every forecast, every recommendation —
-              <span className="text-accent"> traceable to the evidence </span>
-              that produced it.
-            </p>
-            <footer className="mt-8 text-sm text-ink-muted">
-              Inventory intelligence for multi-warehouse operations
-            </footer>
-          </blockquote>
+        <div className="absolute inset-0 flex flex-col justify-center">
+          <figure className="ml-14">
+            <figcaption className="mb-5 max-w-sm">
+              <p className="eyebrow">Stock on hand · Warehouse BLR-01</p>
+              <p className="mt-3 font-display text-2xl leading-snug font-semibold text-balance">
+                A line converging on its reorder rule is visible days before the
+                alert fires.
+              </p>
+            </figcaption>
 
-          <dl className="mt-14 grid grid-cols-3 gap-8 border-t border-border pt-8">
-            {[
-              ["200", "products tracked"],
-              ["4", "warehouses"],
-              ["18.5k", "sales analysed"],
-            ].map(([value, label]) => (
-              <div key={label}>
-                <dt className="tnum text-2xl font-medium">{value}</dt>
-                <dd className="mt-1 text-xs text-ink-muted">{label}</dd>
-              </div>
-            ))}
-          </dl>
+            {/* Bleeds off the right edge: this is a fragment of a continuous
+                sheet, not a card that happens to contain a table. */}
+            <div className="-mr-px overflow-hidden rounded-l-lg border border-r-0 border-border bg-surface">
+              <table className="w-full border-collapse text-sm">
+                <tbody className="zebra">
+                  {SPECIMEN.map((row) => {
+                    const now = row.series[row.series.length - 1];
+                    const low = now <= row.reorderPoint;
+                    return (
+                      <tr key={row.sku}>
+                        <td className="tnum py-1.5 pl-4 text-2xs text-ink-subtle">
+                          {row.sku}
+                        </td>
+                        <td className="max-w-[13rem] truncate px-3 py-1.5">
+                          {row.name}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <Trace
+                            points={row.series}
+                            reorderPoint={row.reorderPoint}
+                            low={low}
+                            label={`${row.name}, ${now} on hand`}
+                          />
+                        </td>
+                        <td
+                          className={cn(
+                            "tnum px-3 py-1.5 text-right font-medium",
+                            now === 0 && "text-danger",
+                            low && now > 0 && "text-warning",
+                          )}
+                        >
+                          {now.toLocaleString("en-IN")}
+                        </td>
+                        <td className="w-14 py-1.5 pr-4">
+                          <StockMark quantity={now} reorderPoint={row.reorderPoint} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="mt-5 max-w-sm text-xs text-ink-muted">
+              Inventory intelligence for multi-warehouse operations. Sample rows
+              shown; your workspace loads a year of trading data.
+            </p>
+          </figure>
         </div>
       </div>
     </div>
   );
 }
+
+/** Illustrative rows for the sign-in specimen. Not fetched, and labelled as such. */
+const SPECIMEN = [
+  {
+    sku: "NOVA-KB-114",
+    name: "Mechanical keyboard, TKL",
+    reorderPoint: 600,
+    series: [980, 940, 905, 860, 830, 790, 742, 700, 655, 610, 570, 528],
+  },
+  {
+    sku: "NOVA-MN-027",
+    name: "27-inch IPS monitor",
+    reorderPoint: 120,
+    series: [312, 318, 306, 299, 311, 304, 296, 308, 301, 297, 305, 299],
+  },
+  {
+    sku: "NOVA-CB-008",
+    name: "USB-C cable, 2 m",
+    reorderPoint: 200,
+    series: [420, 360, 300, 255, 190, 140, 96, 60, 38, 20, 8, 0],
+  },
+  {
+    sku: "NOVA-HS-052",
+    name: "Wireless headset",
+    reorderPoint: 100,
+    series: [140, 168, 190, 215, 244, 266, 290, 318, 340, 366, 392, 415],
+  },
+  {
+    sku: "NOVA-DK-311",
+    name: "Standing desk frame",
+    reorderPoint: 60,
+    series: [88, 66, 44, 22, 210, 186, 160, 138, 112, 90, 66, 44],
+  },
+  {
+    sku: "NOVA-SS-190",
+    name: "NVMe SSD, 1 TB",
+    reorderPoint: 400,
+    series: [1204, 1188, 1210, 1176, 1192, 1165, 1180, 1158, 1171, 1149, 1160, 1142],
+  },
+  {
+    sku: "NOVA-WC-045",
+    name: "1080p webcam",
+    reorderPoint: 130,
+    series: [268, 252, 240, 226, 214, 201, 190, 178, 167, 155, 144, 132],
+  },
+];
 
 /** Full-page spinner for the brief moment before we know who is signed in. */
 export function AuthLoading() {

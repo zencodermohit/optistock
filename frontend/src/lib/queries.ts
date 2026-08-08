@@ -81,6 +81,7 @@ export interface Recommendation {
 export const keys = {
   products: (params?: unknown) => ["products", params] as const,
   inventory: (params?: unknown) => ["inventory", params] as const,
+  traces: (days: number) => ["inventory", "traces", days] as const,
   warehouses: () => ["warehouses"] as const,
   recommendations: () => ["recommendations"] as const,
 };
@@ -131,6 +132,25 @@ export function useInventory(
     // Keep showing the previous page while the next one loads, so filtering a
     // table doesn't flash a skeleton on every keystroke.
     placeholderData: (previous) => previous,
+  });
+}
+
+/**
+ * Recent movement history for every stock line, keyed by inventory id.
+ *
+ * Deliberately a second request rather than part of the stock list. The list is
+ * what blocks the table from rendering; a trace is context that can arrive a
+ * moment later and fade in. Cached for a minute because a sparkline that
+ * refetches on every keystroke is a sparkline nobody can read.
+ */
+export function useInventoryTraces(days = 30) {
+  return useQuery({
+    queryKey: keys.traces(days),
+    queryFn: () =>
+      api<{ days: number; traces: Record<string, number[]> }>(
+        `/inventory/traces?days=${days}`,
+      ),
+    staleTime: 60_000,
   });
 }
 

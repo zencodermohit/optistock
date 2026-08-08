@@ -18,6 +18,7 @@ import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { Button } from "@/components/ui/Button";
+import { Mark } from "@/components/ui/Mark";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -107,11 +108,9 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
       )}
     >
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
-        <div className="flex items-center gap-2">
-          <div className="h-5 w-5 rounded bg-accent" />
-          <span className="font-display text-base font-semibold tracking-tight">
-            OptiStock
-          </span>
+        <div className="flex items-center gap-2.5">
+          <Mark />
+          <span className="font-display text-lg font-semibold">OptiStock</span>
         </div>
         <Button
           variant="ghost"
@@ -140,8 +139,12 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                     className={({ isActive }) =>
                       cn(
                         "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-base transition-colors",
+                        // The active item carries a left rule as well as a
+                        // tint, so the current page survives being read on a
+                        // dim screen or by someone who can't separate the two
+                        // background greens.
                         isActive
-                          ? "bg-accent-soft font-medium text-accent-hover"
+                          ? "border-l-2 border-accent bg-accent-soft pl-1.5 font-medium text-accent-hover"
                           : "text-ink-muted hover:bg-sunken hover:text-ink",
                       )
                     }
@@ -193,7 +196,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
             aria-expanded={menuOpen}
             aria-haspopup="menu"
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft text-2xs font-semibold text-accent-hover">
+            <span className="flex h-6 w-6 items-center justify-center rounded-sm border border-accent-border bg-accent-soft font-mono text-2xs font-semibold text-accent-hover">
               {session?.role?.[0]?.toUpperCase() ?? "?"}
             </span>
             <span className="hidden text-ink-muted sm:inline">

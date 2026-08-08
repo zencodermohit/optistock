@@ -5,16 +5,19 @@ import { cn } from "@/lib/utils";
 /**
  * Table primitives.
  *
- * Two decisions worth knowing:
+ * Three decisions worth knowing:
+ *  - Rows are banded, not ruled. Greenbar paper alternated tint so the eye
+ *    could follow one row across a wide sheet without a straightedge; doing
+ *    both bands and hairlines would be two devices solving one problem.
  *  - `numeric` right-aligns and switches to tabular figures. Numbers compare by
  *    their right edge, so left-aligned currency in a column is genuinely harder
  *    to scan.
- *  - The header is sticky, because an inventory table is 200 rows long and a
+ *  - The header is sticky, because an inventory table is 300 rows long and a
  *    column heading you have scrolled past is a column heading you don't have.
  */
 
 export function TableWrap({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("overflow-x-auto", className)} {...props} />;
+  return <div className={cn("overflow-auto", className)} {...props} />;
 }
 
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
@@ -29,26 +32,20 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 export function THead({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <thead
-      className={cn(
-        "sticky top-0 z-10 bg-sunken/90 backdrop-blur-sm",
-        className,
-      )}
+      // Opaque, not translucent: banded rows scrolling under a see-through
+      // header turn the column labels into a flicker.
+      className={cn("sticky top-0 z-10 bg-canvas", className)}
       {...props}
     />
   );
 }
 
 export function TBody({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody className={cn("divide-y divide-border", className)} {...props} />;
+  return <tbody className={cn("zebra", className)} {...props} />;
 }
 
 export function TR({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-  return (
-    <tr
-      className={cn("transition-colors hover:bg-sunken/60", className)}
-      {...props}
-    />
-  );
+  return <tr className={cn("transition-colors", className)} {...props} />;
 }
 
 interface CellProps {
@@ -65,8 +62,8 @@ export function TH({
     <th
       scope="col"
       className={cn(
-        "border-b border-border px-4 py-2.5 text-2xs font-medium tracking-wider " +
-          "text-ink-subtle uppercase",
+        "border-b border-border-strong px-3 py-2 font-mono text-2xs font-medium " +
+          "tracking-widest text-ink-subtle uppercase",
         numeric ? "text-right" : "text-left",
         className,
       )}
@@ -83,7 +80,7 @@ export function TD({
   return (
     <td
       className={cn(
-        "px-4 py-2.5 align-middle",
+        "px-3 py-1.5 align-middle",
         numeric && "text-right tnum",
         className,
       )}

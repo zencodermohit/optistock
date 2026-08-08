@@ -13,16 +13,16 @@ const button = cva(
   {
     variants: {
       variant: {
-        // Exactly one primary action per view. If two things are terracotta,
+        // Exactly one primary action per view. If two things carry the accent,
         // neither reads as the thing to click.
-        primary:
-          "bg-accent text-white shadow-xs hover:bg-accent-hover active:translate-y-px",
+        primary: "bg-accent text-white hover:bg-accent-hover active:translate-y-px",
         secondary:
-          "bg-surface text-ink border border-border-strong shadow-xs " +
+          "bg-surface text-ink border border-border-strong " +
           "hover:bg-sunken active:translate-y-px",
         ghost: "text-ink-muted hover:bg-sunken hover:text-ink",
-        danger:
-          "bg-danger text-white shadow-xs hover:brightness-110 active:translate-y-px",
+        // Destructive only. `danger` is reserved for stock trouble everywhere
+        // else, so a red button must genuinely destroy something.
+        danger: "bg-danger text-white hover:brightness-110 active:translate-y-px",
         link: "text-accent underline-offset-4 hover:underline p-0 h-auto",
       },
       size: {

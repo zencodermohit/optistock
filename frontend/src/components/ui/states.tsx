@@ -35,18 +35,24 @@ export function Skeleton({ className }: { className?: string }) {
   );
 }
 
-/** Placeholder rows shaped like the table that is loading. */
+/** Placeholder rows shaped like the table that is loading, banded to match. */
 export function TableSkeleton({ rows = 8, cols = 5 }: { rows?: number; cols?: number }) {
   return (
-    <div className="divide-y divide-border" aria-busy aria-label="Loading">
+    <div aria-busy aria-label="Loading">
       {Array.from({ length: rows }).map((_, r) => (
-        <div key={r} className="flex items-center gap-4 px-5 py-3">
+        <div
+          key={r}
+          className={cn(
+            "flex items-center gap-4 px-3 py-2.5",
+            r % 2 === 1 && "bg-sunken/60",
+          )}
+        >
           {Array.from({ length: cols }).map((_, c) => (
             <Skeleton
               key={c}
               className={cn(
-                "h-4",
-                c === 0 ? "w-1/4" : c === cols - 1 ? "ml-auto w-16" : "w-1/6",
+                "h-3.5",
+                c === 0 ? "w-1/5" : c === cols - 1 ? "ml-auto w-16" : "w-1/6",
               )}
             />
           ))}
@@ -59,7 +65,7 @@ export function TableSkeleton({ rows = 8, cols = 5 }: { rows?: number; cols?: nu
 /** Placeholder for a KPI tile. */
 export function MetricSkeleton() {
   return (
-    <div className="rounded-xl border border-border bg-surface p-5 shadow-xs">
+    <div className="rounded-lg border border-border bg-surface p-4">
       <Skeleton className="h-3 w-24" />
       <Skeleton className="mt-3 h-8 w-32" />
       <Skeleton className="mt-3 h-3 w-20" />
@@ -92,7 +98,7 @@ export function EmptyState({
         className,
       )}
     >
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-sunken text-ink-subtle">
+      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-sm border bg-sunken text-ink-subtle">
         {icon ?? <Inbox className="h-5 w-5" />}
       </div>
       <h3 className="text-lg font-semibold">{title}</h3>
@@ -127,7 +133,7 @@ export function ErrorState({
       )}
       role="alert"
     >
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-danger-soft text-danger">
+      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-sm border bg-danger-soft text-danger">
         <AlertTriangle className="h-5 w-5" />
       </div>
       <h3 className="text-lg font-semibold">{title}</h3>

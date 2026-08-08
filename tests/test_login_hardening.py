@@ -137,9 +137,9 @@ def test_unknown_email_takes_comparable_time_to_a_wrong_password(client, admin_u
     # Both paths run a real bcrypt verification, so neither should be an order of
     # magnitude faster. Generous bound: this asserts "no short circuit", not a
     # constant-time guarantee.
-    assert (
-        unknown > known / 3
-    ), f"unknown-email path was suspiciously fast: {unknown:.4f}s vs {known:.4f}s"
+    assert unknown > known / 3, (
+        f"unknown-email path was suspiciously fast: {unknown:.4f}s vs {known:.4f}s"
+    )
 
 
 # ---------------------------------------------------------------------------

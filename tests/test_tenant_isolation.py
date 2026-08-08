@@ -250,9 +250,9 @@ def test_two_tenants_may_use_the_same_sku(authenticated_client, other_client):
     theirs = other_client.post("/api/v1/products/", json=payload)
 
     assert mine.status_code == 201
-    assert (
-        theirs.status_code == 201
-    ), "second tenant was blocked from using a SKU the first tenant registered"
+    assert theirs.status_code == 201, (
+        "second tenant was blocked from using a SKU the first tenant registered"
+    )
     assert mine.json()["id"] != theirs.json()["id"]
 
 
@@ -265,9 +265,9 @@ def test_two_tenants_may_use_the_same_warehouse_location_code(
     theirs = other_client.post("/api/v1/warehouses/", json=payload)
 
     assert mine.status_code == 201
-    assert (
-        theirs.status_code == 201
-    ), "second tenant was blocked from using a location code the first registered"
+    assert theirs.status_code == 201, (
+        "second tenant was blocked from using a location code the first registered"
+    )
 
 
 def test_a_token_whose_company_claim_was_tampered_with_is_rejected(

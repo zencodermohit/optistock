@@ -4,17 +4,17 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const badge = cva(
-  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 " +
-    "text-xs font-medium whitespace-nowrap",
+  "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 " +
+    "font-mono text-2xs font-medium tracking-wide whitespace-nowrap uppercase",
   {
     variants: {
       tone: {
         neutral: "border-border-strong bg-sunken text-ink-muted",
-        accent: "border-accent-border bg-accent-soft text-accent-hover",
-        success: "border-success/20 bg-success-soft text-success",
-        warning: "border-warning/20 bg-warning-soft text-warning",
-        danger: "border-danger/20 bg-danger-soft text-danger",
-        info: "border-info/20 bg-info-soft text-info",
+        accent: "border-accent bg-accent text-white",
+        outline: "border-accent-border bg-accent-soft text-accent-hover",
+        success: "border-success/25 bg-success-soft text-success",
+        warning: "border-warning/25 bg-warning-soft text-warning",
+        danger: "border-danger/25 bg-danger-soft text-danger",
       },
     },
     defaultVariants: { tone: "neutral" },
@@ -30,29 +30,31 @@ export function Badge({ className, tone, ...props }: BadgeProps) {
 }
 
 /**
- * ABC class carries meaning, so it gets a consistent colour everywhere it
- * appears — A is where the revenue is, C is the long tail. Defining it once
- * stops the product table and the Pareto chart disagreeing about what "A" looks
- * like.
+ * ABC class is an ordinal scale, not three categories, so it is encoded by
+ * weight rather than by hue: A is solid, B is outlined, C is bare. Giving each
+ * class its own colour would imply they are unrelated kinds of thing, and would
+ * spend three hues on a scale that only ever runs one direction.
+ *
+ * Defined once so the product table and the Pareto chart can never disagree
+ * about what "A" looks like.
  */
 export function AbcBadge({ value }: { value: string | null | undefined }) {
   if (!value) {
-    return <span className="text-xs text-ink-subtle">—</span>;
+    return <span className="font-mono text-2xs text-ink-subtle">—</span>;
   }
-  const tone = { A: "accent", B: "info", C: "neutral" }[value] as
-    | "accent"
-    | "info"
-    | "neutral"
-    | undefined;
+
+  const tone = ({ A: "accent", B: "outline", C: "neutral" } as const)[
+    value as "A" | "B" | "C"
+  ];
 
   return (
-    <Badge tone={tone ?? "neutral"} className="w-6 justify-center px-0">
+    <Badge tone={tone ?? "neutral"} className="w-5 justify-center px-0">
       {value}
     </Badge>
   );
 }
 
-/** Product lifecycle state. */
+/** Product and order lifecycle state. */
 export function StatusBadge({ value }: { value: string }) {
   const tone =
     (
@@ -70,4 +72,24 @@ export function StatusBadge({ value }: { value: string }) {
     )[value] ?? "neutral";
 
   return <Badge tone={tone}>{value}</Badge>;
+}
+
+/**
+ * Stock health, and the one place warning/danger are allowed to appear on a
+ * quantity. Healthy is deliberately unmarked — you don't stamp "FINE" on a
+ * report, you stamp the problems, and a column of green ticks is a column the
+ * eye has to filter before it can find the two rows that matter.
+ */
+export function StockMark({
+  quantity,
+  reorderPoint,
+}: {
+  quantity: number;
+  reorderPoint: number;
+}) {
+  if (quantity <= 0) return <Badge tone="danger">Out</Badge>;
+  // A reorder point of 0 means "not configured", so it never reads as low.
+  if (reorderPoint > 0 && quantity <= reorderPoint)
+    return <Badge tone="warning">Low</Badge>;
+  return null;
 }

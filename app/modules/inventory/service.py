@@ -1,6 +1,9 @@
+from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from uuid import UUID
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 from app.modules.inventory.models import Inventory, InventoryMovement
 from app.modules.products.models import Product
 from app.modules.warehouses.models import Warehouse
@@ -51,7 +54,12 @@ class InventoryService:
             )
 
         total = query.count()
-        rows = query.order_by(Inventory.quantity.asc()).offset(skip).limit(limit).all()
+
+        # Order follows intent. Browsing the catalogue, SKU is the order the
+        # user can predict and scan. Asking for what is below its reorder point
+        # is a triage question, and triage wants the worst first.
+        order = Inventory.quantity.asc() if low_only else Product.sku.asc()
+        rows = query.order_by(order).offset(skip).limit(limit).all()
 
         return [self._to_line(row) for row in rows], total
 
@@ -108,6 +116,70 @@ class InventoryService:
             **row._mapping,
             "is_low": row.reorder_point > 0 and row.quantity <= row.reorder_point,
         }
+
+    def get_traces(self, company_id: UUID, days: int = 30) -> Dict[UUID, List[int]]:
+        """Daily closing quantity per stock line for the last `days` days.
+
+        Reconstructed backwards from the current quantity rather than forwards
+        from history. Walking forwards would need the closing balance from
+        before the window as a starting point -- a second query per line, or a
+        second pass over the whole ledger. Walking backwards, today's quantity
+        is already known and each earlier day is the next day minus that day's
+        movements. One grouped query, exact, and days with no movement fall out
+        for free as a repeat of the day after.
+        """
+        start = datetime.now(timezone.utc).date() - timedelta(days=days - 1)
+
+        current = {
+            row.id: row.quantity
+            for row in self.db.query(Inventory.id, Inventory.quantity)
+            .join(Product, Inventory.product_id == Product.id)
+            .join(Warehouse, Inventory.warehouse_id == Warehouse.id)
+            .filter(
+                Product.company_id == company_id, Warehouse.company_id == company_id
+            )
+            .all()
+        }
+        if not current:
+            return {}
+
+        # Net movement per line per day. Joined to the tenant rather than
+        # filtered by a list of ids, so the query stays one statement whether
+        # the tenant has three hundred lines or three hundred thousand.
+        day = func.date(InventoryMovement.created_at).label("day")
+        rows = (
+            self.db.query(
+                InventoryMovement.inventory_id,
+                day,
+                func.sum(InventoryMovement.quantity_change).label("delta"),
+            )
+            .join(Inventory, InventoryMovement.inventory_id == Inventory.id)
+            .join(Product, Inventory.product_id == Product.id)
+            .join(Warehouse, Inventory.warehouse_id == Warehouse.id)
+            .filter(
+                Product.company_id == company_id,
+                Warehouse.company_id == company_id,
+                InventoryMovement.created_at >= start,
+            )
+            .group_by(InventoryMovement.inventory_id, day)
+            .all()
+        )
+
+        deltas: Dict[UUID, Dict[date, int]] = defaultdict(dict)
+        for inventory_id, moved_on, delta in rows:
+            deltas[inventory_id][moved_on] = int(delta)
+
+        traces: Dict[UUID, List[int]] = {}
+        for inventory_id, quantity in current.items():
+            per_day = deltas.get(inventory_id, {})
+            series = [0] * days
+            running = quantity
+            for offset in range(days - 1, -1, -1):
+                series[offset] = running
+                running -= per_day.get(start + timedelta(days=offset), 0)
+            traces[inventory_id] = series
+
+        return traces
 
     def get_or_create_inventory(
         self, product_id: UUID, warehouse_id: UUID

@@ -1,7 +1,7 @@
 import { Hammer } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/AppShell";
-import { Card } from "@/components/ui/Card";
+import { Band } from "@/components/ui/Band";
 import { EmptyState } from "@/components/ui/states";
 
 /**
@@ -23,13 +23,13 @@ export function Placeholder({
   return (
     <>
       <PageHeader title={title} description={description} />
-      <Card>
+      <Band>
         <EmptyState
           icon={<Hammer className="h-5 w-5" />}
           title="Not built yet"
           description={building}
         />
-      </Card>
+      </Band>
     </>
   );
 }

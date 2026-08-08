@@ -46,6 +46,32 @@ def get_inventory_levels(
     return {"total": total, "skip": skip, "limit": limit, "data": items}
 
 
+@router.get("/traces")
+def get_inventory_traces(
+    days: int = Query(30, ge=7, le=90, description="Window length in days"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Daily closing quantity per stock line, for the sparkline on each row.
+
+    Served separately from the stock list rather than embedded in it. The list
+    is the page's blocking request and must stay fast; a trace is decoration
+    that can arrive a moment later without holding the table back. Keyed by
+    inventory id so the client joins them to rows it already has.
+    """
+    service = InventoryService(db)
+    traces = service.get_traces(
+        company_id=UUID(current_user["company_id"]),
+        days=days,
+    )
+    return {
+        "days": days,
+        "traces": {
+            str(inventory_id): series for inventory_id, series in traces.items()
+        },
+    }
+
+
 @router.post("/adjust", response_model=InventoryResponse)
 def manual_inventory_adjustment(
     adjustment: InventoryAdjustmentCreate,

@@ -3,8 +3,8 @@ import { useState } from "react";
 
 import { PageHeader } from "@/components/layout/AppShell";
 import { AbcBadge, StatusBadge } from "@/components/ui/Badge";
+import { Band, BandHeader } from "@/components/ui/Band";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import {
   Table,
@@ -47,38 +47,44 @@ export function Products() {
         description="Catalogue with revenue classification from the nightly Pareto analysis."
       />
 
-      <Card>
-        <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
-          <div className="w-full sm:w-64">
-            <Input
-              placeholder="Search SKU or name"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              icon={<Search className="h-4 w-4" />}
-              aria-label="Search products"
-            />
-          </div>
+      <Band>
+        <BandHeader
+          label="Catalogue"
+          action={
+            <>
+              <div className="w-full sm:w-56">
+                <Input
+                  placeholder="Search SKU or name"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  icon={<Search className="h-3.5 w-3.5" />}
+                  aria-label="Search products"
+                  className="h-8 text-sm"
+                />
+              </div>
 
-          <div className="flex items-center gap-1">
-            {["A", "B", "C"].map((cls) => (
-              <Button
-                key={cls}
-                size="sm"
-                variant={abcFilter === cls ? "primary" : "secondary"}
-                onClick={() => setAbcFilter(abcFilter === cls ? "" : cls)}
-                aria-pressed={abcFilter === cls}
-                className="w-9 px-0"
-              >
-                {cls}
-              </Button>
-            ))}
-          </div>
+              <div className="flex items-center gap-1">
+                {["A", "B", "C"].map((cls) => (
+                  <Button
+                    key={cls}
+                    size="sm"
+                    variant={abcFilter === cls ? "primary" : "secondary"}
+                    onClick={() => setAbcFilter(abcFilter === cls ? "" : cls)}
+                    aria-pressed={abcFilter === cls}
+                    className="w-8 px-0 font-mono"
+                  >
+                    {cls}
+                  </Button>
+                ))}
+              </div>
 
-          <span className="ml-auto text-xs text-ink-muted">
-            <span className="tnum">{count(products.data?.total ?? 0)}</span>
-            {search || abcFilter ? " matching" : " products"}
-          </span>
-        </div>
+              <span className="font-mono text-2xs tracking-wider text-ink-subtle uppercase">
+                {count(products.data?.total ?? 0)}
+                {search || abcFilter ? " matching" : " products"}
+              </span>
+            </>
+          }
+        />
 
         {products.isPending ? (
           <TableSkeleton rows={10} cols={6} />
@@ -107,10 +113,10 @@ export function Products() {
             }
           />
         ) : (
-          <TableWrap className="max-h-[calc(100vh-19rem)]">
+          <TableWrap className="max-h-[calc(100vh-17rem)]">
             <Table>
               <THead>
-                <TR className="hover:bg-transparent">
+                <TR>
                   <TH>SKU</TH>
                   <TH>Name</TH>
                   <TH>Category</TH>
@@ -126,8 +132,12 @@ export function Products() {
                   const m = margin(p.unit_cost, p.selling_price);
                   return (
                     <TR key={p.id}>
-                      <TD className="tnum text-xs text-ink-muted">{p.sku}</TD>
-                      <TD className="font-medium">{p.name}</TD>
+                      <TD className="tnum text-2xs whitespace-nowrap text-ink-subtle">
+                        {p.sku}
+                      </TD>
+                      <TD className="max-w-[18rem] truncate font-medium">
+                        {p.name}
+                      </TD>
                       <TD className="text-ink-muted">{p.category ?? "—"}</TD>
                       <TD>
                         <AbcBadge value={p.abc_class} />
@@ -140,7 +150,13 @@ export function Products() {
                         {percent(m, 0)}
                       </TD>
                       <TD>
-                        <StatusBadge value={p.status} />
+                        {/* Almost everything in a catalogue is active, and a
+                            column of two hundred green badges is a column the
+                            eye has to filter before it can find the one
+                            discontinued line. Only the exception is marked. */}
+                        {p.status === "active" ? null : (
+                          <StatusBadge value={p.status} />
+                        )}
                       </TD>
                     </TR>
                   );
@@ -149,7 +165,7 @@ export function Products() {
             </Table>
           </TableWrap>
         )}
-      </Card>
+      </Band>
     </>
   );
 }

@@ -1,62 +1,84 @@
 /* ==========================================================================
-   OptiStock design system — "Editorial"
-   Warm light neutrals, serif display type, one terracotta accent.
+   OptiStock design system — "Greenbar"
+
+   Inventory reports were printed for forty years on continuous-feed greenbar
+   paper: pale green bands alternating with white so the eye could track one row
+   across a wide sheet. It is the actual artifact of this domain, and the band
+   is the functional answer to our actual problem — tables three hundred rows
+   long. The stripe is structure, not decoration.
+
+   Two rules the palette exists to protect:
+
+   1. Orange and red mean stock trouble. Nothing else may use them. The accent
+      is therefore ink blue, as far from every alert hue as the wheel allows.
+   2. Healthy is unmarked. You don't stamp "FINE" on a report; you stamp
+      problems. Colour appears where something needs attention.
 
    Everything visual is a token. Screens never hard-code a hex, a font stack or
    a radius; they compose tokens. That is what keeps twenty screens looking like
    one product instead of twenty.
    ========================================================================== */
 
-@import "@fontsource-variable/fraunces";
-@import "@fontsource-variable/inter";
+/* IBM's 1403 line printer is what put ink on greenbar in the first place, and
+   Plex is IBM's typeface. Condensed for display buys horizontal room in a dense
+   table; the superfamily keeps three roles visibly related. */
+@import "@fontsource/ibm-plex-sans-condensed/500.css";
+@import "@fontsource/ibm-plex-sans-condensed/600.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 
 @import "tailwindcss";
 
 @theme {
-  /* --- Neutrals -----------------------------------------------------------
-     Warm rather than grey. A cream canvas with white cards reads as considered;
-     pure #FFF on #F9FAFB reads as a bootstrap template. */
-  --color-canvas: #faf9f6;
+  /* --- Paper --------------------------------------------------------------
+     A green cast, not a cream one. `sunken` is the greenbar stripe itself, so
+     zebra rows and section headers are the same material as the page. */
+  --color-canvas: #f2f4ee;
   --color-surface: #ffffff;
-  --color-sunken: #f4f2ed;
-  --color-border: #e7e3da;
-  --color-border-strong: #d8d2c6;
+  --color-sunken: #e6ebdf;
+  --color-border: #dce3d4;
+  --color-border-strong: #c4cfba;
 
-  /* --- Ink ---------------------------------------------------------------
-     Near-black with a warm cast, never #000 — pure black on cream vibrates. */
-  --color-ink: #1c1a17;
-  --color-ink-muted: #6e675e;
-  --color-ink-subtle: #9c948a;
-  --color-ink-inverse: #faf9f6;
+  /* --- Ink ----------------------------------------------------------------
+     Near-black with a green cast, never #000 — pure black on tinted paper
+     vibrates. Every step below is checked at 4.5:1 or better on `canvas`,
+     because 11px uppercase labels are not "large text" under WCAG. */
+  --color-ink: #19201b;
+  --color-ink-muted: #414d42; /* 7.5:1 */
+  --color-ink-subtle: #62705f; /* 4.6:1 */
+  --color-ink-inverse: #f2f4ee;
 
-  /* --- Accent ------------------------------------------------------------
-     Exactly one. Terracotta carries every primary action, active nav state and
-     focus ring. A second accent is how a palette starts to look accidental. */
-  --color-accent: #c2410c;
-  --color-accent-hover: #9a3412;
-  --color-accent-soft: #fcefe7;
-  --color-accent-border: #f0d3c2;
+  /* --- Accent -------------------------------------------------------------
+     Exactly one, and deliberately blue. Terracotta sat one hue-step from the
+     low-stock warning, so a primary button and a stockout read as the same
+     signal. Ink blue can never be mistaken for either. 7.0:1 on paper. */
+  --color-accent: #1f44c4;
+  --color-accent-hover: #17339a;
+  --color-accent-soft: #e7ebfa;
+  --color-accent-border: #c3cdf0;
 
-  /* --- Semantic ----------------------------------------------------------
-     Each has a solid (text/icon) and a soft (background) so badges and banners
-     never need opacity guesswork. */
-  --color-success: #15803d;
-  --color-success-soft: #ebf7ef;
-  --color-warning: #b45309;
-  --color-warning-soft: #fdf4e3;
-  --color-danger: #b3261e;
-  --color-danger-soft: #fbedec;
-  --color-info: #1d4ed8;
-  --color-info-soft: #edf2fe;
+  /* --- Semantic -----------------------------------------------------------
+     Reserved. `warning` is low stock, `danger` is out of stock, and nothing
+     decorative may borrow either. Each has a solid (text/icon) and a soft
+     (background) so badges never need opacity guesswork. */
+  --color-success: #2d6a4f;
+  --color-success-soft: #e4efe6;
+  --color-warning: #a85a11;
+  --color-warning-soft: #f7eddc;
+  --color-danger: #a3231d;
+  --color-danger-soft: #f6e5e2;
+  --color-info: #1f44c4;
+  --color-info-soft: #e7ebfa;
 
-  /* --- Type --------------------------------------------------------------
-     Three faces, three jobs. Fraunces for display only; Inter for everything
-     you read; Plex Mono for every number, so digits are the same width and
-     columns line up down the page. */
-  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  /* --- Type ---------------------------------------------------------------
+     Three roles from one superfamily. Condensed for display, regular for
+     reading, mono for every SKU, quantity and timestamp — so digits are equal
+     width and columns line up down the page. */
+  --font-display: "IBM Plex Sans Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
   /* Dashboards read at 14px, not 16px — more information per screen without
@@ -65,25 +87,28 @@
   --text-xs: 0.75rem; /* 12 — labels, badges */
   --text-sm: 0.8125rem; /* 13 — table body */
   --text-base: 0.875rem; /* 14 — body */
-  --text-lg: 1rem; /* 16 — card titles */
+  --text-lg: 1rem; /* 16 — band titles */
   --text-xl: 1.25rem; /* 20 — section headings */
   --text-2xl: 1.5rem; /* 24 — page titles */
   --text-3xl: 2rem; /* 32 — hero metrics */
   --text-4xl: 2.75rem; /* 44 — the one big number */
 
-  /* --- Shape -------------------------------------------------------------- */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.625rem;
-  --radius-xl: 0.875rem;
+  /* --- Shape --------------------------------------------------------------
+     Small but never zero. Printed forms have soft corners; hard 0px everywhere
+     is a different, louder style than this one. */
+  --radius-sm: 0.125rem;
+  --radius-md: 0.1875rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.375rem;
 
   /* --- Elevation ----------------------------------------------------------
-     Warm-tinted, not black. A neutral-black shadow on a cream surface looks
-     like dirt; tinting it to the canvas hue keeps it clean. */
-  --shadow-xs: 0 1px 2px 0 rgb(28 26 23 / 0.04);
-  --shadow-sm: 0 1px 3px 0 rgb(28 26 23 / 0.06), 0 1px 2px -1px rgb(28 26 23 / 0.04);
-  --shadow-md: 0 4px 12px -2px rgb(28 26 23 / 0.08), 0 2px 4px -2px rgb(28 26 23 / 0.04);
-  --shadow-lg: 0 12px 28px -8px rgb(28 26 23 / 0.12), 0 4px 8px -4px rgb(28 26 23 / 0.06);
+     Paper does not cast a shadow on paper. Bands separate by tint and hairline
+     alone, so xs and sm are genuinely none. Only things that truly float above
+     the page — menus, dialogs — get md and lg. */
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow-md: 0 4px 12px -2px rgb(25 32 27 / 0.1), 0 2px 4px -2px rgb(25 32 27 / 0.06);
+  --shadow-lg: 0 12px 28px -8px rgb(25 32 27 / 0.16), 0 4px 8px -4px rgb(25 32 27 / 0.08);
 }
 
 @layer base {
@@ -105,15 +130,15 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Fraunces ships optical-size, softness and "wonk" axes. Dialled slightly
-     soft and un-wonky so headings feel warm rather than quirky. */
+  /* Condensed type is already tight; tracking it in further would close the
+     counters. A hair of negative tracking at display sizes only. */
   h1,
   h2,
   h3,
   h4 {
     font-family: var(--font-display);
-    font-variation-settings: "SOFT" 20, "WONK" 0;
-    letter-spacing: -0.015em;
+    font-weight: 600;
+    letter-spacing: -0.005em;
     color: var(--color-ink);
   }
 
@@ -130,7 +155,7 @@
     color: var(--color-accent-hover);
   }
 
-  /* Scrollbars, so long tables don't punch a grey hole in a warm page. */
+  /* Scrollbars, so long tables don't punch a grey hole in a tinted page. */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -158,13 +183,29 @@
     font-feature-settings: "tnum";
   }
 
-  /* Small uppercase label above a metric or section. */
+  /* The label stamped at the head of a band or above a figure. Mono, because
+     on a printed report these were machine-set and everything else was not. */
   .eyebrow {
+    font-family: var(--font-mono);
     font-size: var(--text-2xs);
     font-weight: 500;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--color-ink-subtle);
+  }
+
+  /* The greenbar stripe. Applied to a <tbody>.
+   *
+   * Alternating bands replace row rules entirely — that is how the paper did
+   * it, and one device beats two. Written here rather than as utilities on the
+   * row because the zebra and hover selectors have identical specificity, so
+   * whichever CSS is emitted last wins. Source order settles it deterministically;
+   * Tailwind class order would not. */
+  .zebra > tr:nth-child(even) {
+    background-color: color-mix(in srgb, var(--color-sunken) 72%, transparent);
+  }
+  .zebra > tr:hover {
+    background-color: var(--color-accent-soft);
   }
 
   @keyframes shimmer {
@@ -182,7 +223,7 @@
     background-image: linear-gradient(
       90deg,
       transparent,
-      rgb(255 255 255 / 0.6),
+      rgb(255 255 255 / 0.65),
       transparent
     );
     animation: shimmer 1.6s infinite;
