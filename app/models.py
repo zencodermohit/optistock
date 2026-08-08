@@ -19,6 +19,7 @@ Import it for the side effect:
 from app.core.database import Base
 from app.modules.alerts.models import Alert
 from app.modules.analytics.models import ForecastRun
+from app.modules.analytics.projection_models import DailyMetric
 from app.modules.audit.models import AuditLog
 from app.modules.companies.models import Company
 from app.modules.events.models import EventOutbox
@@ -38,6 +39,7 @@ __all__ = [
     "Alert",
     "AuditLog",
     "Company",
+    "DailyMetric",
     "Customer",
     "EventOutbox",
     "ForecastRun",

@@ -64,12 +64,19 @@
      Reserved. `warning` is low stock, `danger` is out of stock, and nothing
      decorative may borrow either. Each has a solid (text/icon) and a soft
      (background) so badges never need opacity guesswork. */
+  /* Warning and danger were #a85a11 and #a3231d, which measured only ΔE 11.3
+     apart in OKLab -- below the 15 floor at which two colours are hard to
+     separate even with full colour vision, and 8.0 under deuteranopia. They
+     always carry a text label so they were never colour-alone, but "critical"
+     has to LOOK worse than "warning" at a glance or the severity ladder is
+     decorative. Re-stepped to ΔE 17.0 normal / 12.9 deutan, and both got
+     darker in the process: 8.4:1 and 4.5:1 against the canvas. */
   --color-success: #2d6a4f;
   --color-success-soft: #e4efe6;
-  --color-warning: #a85a11;
-  --color-warning-soft: #f7eddc;
-  --color-danger: #a3231d;
-  --color-danger-soft: #f6e5e2;
+  --color-warning: #9a6410;
+  --color-warning-soft: #f5eedb;
+  --color-danger: #8f1109;
+  --color-danger-soft: #f6e3e0;
   --color-info: #1f44c4;
   --color-info-soft: #e7ebfa;
 

@@ -85,6 +85,7 @@ export const keys = {
   events: (limit: number) => ["events", limit] as const,
   outboxHealth: () => ["events", "health"] as const,
   alerts: (params?: unknown) => ["alerts", params] as const,
+  overview: (days: number) => ["dashboard", "overview", days] as const,
   warehouses: () => ["warehouses"] as const,
   recommendations: () => ["recommendations"] as const,
 };
@@ -154,6 +155,45 @@ export function useInventoryTraces(days = 30) {
         `/inventory/traces?days=${days}`,
       ),
     staleTime: 60_000,
+  });
+}
+
+export interface DayMetric {
+  date: string;
+  revenue: number;
+  orders: number;
+  units_sold: number;
+  stock_movements: number;
+  units_received: number;
+}
+
+export interface Overview {
+  range_days: number;
+  trading: {
+    revenue: number;
+    orders: number;
+    units_sold: number;
+    movements: number;
+    revenue_change_pct: number | null;
+    comparison_days: number;
+  };
+  series: DayMetric[];
+  stock: {
+    lines: number;
+    units: number;
+    value_at_cost: number;
+    low: number;
+    out: number;
+  };
+  alerts: Record<string, number>;
+  projection: { updated_at: string | null; age_seconds: number | null };
+}
+
+export function useOverview(days = 30) {
+  return useQuery({
+    queryKey: keys.overview(days),
+    queryFn: () => api<Overview>(`/dashboard/overview?days=${days}`),
+    placeholderData: (previous) => previous,
   });
 }
 

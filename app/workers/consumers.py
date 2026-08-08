@@ -218,6 +218,7 @@ def main() -> None:
     # Importing the handler modules is what populates the registry. Without
     # this the consumer starts cleanly, reads the stream and reacts to nothing.
     import app.modules.alerts.handlers  # noqa: F401
+    import app.modules.analytics.handlers  # noqa: F401
 
     Consumer().run()
 

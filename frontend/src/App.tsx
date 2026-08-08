@@ -6,6 +6,7 @@ import { Alerts } from "@/pages/Alerts";
 import { EventStream } from "@/pages/EventStream";
 import { Inventory } from "@/pages/Inventory";
 import { Login } from "@/pages/Login";
+import { Overview } from "@/pages/Overview";
 import { Placeholder } from "@/pages/Placeholder";
 import { Products } from "@/pages/Products";
 
@@ -32,16 +33,7 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route
-          index
-          element={
-            <Placeholder
-              title="Overview"
-              description="Stock value, revenue trend and what needs attention."
-              building="KPI tiles, the revenue chart and the Pareto curve arrive in week 3, once the projection consumers are feeding them."
-            />
-          }
-        />
+        <Route index element={<Overview />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="products" element={<Products />} />
         <Route

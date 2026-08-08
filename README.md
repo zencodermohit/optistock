@@ -191,10 +191,31 @@ uvicorn app.main:app --reload
 
 ### 2. Docker Deployment
 ```bash
-# Build and start the entire stack (Nginx, API, Postgres, Redis)
+# Build and start the entire stack (Nginx, API, Postgres, Redis,
+# plus the outbox relay and the event consumers)
 docker compose up -d --build
 ```
 The API will be available at `http://localhost/api/v1/`.
+
+### 3. Background processes
+
+Compose runs these for you. Outside Docker they are separate entrypoints, and
+the event system does nothing without the first two:
+
+```bash
+python -m app.workers.relay       # event_outbox -> Redis Streams
+python -m app.workers.consumers   # raises alerts, maintains projections
+```
+
+The daily-metrics projection is derived state and can always be recomputed from
+the source tables. Run this after seeding — a year of seeded history predates
+the event system and therefore emitted no events, so nothing else will put it
+in the read model:
+
+```bash
+python -m app.workers.rebuild_projections          # all history
+python -m app.workers.rebuild_projections --days 90
+```
 
 ---
 
