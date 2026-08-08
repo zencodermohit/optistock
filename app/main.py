@@ -32,6 +32,7 @@ from app.modules.reconciliation.router import router as recon_router
 from app.modules.recommendations.router import router as recommendations_router
 from app.modules.companies.router import router as companies_router
 from app.modules.audit.router import router as audit_router
+from app.modules.customers.router import router as customers_router
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -135,3 +136,4 @@ app.include_router(recon_router)
 app.include_router(recommendations_router)
 app.include_router(companies_router)
 app.include_router(audit_router)
+app.include_router(customers_router)

@@ -6,7 +6,7 @@ from app.modules.products.models import Product
 from app.modules.warehouses.models import Warehouse
 from app.modules.sales.schemas import SaleCreate
 from app.modules.inventory.service import InventoryService
-from app.core.exceptions import OptiStockException
+from app.core.exceptions import OptiStockException, ResourceNotFoundError
 
 
 class SaleService:
@@ -17,20 +17,36 @@ class SaleService:
     def get_sales(
         self, company_id: UUID, skip: int = 0, limit: int = 50, status: str = None
     ) -> Tuple[List[Sale], int]:
-        """Returns paginated sales and the total count."""
-        query = (
-            self.db.query(Sale)
-            .options(joinedload(Sale.items))
-            .filter(Sale.company_id == company_id)
-        )
+        """Returns paginated sales and the total count.
+
+        No joinedload here: the list representation does not include line items,
+        so eager-loading them would fetch hundreds of rows only to discard them.
+        """
+        query = self.db.query(Sale).filter(Sale.company_id == company_id)
 
         if status:
             query = query.filter(Sale.status == status)
 
         total = query.count()
-        sales = query.offset(skip).limit(limit).all()
+        sales = query.order_by(Sale.created_at.desc()).offset(skip).limit(limit).all()
 
         return sales, total
+
+    def get_sale_by_id(self, sale_id: UUID, company_id: UUID) -> Sale:
+        """A single sale with its line items.
+
+        joinedload IS worth it here — the detail view renders every item, and
+        without it this would be one query per line (the N+1 problem).
+        """
+        sale = (
+            self.db.query(Sale)
+            .options(joinedload(Sale.items))
+            .filter(Sale.id == sale_id, Sale.company_id == company_id)
+            .first()
+        )
+        if not sale:
+            raise ResourceNotFoundError(resource="Sale", resource_id=str(sale_id))
+        return sale
 
     def create_sale(self, sale_in: SaleCreate, company_id: UUID) -> Sale:
         """

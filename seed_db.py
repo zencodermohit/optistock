@@ -684,6 +684,23 @@ def main() -> int:
         )
 
         users = []
+        # The SaaS operator. Only this role can reach /companies to onboard new
+        # tenants, and it is deliberately NOT assignable through registration --
+        # a tenant admin able to mint one could escalate to platform operator.
+        # users.company_id is NOT NULL, so it has to live somewhere; what makes
+        # it cross-tenant is the role, not the home company.
+        users.append(
+            dict(
+                id=uuid.uuid4(),
+                company_id=company_a["id"],
+                email="platform@optistock.internal",
+                hashed_password=pwd_context.hash(DEMO_PASSWORD),
+                role="platform_admin",
+                is_active=True,
+                failed_login_attempts=0,
+                created_at=datetime.now(timezone.utc),
+            )
+        )
         for company, domain in (
             (company_a, "technova.com"),
             (company_b, "greenleaf.com"),

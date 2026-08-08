@@ -1,13 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
+from uuid import UUID
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, RequireRole
 from app.modules.users.models import User
-from app.core.exceptions import OptiStockException
+from app.core.exceptions import OptiStockException, ResourceNotFoundError
 
-from app.modules.sales.schemas import SaleCreate, SaleResponse, PaginatedSalesResponse
+from app.modules.sales.schemas import (
+    PaginatedSalesResponse,
+    SaleCreate,
+    SaleDetailResponse,
+    SaleResponse,
+)
 from app.modules.sales.service import SaleService
 
 router = APIRouter(prefix="/api/v1/sales", tags=["Sales"])
@@ -70,3 +76,20 @@ def get_sales(
 
     # Notice this perfectly matches our PaginatedSalesResponse schema!
     return {"total": total, "skip": skip, "limit": limit, "data": sales}
+
+
+# Parameterised path last. FastAPI matches in declaration order and stops at the
+# first hit, so a literal route added later (e.g. /summary) would be swallowed
+# by /{sale_id} if this sat above it.
+@router.get("/{sale_id}", response_model=SaleDetailResponse)
+def get_sale(
+    sale_id: UUID,
+    db: Session = Depends(get_db),
+    current_user_dict: dict = Depends(get_current_user),
+):
+    """Get a single sale, including its line items."""
+    service = SaleService(db)
+    try:
+        return service.get_sale_by_id(sale_id, UUID(current_user_dict["company_id"]))
+    except ResourceNotFoundError as e:
+        raise HTTPException(status_code=404, detail=e.message)

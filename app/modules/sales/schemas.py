@@ -41,7 +41,12 @@ class SaleCreate(BaseModel):
 
 
 class SaleResponse(BaseModel):
-    """Schema for returning a sale in API responses."""
+    """A sale as it appears in a LIST.
+
+    Deliberately without line items. A page of 50 sales would otherwise drag
+    several hundred item rows across the wire that the list view never renders.
+    Fetch the detail representation below when you actually need them.
+    """
 
     id: UUID
     company_id: UUID
@@ -52,6 +57,12 @@ class SaleResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SaleDetailResponse(SaleResponse):
+    """A single sale, with its line items."""
+
+    items: List[SaleItemResponse] = []
 
 
 # -----------------------------------------
