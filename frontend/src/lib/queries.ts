@@ -82,6 +82,8 @@ export const keys = {
   products: (params?: unknown) => ["products", params] as const,
   inventory: (params?: unknown) => ["inventory", params] as const,
   traces: (days: number) => ["inventory", "traces", days] as const,
+  events: (limit: number) => ["events", limit] as const,
+  outboxHealth: () => ["events", "health"] as const,
   warehouses: () => ["warehouses"] as const,
   recommendations: () => ["recommendations"] as const,
 };
@@ -151,6 +153,32 @@ export function useInventoryTraces(days = 30) {
         `/inventory/traces?days=${days}`,
       ),
     staleTime: 60_000,
+  });
+}
+
+export interface OutboxHealth {
+  unpublished: number;
+  published: number;
+  oldest_unpublished_age_seconds: number | null;
+}
+
+/** Events already committed, so the stream page is not empty before one arrives. */
+export function useRecentEvents(limit = 50) {
+  return useQuery({
+    queryKey: keys.events(limit),
+    queryFn: () =>
+      api<Paginated<import("@/lib/useEventStream").DomainEvent>>(
+        `/events/?limit=${limit}`,
+      ),
+  });
+}
+
+/** Relay lag. A backlog that grows means the relay has stopped. */
+export function useOutboxHealth() {
+  return useQuery({
+    queryKey: keys.outboxHealth(),
+    queryFn: () => api<OutboxHealth>("/events/health"),
+    refetchInterval: 5_000,
   });
 }
 

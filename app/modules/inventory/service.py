@@ -7,6 +7,8 @@ from typing import Dict, List, Tuple
 from app.modules.inventory.models import Inventory, InventoryMovement
 from app.modules.products.models import Product
 from app.modules.warehouses.models import Warehouse
+from app.modules.events import types as event_types
+from app.modules.events.publisher import record_event
 from app.core.exceptions import OptiStockException, ResourceNotFoundError
 
 
@@ -242,6 +244,7 @@ class InventoryService:
         )
 
         # Step 3: Business Logic (Prevent negative stock)
+        previous_quantity = inv.quantity
         new_quantity = inv.quantity + quantity_change
         if new_quantity < 0:
             raise OptiStockException(
@@ -262,6 +265,73 @@ class InventoryService:
         )
         self.db.add(movement)
 
-        # Step 6: Flush changes — caller will commit the full transaction
+        # Step 6: Announce it.
+        #
+        # In the same transaction as the change, so the event cannot describe a
+        # movement that gets rolled back. The payload is deliberately fat --
+        # SKU and name as well as ids -- because a consumer that has to query
+        # the database to understand a message is coupled to the producer's
+        # schema, and the point of the event is to break that coupling.
+        record_event(
+            self.db,
+            company_id=company_id,
+            event_type=event_types.STOCK_MOVED,
+            aggregate_type=event_types.AGGREGATE_INVENTORY,
+            aggregate_id=inv.id,
+            payload={
+                "sku": product.sku,
+                "product_name": product.name,
+                "warehouse_name": warehouse.name,
+                "movement_type": movement_type,
+                "quantity_change": quantity_change,
+                "quantity_after": new_quantity,
+                "reorder_point": inv.reorder_point or 0,
+                "reference": reference_id,
+            },
+        )
+
+        # A crossing, not a state. `stock.moved` says the number changed;
+        # these say it changed *through* a threshold, which is the thing
+        # anyone downstream actually wants to react to. Emitting them only on
+        # the crossing means a line that sits low for a week produces one
+        # event, not one per sale.
+        crossed_reorder = (
+            inv.reorder_point
+            and inv.reorder_point > 0
+            and new_quantity <= inv.reorder_point
+            and previous_quantity > inv.reorder_point
+        )
+        if new_quantity == 0 and previous_quantity > 0:
+            self._announce_threshold(
+                event_types.STOCK_DEPLETED, inv, product, warehouse, company_id
+            )
+        elif crossed_reorder:
+            self._announce_threshold(
+                event_types.STOCK_BELOW_REORDER_POINT,
+                inv,
+                product,
+                warehouse,
+                company_id,
+            )
+
+        # Step 7: Flush changes — caller will commit the full transaction
         self.db.flush()
         return inv
+
+    def _announce_threshold(
+        self, event_type: str, inv, product, warehouse, company_id: UUID
+    ) -> None:
+        record_event(
+            self.db,
+            company_id=company_id,
+            event_type=event_type,
+            aggregate_type=event_types.AGGREGATE_INVENTORY,
+            aggregate_id=inv.id,
+            payload={
+                "sku": product.sku,
+                "product_name": product.name,
+                "warehouse_name": warehouse.name,
+                "quantity": inv.quantity,
+                "reorder_point": inv.reorder_point or 0,
+            },
+        )

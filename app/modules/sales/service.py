@@ -6,6 +6,8 @@ from app.modules.products.models import Product
 from app.modules.warehouses.models import Warehouse
 from app.modules.sales.schemas import SaleCreate
 from app.modules.inventory.service import InventoryService
+from app.modules.events import types as event_types
+from app.modules.events.publisher import record_event
 from app.core.exceptions import OptiStockException, ResourceNotFoundError
 
 
@@ -128,6 +130,26 @@ class SaleService:
                 )
 
             # 4. If we reach here, we successfully deducted stock for all items.
+            #
+            # One event for the sale, on top of the per-line stock.moved events
+            # the inventory service already staged. They answer different
+            # questions: "what did this customer buy" is not reconstructable
+            # from a handful of unrelated stock deductions.
+            record_event(
+                self.db,
+                company_id=company_id,
+                event_type=event_types.SALE_COMPLETED,
+                aggregate_type=event_types.AGGREGATE_SALE,
+                aggregate_id=sale.id,
+                payload={
+                    "customer_name": customer.name,
+                    "warehouse_name": warehouse.name,
+                    "line_count": len(sale_in.items),
+                    "unit_count": sum(item.quantity for item in sale_in.items),
+                    "total_amount": float(total_amount),
+                },
+            )
+
             self.db.flush()
             return sale
 

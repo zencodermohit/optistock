@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/lib/auth";
+import { EventStream } from "@/pages/EventStream";
 import { Inventory } from "@/pages/Inventory";
 import { Login } from "@/pages/Login";
 import { Placeholder } from "@/pages/Placeholder";
@@ -92,16 +93,7 @@ export default function App() {
             />
           }
         />
-        <Route
-          path="system/events"
-          element={
-            <Placeholder
-              title="Event stream"
-              description="Every state change, live, as it happens."
-              building="Week 2. The outbox table is in place; next comes the relay and the Redis consumer groups that feed this view."
-            />
-          }
-        />
+        <Route path="system/events" element={<EventStream />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

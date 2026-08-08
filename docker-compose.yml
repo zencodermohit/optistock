@@ -67,6 +67,27 @@ services:
     networks:
       - optistock-net
 
+  relay:
+    # Same image as the API, different entrypoint. The outbox relay is the only
+    # thing that moves committed events into Redis, so without this service the
+    # event system looks healthy -- rows accumulate in event_outbox, no errors
+    # anywhere -- and nothing is ever delivered.
+    build: .
+    container_name: optistock-relay
+    command: ["python", "-m", "app.workers.relay"]
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # It claims work with FOR UPDATE SKIP LOCKED, so a second replica is safe
+    # and takes a different batch rather than duplicating this one.
+    restart: unless-stopped
+    networks:
+      - optistock-net
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: optistock-pgadmin

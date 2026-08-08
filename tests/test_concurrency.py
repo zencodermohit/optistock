@@ -107,6 +107,18 @@ def committed_stock(engine):
                 text("DELETE FROM warehouses WHERE id = :w"),
                 {"w": created["warehouse_id"]},
             )
+            # Stock movements now emit outbox events, which reference the
+            # company. These tests commit for real -- that is the point, they
+            # exercise row locking across connections -- so unlike every other
+            # test here they cannot rely on a rollback to tidy up. Anything
+            # holding a reference to the company has to be removed by name, and
+            # missing one does not fail quietly: the DELETE below aborts, this
+            # whole cleanup rolls back, and the leftovers break the tests that
+            # run next.
+            cleanup.execute(
+                text("DELETE FROM event_outbox WHERE company_id = :c"),
+                {"c": created["company_id"]},
+            )
             cleanup.execute(
                 text("DELETE FROM companies WHERE id = :c"),
                 {"c": created["company_id"]},
