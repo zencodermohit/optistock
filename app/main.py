@@ -34,6 +34,7 @@ from app.modules.companies.router import router as companies_router
 from app.modules.audit.router import router as audit_router
 from app.modules.customers.router import router as customers_router
 from app.modules.alerts.router import router as alerts_router
+from app.modules.assistant.router import router as assistant_router
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.events.router import router as events_router
 from app.modules.ingest.router import router as ingest_router
@@ -143,6 +144,7 @@ app.include_router(companies_router)
 app.include_router(audit_router)
 app.include_router(customers_router)
 app.include_router(alerts_router)
+app.include_router(assistant_router)
 app.include_router(dashboard_router)
 app.include_router(events_router)
 app.include_router(ingest_router)

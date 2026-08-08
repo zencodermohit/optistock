@@ -88,6 +88,7 @@ export const keys = {
   overview: (days: number) => ["dashboard", "overview", days] as const,
   suggestions: () => ["insights", "recommendations"] as const,
   accuracy: () => ["insights", "accuracy"] as const,
+  assistantStatus: () => ["assistant", "status"] as const,
   warehouses: () => ["warehouses"] as const,
   recommendations: () => ["recommendations"] as const,
 };
@@ -157,6 +158,21 @@ export function useInventoryTraces(days = 30) {
         `/inventory/traces?days=${days}`,
       ),
     staleTime: 60_000,
+  });
+}
+
+export interface AssistantStatus {
+  configured: boolean;
+  model: string | null;
+  tools: { name: string; description: string }[];
+}
+
+/** What the assistant can reach, published so its boundary is visible. */
+export function useAssistantStatus() {
+  return useQuery({
+    queryKey: keys.assistantStatus(),
+    queryFn: () => api<AssistantStatus>("/assistant/status"),
+    staleTime: 5 * 60_000,
   });
 }
 

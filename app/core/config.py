@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
+    # --- Assistant ---------------------------------------------------------
+    # Deliberately defaults to empty rather than being required. The whole app
+    # must run without it -- a missing key disables one screen and says so,
+    # instead of stopping the server from booting.
+    ANTHROPIC_API_KEY: str = ""
+    ASSISTANT_MODEL: str = "claude-opus-5"
+
     # Where the nightly ETL writes Parquet. Must be backed by a Docker volume in
     # any deployed environment or the analytical history is destroyed on restart.
     DATA_LAKE_DIR: str = "data_lake"

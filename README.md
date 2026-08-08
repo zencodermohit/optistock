@@ -237,6 +237,10 @@ Create a `.env` file in the root directory:
 DATABASE_URL=postgresql://optistock:optistock_password@db:5432/optistock_db
 REDIS_URL=redis://redis:6379/0
 SECRET_KEY=your_super_secret_key_change_in_production
+# Optional. Without it the Assistant screen says so and switches itself off;
+# nothing else in the application depends on it.
+ANTHROPIC_API_KEY=
+ASSISTANT_MODEL=claude-opus-5
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ALLOWED_ORIGINS=["http://localhost:3000", "https://yourfrontend.com"]
