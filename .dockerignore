@@ -7,3 +7,14 @@ __pycache__/
 .git/
 .vscode/
 .idea/
+
+# The frontend build runs `npm ci` inside the image, so a host node_modules is
+# both useless and enormous -- and worse, it can carry native binaries built for
+# the host OS into a Linux image. dist/ is rebuilt too; shipping a stale local
+# copy would let a machine that never ran a build deploy whatever it last had.
+frontend/node_modules/
+frontend/dist/
+
+# Local-only artefacts that have no business in an image.
+data_lake/
+*.parquet

@@ -87,6 +87,23 @@ jobs:
             # the old version still serving than fail after `down`.
             docker compose config -q
 
-            # Rebuild and restart services
+            # Migrations run inside the api container's entrypoint, gated on
+            # RUN_MIGRATIONS, which only that service sets -- so the schema is
+            # upgraded exactly once per deploy and the relay and consumers do
+            # not race it. A failed migration exits the api container, which
+            # the check below turns into a failed deploy.
             docker compose down
-            docker compose up -d --build
+            docker compose build
+            docker compose up -d
+
+            # Fail the deploy if anything is already dead. Without this the step
+            # is green whenever `up -d` returned, even when the API or the event
+            # consumers crashlooped on their first tick.
+            sleep 15
+            docker compose ps
+            if [ -n "$(docker compose ps --status exited --quiet)" ]; then
+              echo "::error::A container exited immediately after deploy"
+              docker compose ps --status exited
+              docker compose logs --tail 50
+              exit 1
+            fi

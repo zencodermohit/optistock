@@ -17,11 +17,17 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: "3.12"
-      - name: Install Linting Tools
-        run: pip install black ruff
-      - name: Format Check with Black
-        run: black --check app tests
-      - name: Lint with Ruff
+      # One formatter, not two. This previously installed black AND ruff and
+      # checked formatting with black -- but ruff is used locally, and the two
+      # disagree on enough edge cases that any file touched with `ruff format`
+      # failed CI. Two tools competing for the same job is a build that breaks
+      # on a schedule nobody controls. Ruff does both lint and format, so it
+      # owns both here.
+      - name: Install Ruff
+        run: pip install ruff
+      - name: Format check
+        run: ruff format --check app tests
+      - name: Lint
         run: ruff check app tests
 
   test:

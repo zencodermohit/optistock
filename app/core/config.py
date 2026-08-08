@@ -6,12 +6,16 @@ class Settings(BaseSettings):
     DATABASE_URL: str = (
         "postgresql://optistock:optistock_password@127.0.0.1:5433/optistock_db"
     )
-    # 127.0.0.1, not localhost. docker-compose publishes Redis on the IPv4
-    # loopback only, while "localhost" resolves to ::1 first on Windows -- so
-    # the default silently reached a different Redis (or none) than the one the
-    # stack is running. The API and the relay landing on different brokers
-    # produces no error anywhere: events publish fine and are simply never seen.
-    REDIS_URL: str = "redis://127.0.0.1:6379/0"
+    # 127.0.0.1:6380, and both halves are deliberate.
+    #
+    # Not "localhost": compose publishes Redis on the IPv4 loopback only, while
+    # localhost resolves to ::1 first on Windows. Not 6379: a stock Redis
+    # install runs there as a service, so the default would reach that one
+    # instead. Either mistake produces the same silent failure -- the relay
+    # publishes to one broker, the consumers read from another, and events
+    # disappear with nothing logged. Inside compose the containers use
+    # redis://redis:6379/0 over the internal network and never see this.
+    REDIS_URL: str = "redis://127.0.0.1:6380/0"
     # No default — app MUST crash if SECRET_KEY is missing in production.
     # For local dev, set it in the .env file.
     SECRET_KEY: str

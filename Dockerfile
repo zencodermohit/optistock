@@ -41,5 +41,10 @@ RUN chmod +x /app/docker-entrypoint.sh
 # Expose the API port
 EXPOSE 8000
 
-# Command to run the application using entrypoint
+# The entrypoint migrates (when asked to) and then execs whatever it is given.
+# CMD supplies that default, so `docker compose up` still runs the API -- while
+# the relay and consumer services can override it with their own command and
+# actually be run. Before CMD existed the entrypoint hard-coded uvicorn, and
+# every service in the stack silently became a copy of the web server.
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

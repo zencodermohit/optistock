@@ -30,7 +30,15 @@ services:
       # Loopback only. Redis runs without authentication by default, so an
       # internet-reachable Redis is a well-known remote-takeover vector. Only the
       # api container needs it, and it reaches it over the internal network.
-      - "127.0.0.1:6379:6379"
+      #
+      # 6380 on the host, not 6379. A stock Redis install claims 6379 as an
+      # auto-starting service, and then this container simply fails to bind --
+      # but the worse failure is quieter: with both running, anything started
+      # outside Docker on the default port talks to the OTHER Redis, so the
+      # relay publishes into one broker while the consumers read from another
+      # and events vanish with no error anywhere. An unusual port makes the two
+      # impossible to confuse. Containers still talk to redis:6379 internally.
+      - "127.0.0.1:6380:6379"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -53,6 +61,12 @@ services:
     # deploy-injected production credentials. .env is now the single source.
     env_file:
       - .env
+    environment:
+      # The one service that migrates. Not in .env because .env is shared with
+      # the relay and consumers, and they must NOT race the api on the same
+      # upgrade. The note above about avoiding an environment block is about
+      # DATABASE_URL specifically -- this key is not one .env owns.
+      RUN_MIGRATIONS: "1"
     volumes:
       # The nightly ETL writes Parquet here. Without a volume this lives inside
       # the container, so every `docker compose down` — which deploy.yml runs on
@@ -129,17 +143,28 @@ services:
       - optistock-net
 
   nginx:
-    image: nginx:alpine
+    # Built rather than pulled: the image now contains the compiled React app
+    # as well as the proxy config. Previously this served the config from a
+    # bind mount and had no frontend at all, so every non-/api path was a 404.
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
     container_name: optistock_nginx
     ports:
       - "80:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    # No config bind mount. The config is baked in beside the build it belongs
+    # to, so a host file can't silently override it with a version that predates
+    # the frontend and returns 404 for the whole site.
     depends_on:
       - api
     networks:
       - optistock-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   optistock_data:
