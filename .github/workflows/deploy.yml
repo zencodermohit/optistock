@@ -75,8 +75,17 @@ jobs:
             echo "REDIS_URL=redis://redis:6379/0" >> .env
             echo "SECRET_KEY=${{ secrets.PROD_SECRET_KEY }}" >> .env
             echo "ALGORITHM=HS256" >> .env
-            echo "ACCESS_TOKEN_EXPIRE_MINUTES=30" >> .env
-            echo "ALLOWED_ORIGINS=[\"https://optistock.yourdomain.com\"]" >> .env
+            echo "ACCESS_TOKEN_EXPIRE_MINUTES=60" >> .env
+            # Same-origin in production: nginx serves the built frontend and
+            # proxies /api on one host, so the browser never makes a
+            # cross-origin request and CORS is not what lets the app work. This
+            # stays narrow anyway, so a third-party page cannot call the API
+            # with a user's credentials. PUBLIC_ORIGIN is the deployed URL
+            # (e.g. http://<elastic-ip> before a domain exists).
+            echo "ALLOWED_ORIGINS=[\"${{ secrets.PUBLIC_ORIGIN }}\"]" >> .env
+            # Optional. Absent or empty, the Assistant screen says it is not
+            # configured and the rest of the application is unaffected.
+            echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
             # pgAdmin is gated behind the "dev" Compose profile and will not start
             # here, but Compose interpolates the whole file, so these must exist.
             echo "PGADMIN_EMAIL=disabled@example.com" >> .env
@@ -86,6 +95,26 @@ jobs:
             # now aborts on a missing secret, and we would rather fail here with
             # the old version still serving than fail after `down`.
             docker compose config -q
+
+            # Fail fast on a box too small to build, rather than 20 minutes
+            # later with an OOM-killed compiler and no obvious cause.
+            #
+            # The build compiles the React app (node + vite) and installs the
+            # Python scientific stack (pandas, numpy, pyarrow) in the same run.
+            # A 1 GB free-tier t2.micro with no swap cannot do it: the kernel
+            # kills the process and Docker reports a generic non-zero exit,
+            # which looks like a code failure and is not one.
+            TOTAL_MB=$(free -m | awk '/^Mem:/{print $2}')
+            SWAP_MB=$(free -m | awk '/^Swap:/{print $2}')
+            echo "Host memory: ${TOTAL_MB}MB RAM, ${SWAP_MB}MB swap"
+            if [ "$((TOTAL_MB + SWAP_MB))" -lt 2000 ]; then
+              echo "::error::Need ~2GB of RAM+swap to build; this host has $((TOTAL_MB + SWAP_MB))MB."
+              echo "Either use a larger instance, or add swap once:"
+              echo "  sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile"
+              echo "  sudo mkswap /swapfile && sudo swapon /swapfile"
+              echo "  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab"
+              exit 1
+            fi
 
             # Migrations run inside the api container's entrypoint, gated on
             # RUN_MIGRATIONS, which only that service sets -- so the schema is

@@ -123,10 +123,30 @@ resource "aws_instance" "app_server" {
               curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
               add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
               apt-get update
-              apt-get install -y docker-ce docker-compose-plugin
+              apt-get install -y docker-ce docker-compose-plugin git
               systemctl enable docker
               systemctl start docker
               usermod -aG docker ubuntu
+
+              # Swap. The build compiles the React bundle and installs the
+              # Python scientific stack in one go; on a small instance the
+              # kernel OOM-kills it and Docker reports a generic failure that
+              # looks like broken code. Harmless on a larger instance.
+              if [ ! -f /swapfile ]; then
+                fallocate -l 2G /swapfile
+                chmod 600 /swapfile
+                mkswap /swapfile
+                swapon /swapfile
+                echo '/swapfile none swap sw 0 0' >> /etc/fstab
+              fi
+
+              # deploy.yml starts with `cd /home/ubuntu/project_IV && git pull`,
+              # so the directory has to exist before the first deploy can run.
+              # The clone itself is a manual step: the repository URL is not
+              # known at provisioning time, and a private repo needs a deploy
+              # key that does not belong in user_data.
+              mkdir -p /home/ubuntu/project_IV
+              chown ubuntu:ubuntu /home/ubuntu/project_IV
               EOF
 
   tags = {

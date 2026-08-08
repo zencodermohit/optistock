@@ -275,17 +275,127 @@ Once the server is running, visit: **`http://localhost:8000/docs`**
 
 ---
 
-## ☁️ AWS Deployment (Terraform)
+## ☁️ AWS Deployment
 
-The infrastructure is defined as Code using Terraform in the `terraform/` directory. It provisions a VPC, public subnets, and an EC2 instance.
+Continuous deployment: a push to `main` runs the tests, then SSHes to the EC2
+instance and rebuilds the stack. Nothing below is automatic on a fresh account
+— these are the one-time steps, in the order they have to happen.
+
+### 1. Push the repository to GitHub
+
+The workflows trigger on `main`, and GitHub Actions is what performs the
+deploy, so the code has to live there first.
+
+```bash
+git remote add origin git@github.com:<you>/optistock.git
+git push -u origin main
+```
+
+### 2. Provision the infrastructure
 
 ```bash
 cd terraform
 terraform init
-terraform plan
-terraform apply
+terraform apply -var="ssh_allowed_cidr=<your.ip.address>/32"
 ```
-*Continuous Deployment:* Pushing to the `main` branch triggers the GitHub Actions workflow (`.github/workflows/deploy.yml`), which runs `pytest`, SSHs into the EC2 instance, and rebuilds the Docker stack with zero downtime.
+
+`ssh_allowed_cidr` has no default on purpose — port 22 open to the world is the
+most common way a demo box becomes someone else's. Everything else defaults:
+`us-east-1`, `t3.medium`, and an EC2 key pair named `optistock-prod-key` which
+must already exist in that region.
+
+**On instance size.** `t3.medium` is not free tier (roughly $30/month, so
+destroy it when you are not demoing). It is the default because the build
+compiles the React bundle and installs pandas/numpy/pyarrow in one pass; on a
+1 GB `t2.micro` the kernel kills it and Docker reports a generic failure that
+reads like broken code. `user_data` adds 2 GB of swap for the same reason, and
+the deploy refuses to start on a host with less than ~2 GB of RAM plus swap
+rather than failing obscurely twenty minutes in.
+
+Note the public IP from `terraform output`.
+
+### 3. Clone the repository onto the instance
+
+The deploy begins with `cd /home/ubuntu/project_IV && git pull`, so the working
+copy has to exist before the first run. `user_data` creates the directory and
+installs git; the clone is manual because the repository URL is not known at
+provisioning time, and a private repo needs a deploy key that has no business
+being in Terraform state.
+
+```bash
+ssh -i optistock-prod-key.pem ubuntu@<public-ip>
+git clone https://github.com/<you>/optistock.git /home/ubuntu/project_IV
+```
+
+### 4. Add the repository secrets
+
+**Settings → Secrets and variables → Actions.** The deploy reads exactly these:
+
+| Secret | What it is |
+|---|---|
+| `EC2_HOST` | The instance's public IP or DNS name |
+| `EC2_SSH_KEY` | Contents of the `.pem` private key, whole file including the header and footer lines |
+| `DB_PASSWORD` | Postgres password. Generated, not chosen — it is written into `.env` on the host |
+| `PROD_SECRET_KEY` | JWT signing key. `openssl rand -hex 32`. Changing it invalidates every existing session |
+| `PUBLIC_ORIGIN` | The deployed URL, e.g. `http://<elastic-ip>` until a domain exists |
+| `ANTHROPIC_API_KEY` | Optional. Without it the Assistant screen says it is unconfigured and nothing else changes |
+
+The deploy writes `.env` on the host from these on every run, so `.env` is never
+committed and the instance never holds a credential the repository knows.
+
+### 5. Deploy
+
+```bash
+git push origin main
+```
+
+Watch the run in the Actions tab. It runs the test suite first and stops there
+on a failure, so a red build never reaches the server.
+
+### 6. Seed the demo data (first deploy only)
+
+Migrations run automatically inside the API container. The demo catalogue and
+its year of simulated trading do not — seeding is destructive and must be a
+decision, not a side effect of deploying.
+
+```bash
+ssh -i optistock-prod-key.pem ubuntu@<public-ip>
+cd /home/ubuntu/project_IV
+docker compose exec api python seed_db.py
+docker compose exec api python -m app.workers.rebuild_projections
+docker compose exec api python -m app.workers.backfill_forecasts --weeks 8 --replace
+```
+
+The last two populate the dashboard and the forecast-accuracy figures, which
+are otherwise empty: both are derived from a history that predates the event
+system, so nothing replays it for you.
+
+### Verifying a deploy
+
+```bash
+curl -s -o /dev/null -w "%{http_code}
+" http://<public-ip>/          # 200, the app
+curl -s -o /dev/null -w "%{http_code}
+" http://<public-ip>/inventory  # 200, SPA fallback
+curl -s http://<public-ip>/health
+docker compose ps          # six services, all running
+docker compose logs relay --tail 5      # "Watching event_outbox"
+docker compose logs consumers --tail 5  # the event types it reacts to
+```
+
+The last two matter more than they look. The relay and the consumers are the
+only things that move events and raise alerts, and when they are wrong they
+fail silently — the site stays up and simply stops noticing anything.
+
+### Not done yet
+
+- **No HTTPS.** The security group opens 443 but nginx only listens on 80 and
+  there is no certificate. A login over plain HTTP sends the password in the
+  clear, so treat any deployment as a demo until Let's Encrypt is wired in.
+- **No backups.** Postgres data lives in a Docker volume on one instance. A
+  terminated instance is a lost database.
+- **Single instance.** No load balancer, no redundancy; a deploy is a short
+  outage while the containers restart.
 
 ---
 
