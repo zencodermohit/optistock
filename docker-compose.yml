@@ -1,0 +1,108 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: optistock-db
+    environment:
+      POSTGRES_USER: optistock
+      # Interpolated from .env at parse time. The ":?" form makes Compose abort
+      # with this message if the variable is unset, so the database can never be
+      # provisioned with a blank or forgotten password.
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
+      POSTGRES_DB: optistock_db
+    ports:
+      # Bound to loopback: reachable from the host for psql/pgAdmin, never from the network.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - optistock_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U optistock -d optistock_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - optistock-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: optistock-redis
+    ports:
+      # Loopback only. Redis runs without authentication by default, so an
+      # internet-reachable Redis is a well-known remote-takeover vector. Only the
+      # api container needs it, and it reaches it over the internal network.
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - optistock-net
+
+  api:
+    build: .
+    container_name: optistock-api
+    ports:
+      # Loopback only. Nginx reaches the API over the internal Docker network, so
+      # this mapping exists purely for local debugging and /docs, and cannot be
+      # used to bypass Nginx's rate limiting and security headers from off-host.
+      - "127.0.0.1:8000:8000"
+    # Deliberately no `environment:` block. Inline values take precedence over
+    # env_file in Compose, so hardcoding DATABASE_URL here silently discarded the
+    # deploy-injected production credentials. .env is now the single source.
+    env_file:
+      - .env
+    volumes:
+      # The nightly ETL writes Parquet here. Without a volume this lives inside
+      # the container, so every `docker compose down` — which deploy.yml runs on
+      # each deploy — destroyed the entire analytical history the forecast needs.
+      - optistock_data_lake:/app/data_lake
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - optistock-net
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: optistock-pgadmin
+    # Only starts with `docker compose --profile dev up`. A plain
+    # `docker compose up` (what deploy.yml runs) skips it entirely, so no
+    # database console process exists on the production host.
+    profiles: ["dev"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "${PGADMIN_EMAIL:?PGADMIN_EMAIL must be set in .env}"
+      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_PASSWORD:?PGADMIN_PASSWORD must be set in .env}"
+    ports:
+      # Loopback only. pgAdmin is a database console; it must never be internet-facing.
+      - "127.0.0.1:5050:80"
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - optistock-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: optistock_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    networks:
+      - optistock-net
+    restart: unless-stopped
+
+volumes:
+  optistock_data:
+  optistock_data_lake:
+
+networks:
+  optistock-net:
+    driver: bridge

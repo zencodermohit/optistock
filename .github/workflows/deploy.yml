@@ -1,0 +1,92 @@
+name: Deploy OptiStock
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # NOTE: this duplicates ci.yml's test job. It previously had no database
+  # service and no DATABASE_URL, so it could never pass — meaning deploys were
+  # effectively ungated. Worth consolidating the two workflows into one
+  # lint -> test -> build -> deploy pipeline; until then, keep this in sync.
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: optistock
+          POSTGRES_PASSWORD: optistock_password
+          POSTGRES_DB: optistock_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest httpx pytest-mock
+
+      - name: Run Tests
+        env:
+          TEST_DATABASE_URL: "postgresql://optistock:optistock_password@localhost:5432/optistock_test"
+          SECRET_KEY: "test_secret_key"
+          # NOT ["*"]: a wildcard origin combined with allow_credentials=True is
+          # rejected by browsers and is unsafe as a habit even in CI.
+          ALLOWED_ORIGINS: '["http://localhost:3000"]'
+        run: pytest tests/
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/project_IV
+            git pull origin main
+            
+            # Inject production secrets. POSTGRES_PASSWORD provisions the database
+            # container and MUST match the password embedded in DATABASE_URL, so
+            # both are derived from the same secret.
+            echo "POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}" > .env
+            echo "DATABASE_URL=postgresql://optistock:${{ secrets.DB_PASSWORD }}@db:5432/optistock_db" >> .env
+            echo "REDIS_URL=redis://redis:6379/0" >> .env
+            echo "SECRET_KEY=${{ secrets.PROD_SECRET_KEY }}" >> .env
+            echo "ALGORITHM=HS256" >> .env
+            echo "ACCESS_TOKEN_EXPIRE_MINUTES=30" >> .env
+            echo "ALLOWED_ORIGINS=[\"https://optistock.yourdomain.com\"]" >> .env
+            # pgAdmin is gated behind the "dev" Compose profile and will not start
+            # here, but Compose interpolates the whole file, so these must exist.
+            echo "PGADMIN_EMAIL=disabled@example.com" >> .env
+            echo "PGADMIN_PASSWORD=${{ secrets.PROD_SECRET_KEY }}" >> .env
+
+            # Validate interpolation BEFORE touching running containers. Compose
+            # now aborts on a missing secret, and we would rather fail here with
+            # the old version still serving than fail after `down`.
+            docker compose config -q
+
+            # Rebuild and restart services
+            docker compose down
+            docker compose up -d --build
