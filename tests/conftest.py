@@ -47,6 +47,7 @@ from app.core.database import get_db  # noqa: E402
 from app.core.rate_limit import limiter  # noqa: E402
 from app.core.security import create_access_token, get_password_hash  # noqa: E402
 from app.main import app  # noqa: E402
+from app.modules.assistant import cache as assistant_cache  # noqa: E402
 from app.modules.companies.models import Company  # noqa: E402
 from app.modules.inventory.models import Inventory  # noqa: E402
 from app.modules.products.models import Product  # noqa: E402
@@ -141,6 +142,22 @@ def disable_rate_limiting():
     yield
     limiter.enabled = False
     limiter.reset()
+
+
+# ---------------------------------------------------------------------------
+# Assistant tool cache
+# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def clear_tool_cache():
+    """Emptied between tests, because it is process-wide and outlives them.
+
+    Without this, a test that writes rows and then queries them can be served a
+    result cached by an earlier test in the same second -- a failure that looks
+    like a data bug and moves when the suite is reordered.
+    """
+    assistant_cache.clear()
+    yield
+    assistant_cache.clear()
 
 
 @pytest.fixture

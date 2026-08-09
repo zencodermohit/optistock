@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # agentic loop now, so without this a model that keeps calling tools keeps
     # billing and keeps holding the request open.
     MAX_TOOL_CALLS: int = 5
+    # How long a tool result may be reused. Short on purpose -- this is stock
+    # data, and a stale answer is worse than a slow one.
+    TOOL_CACHE_TTL_SECONDS: int = 45
     # Gemini 3.x. The 2.5 Flash models are no longer served to new API keys,
     # so an older default would 404 for anyone setting this up today.
     ASSISTANT_MODEL: str = "gemini-3.6-flash"

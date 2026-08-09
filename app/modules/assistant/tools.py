@@ -20,11 +20,14 @@ Every tool returns its rows *and* the citations for them, so an answer can point
 at the records it came from rather than asking to be believed.
 """
 
+from copy import deepcopy
 from typing import Any, Callable, Dict, List
 from uuid import UUID
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+from app.modules.assistant import cache
 
 from app.modules.alerts.models import STATUS_OPEN, Alert
 from app.modules.analytics.accuracy import accuracy_summary
@@ -412,6 +415,17 @@ def run_tool(db: Session, company_id: UUID, name: str, arguments: Dict[str, Any]
         if key not in {"company_id", "db"}
     }
 
+    # Cached on the normalised arguments, after the tenant fields are stripped,
+    # so a model that supplied a company_id cannot use it to vary the key. The
+    # key carries the real company_id regardless -- see cache.py.
+    cached = cache.get(company_id, name, safe_arguments)
+    if cached is not None:
+        payload, citations = cached
+        # Copied on the way out. A caller that mutates a result -- the redactor
+        # does exactly that -- must not be editing the cached entry, or the next
+        # reader gets someone's pseudonyms.
+        return deepcopy(payload), deepcopy(citations)
+
     try:
         result = executor(db, company_id, **safe_arguments)
     except TypeError as e:
@@ -420,4 +434,5 @@ def run_tool(db: Session, company_id: UUID, name: str, arguments: Dict[str, Any]
         return {"error": f"Invalid arguments for {name}: {e}"}, []
 
     citations = result.pop("_citations", [])
-    return result, citations
+    cache.put(company_id, name, safe_arguments, (result, citations))
+    return deepcopy(result), deepcopy(citations)
