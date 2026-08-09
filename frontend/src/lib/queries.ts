@@ -163,8 +163,11 @@ export function useInventoryTraces(days = 30) {
 
 export interface AssistantStatus {
   configured: boolean;
+  provider: string;
   model: string | null;
   tools: { name: string; description: string }[];
+  data_mode: { mode: "demo" | "production"; masked_fields: string[]; note: string };
+  max_tool_calls: number;
 }
 
 /** What the assistant can reach, published so its boundary is visible. */

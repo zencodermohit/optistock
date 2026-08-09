@@ -12,6 +12,8 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.rate_limit import limiter
 from app.modules.assistant import service
+from app.modules.assistant.redaction import describe_mode
+from app.modules.assistant.runtime import get_runtime
 from app.modules.assistant.tools import TOOLS
 
 logger = logging.getLogger(__name__)
@@ -35,10 +37,16 @@ def assistant_status(current_user: dict = Depends(get_current_user)):
     invisible gets asked questions it cannot answer, and every one of those
     reads as a failure rather than as a boundary.
     """
+    runtime = get_runtime()
     return {
-        "configured": service.is_configured(),
-        "model": service.settings.ASSISTANT_MODEL if service.is_configured() else None,
+        "configured": runtime.is_configured(),
+        "provider": runtime.name,
+        "model": runtime.model if runtime.is_configured() else None,
         "tools": [{"name": t["name"], "description": t["description"]} for t in TOOLS],
+        # Published for the same reason as the tool list: a privacy boundary
+        # nobody can see is a privacy boundary nobody trusts.
+        "data_mode": describe_mode(),
+        "max_tool_calls": service.settings.MAX_TOOL_CALLS,
     }
 
 
@@ -60,8 +68,10 @@ async def ask(
     """
     company_id = UUID(current_user["company_id"])
 
+    runtime = get_runtime()
+
     async def events():
-        if not service.is_configured():
+        if not runtime.is_configured():
             yield _sse(
                 {
                     "type": "error",
@@ -73,10 +83,9 @@ async def ask(
             )
             return
 
-        client = service.build_client()
         try:
             async for event in service.converse(
-                client=client,
+                runtime=runtime,
                 db=db,
                 company_id=company_id,
                 question=body.question,

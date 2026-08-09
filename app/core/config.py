@@ -27,7 +27,19 @@ class Settings(BaseSettings):
     # Deliberately defaults to empty rather than being required. The whole app
     # must run without it -- a missing key disables one screen and says so,
     # instead of stopping the server from booting.
+    # Which LLMRuntime answers questions. One name, so swapping vendors is a
+    # config change and a subclass rather than a rewrite -- this project has
+    # already moved providers once and the move touched everything.
+    LLM_PROVIDER: str = "gemini"
     GEMINI_API_KEY: str = ""
+    # demo | production. Defaults to demo deliberately: the safe value is the
+    # one you get by forgetting to set it. Sending real identifiers to a
+    # third-party model has to be an explicit decision, not an oversight.
+    LLM_DATA_MODE: str = "demo"
+    # A hard ceiling on tool calls per question. The provider SDK owns the
+    # agentic loop now, so without this a model that keeps calling tools keeps
+    # billing and keeps holding the request open.
+    MAX_TOOL_CALLS: int = 5
     # Gemini 3.x. The 2.5 Flash models are no longer served to new API keys,
     # so an older default would 404 for anyone setting this up today.
     ASSISTANT_MODEL: str = "gemini-3.6-flash"

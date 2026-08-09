@@ -1,4 +1,4 @@
-import { ArrowUp, Square, Wrench } from "lucide-react";
+import { ArrowUp, ShieldCheck, Square, Wrench } from "lucide-react";
 import Markdown from "react-markdown";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -163,6 +163,21 @@ export function Assistant() {
             Read-only, and scoped to your company by the server rather than by
             the question. It cannot change stock, dismiss alerts or place orders.
           </p>
+
+          {status.data?.data_mode?.mode === "demo" && (
+            <div className="mt-3 border-t border-border pt-3">
+              <span className="inline-flex items-center gap-1.5 text-2xs text-ink-muted">
+                <ShieldCheck className="h-3 w-3 text-accent" />
+                <span className="eyebrow">Demo privacy mode</span>
+              </span>
+              <p className="mt-1.5 text-2xs leading-relaxed text-ink-subtle">
+                {status.data.data_mode.masked_fields.join(", ")} are replaced
+                with stable pseudonyms before anything leaves this server. The
+                citations above are built from the real records, which is why
+                they still read correctly.
+              </p>
+            </div>
+          )}
         </Band>
       </div>
     </>
@@ -248,6 +263,14 @@ function TurnBlock({ turn }: { turn: Turn }) {
 
       {turn.streaming && !turn.text && (
         <p className="text-sm text-ink-subtle">Looking it up…</p>
+      )}
+
+      {turn.notice && (
+        // Below the answer, not above it: the answer is the point, this is the
+        // footnote. Styled as a caveat rather than a failure.
+        <p className="mt-2 rounded-sm border border-warning/25 bg-warning-soft px-2.5 py-1.5 text-2xs text-ink-muted">
+          {turn.notice}
+        </p>
       )}
 
       {turn.error && (

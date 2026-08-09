@@ -19,6 +19,12 @@ export interface Turn {
   tools: ToolCall[];
   citations: Citation[];
   error?: string;
+  /**
+   * A caveat about the answer rather than a failure of it — currently, that
+   * the tool-call budget ran out before the model finished looking. Separate
+   * from `error` because the answer above it is still worth reading.
+   */
+  notice?: string;
   /** True while this turn is still being written. */
   streaming?: boolean;
 }
@@ -129,6 +135,9 @@ export function useAssistant() {
                   ...t,
                   citations: [...t.citations, event.citation as unknown as Citation],
                 }));
+                break;
+              case "notice":
+                patch((t) => ({ ...t, notice: event.message as string }));
                 break;
               case "error":
                 patch((t) => ({ ...t, error: event.message as string }));
