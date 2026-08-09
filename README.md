@@ -30,13 +30,16 @@ It handles everything from strict ACID-compliant inventory deductions and Role-B
 - **ACID-Compliant Transactions**: Bulletproof inventory mechanics preventing race conditions and ghost stock.
 - **Automated Data Lake (ETL)**: A nightly job extracts completed sales into optimized Parquet files, persisted on a Docker volume.
 - **Demand Forecasting**: Average daily velocity over a 30-day trailing window, extrapolated across a 7-day horizon and written back as explainable reorder recommendations — net of stock already on hand, so well-stocked products generate no noise. Every figure behind a suggestion is stored in its `evidence` payload.
+- **Stockout Prediction**: Ranks every stock line by *days remaining* at its observed sales rate, not by whether it is under a threshold somebody typed in once. Two hundred units selling forty a day is an emergency; two hundred selling one a day is fine, and a static reorder point flags the second while missing the first. Each row carries the numbers behind its prediction — on hand, reorder point, daily usage, days left, projected date — plus a one-sentence explanation computed server-side, so the screen, the API and the assistant cannot disagree about what a row means.
+- **AI Assistant with a hard safety boundary**: Tool calling against read-only functions (never text-to-SQL), with the tenant bound in a closure from the verified JWT and absent from every schema the model can see. In demo mode identifiers are replaced with stable pseudonyms before anything leaves the process and restored in the answer, so the provider sees hashes and the user reads real SKUs. Answers are validated before they render — an assistant that claims to have placed an order is flagged, because that claim is false in every configuration of this system.
+- **Human-in-the-loop write actions**: The assistant can *propose* a purchase order; it cannot place one. Proposals land on an Approvals screen where a person accepts, amends or rejects them, and approving runs the same service and the same role check as creating a PO by hand. What the model asked for and what the human actually ran are stored in separate columns, so an amended quantity is a signal rather than an overwrite.
 - **ABC Inventory Analysis**: Nightly Pareto classification (A/B/C by revenue contribution), ranked *within* each tenant and written to `products.abc_class`.
 - **Business Intelligence Ready**: Pre-aggregated SQL Views specifically optimized for Power BI dashboards.
 
 - **Compliance Audit Trail**: Every create/update/delete on a tracked entity is recorded automatically by a SQLAlchemy flush listener — entity, action, before/after values, actor and tenant — in the same transaction as the change itself, so a rolled-back operation leaves no trace.
 - **Enterprise Security**: JWT authentication with database-backed identity resolution (revoked or demoted users lose access on their next request), role-based access control, bcrypt hashing, per-account lockout and rate-limited login.
 
-> **Not yet wired:** Economic Order Quantity and safety-stock helpers exist and are unit-tested in `app/modules/analytics/eoq.py` but nothing calls them yet. Redis caching is initialised but unused. The email interface in `app/core/notifications.py` is a mock with no callers, so none of the alerting requirements (FR-NF-*) are met. `AuditService.log_action` is superseded by the flush listener and is now itself unused.
+> **Not yet wired:** Economic Order Quantity and safety-stock helpers exist and are unit-tested in `app/modules/analytics/eoq.py` but nothing calls them yet. Redis caching is initialised but unused. The email interface in `app/core/notifications.py` is a mock with no callers, so none of the alerting requirements (FR-NF-*) are met. `AuditService.log_action` is superseded by the flush listener for ordinary CRUD, and is now used only where the listener cannot help: recording an assistant proposal alongside the decision a human made about it.
 
 > **Roles:** `platform_admin`, `admin`, `finance`, `supply_chain`, `warehouse_manager`, `sales_rep`, `analyst`. Note that `platform_admin` — required by every `/api/v1/companies` endpoint — is absent from the role list `POST /auth/register` accepts, so it can currently only be assigned directly in the database.
 - **DevOps & Observability**: Dockerized stack, GitHub Actions CI/CD, Nginx rate-limiting, and Prometheus metrics.
@@ -241,6 +244,20 @@ SECRET_KEY=your_super_secret_key_change_in_production
 # nothing else in the application depends on it. Free tier: aistudio.google.com/apikey
 GEMINI_API_KEY=
 ASSISTANT_MODEL=gemini-3.6-flash
+# demo | production. Defaults to demo, deliberately: the safe value should be
+# the one you get by forgetting to set it. In demo mode SKUs and other
+# identifiers are replaced with stable pseudonyms before any request leaves the
+# process, and restored in the answer the user reads.
+LLM_DATA_MODE=demo
+# Which LLMRuntime answers questions. Swapping vendors is this line plus a
+# subclass, rather than a rewrite.
+LLM_PROVIDER=gemini
+# Hard ceiling on tool calls per question. The provider SDK owns the agentic
+# loop, so without this a model that keeps calling tools keeps billing.
+MAX_TOOL_CALLS=5
+# How long a tool result may be reused. Short on purpose: this is stock data,
+# and a stale answer is worse than a slow one.
+TOOL_CACHE_TTL_SECONDS=45
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ALLOWED_ORIGINS=["http://localhost:3000", "https://yourfrontend.com"]
@@ -267,6 +284,17 @@ Once the server is running, visit: **`http://localhost:8000/docs`**
 #### Transactions
 - `POST /api/v1/sales/`: Create a sale (Atomically deducts inventory).
 - `POST /api/v1/purchase_orders/`: Create a PO.
+
+#### Intelligence
+- `GET /api/v1/insights/stockout-risk`: Every stock line ranked by days remaining, with the numbers behind each prediction.
+- `GET /api/v1/insights/accuracy`: How the demand forecast has actually performed against real sales.
+
+#### Assistant
+- `GET /api/v1/assistant/status`: Whether it is configured, which tools it can reach, and which data mode it is in. Published deliberately — a boundary nobody can see is a boundary nobody trusts.
+- `POST /api/v1/assistant/ask`: Ask a question. Streams tool calls, the answer and its citations over SSE.
+- `GET /api/v1/assistant/actions`: Purchase orders the assistant has proposed.
+- `POST /api/v1/assistant/actions/{id}/approve`: Execute one, optionally amending the quantity. Requires `admin` or `supply_chain` — the same roles as creating a PO by hand.
+- `POST /api/v1/assistant/actions/{id}/reject`: Decline one, and keep the record of having declined it.
 
 #### Observability
 - `GET /ready`: Fast lightweight health check for AWS ALBs.

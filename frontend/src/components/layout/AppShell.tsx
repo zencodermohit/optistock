@@ -4,6 +4,7 @@ import {
   Boxes,
   ChevronDown,
   ClipboardCheck,
+  Hourglass,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -67,6 +68,7 @@ const NAV: NavGroup[] = [
     heading: "Intelligence",
     items: [
       { to: "/insights", label: "Insights", icon: Sparkles },
+      { to: "/stockout-risk", label: "Stockout risk", icon: Hourglass },
       {
         to: "/alerts",
         label: "Alerts",

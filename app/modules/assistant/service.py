@@ -218,6 +218,27 @@ def build_toolset(
         """
         return call("warehouse_overview", {})
 
+    def stockout_risk(days: int = 0, limit: int = 10) -> dict:
+        """Predict WHEN each product runs out, soonest first, with the workings.
+
+        Returns units on hand, reorder point, daily usage rate, days remaining
+        and the projected date for each line. Call this for "what will run out",
+        "what should I worry about", "how long will X last", or anything about
+        urgency or timing.
+
+        Prefer this over check_stock when the user cares about WHEN rather than
+        HOW MUCH: check_stock compares against a static threshold somebody typed
+        in once, this uses actual sales velocity.
+
+        Each row carries a 'why' sentence. Quote it rather than recomputing the
+        arithmetic yourself.
+
+        Args:
+            days: Only lines running out within this many days. Omit for all.
+            limit: How many rows, between 1 and 25.
+        """
+        return call("stockout_risk", {"days": days, "limit": limit})
+
     def create_purchase_order(sku: str, quantity: int, reason: str = "") -> dict:
         """Propose a purchase order for a human to approve. Does NOT place it.
 
@@ -249,6 +270,7 @@ def build_toolset(
         forecast_accuracy,
         recent_events,
         warehouse_overview,
+        stockout_risk,
         create_purchase_order,
     ]
 

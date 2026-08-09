@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.modules.analytics.accuracy import accuracy_summary
+from app.modules.analytics.stockout import stockout_risks, summarise
 from app.modules.insights.service import InsightsService
 
 router = APIRouter(prefix="/api/v1/insights", tags=["Insights"])
@@ -55,4 +56,32 @@ def forecast_accuracy(
         "summary": accuracy_summary(db, company_id, lookback_days=lookback_days),
         "lookback_days": lookback_days,
         "worst": service.accuracy_detail(company_id, limit=15),
+    }
+
+
+@router.get("/stockout-risk")
+def stockout_risk(
+    lookback_days: int = Query(30, ge=7, le=90),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """When each stock line runs out, soonest first.
+
+    Distinct from /inventory?low_only=true, which compares against a static
+    reorder point. This ranks by days remaining at the observed sales rate, so
+    two hundred units selling forty a day sorts above two hundred selling one.
+    Every row carries the numbers it was computed from -- a prediction a person
+    cannot check is one they will either over-trust or ignore.
+    """
+    risks = stockout_risks(
+        db,
+        UUID(current_user["company_id"]),
+        lookback_days=lookback_days,
+        limit=limit,
+    )
+    return {
+        "lookback_days": lookback_days,
+        "summary": summarise(risks),
+        "data": [r.to_dict() for r in risks],
     }

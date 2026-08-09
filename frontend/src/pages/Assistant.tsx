@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
 
 /** Openers that show what the assistant is for, phrased as a person would ask. */
 const STARTERS = [
+  "What will run out first, and how long have I got?",
   "What needs reordering right now?",
   "How has revenue been over the last 30 days?",
   "Can I trust the forecast?",
-  "What happened in the last hour?",
 ];
 
 export function Assistant() {
@@ -191,6 +191,50 @@ export function Assistant() {
   );
 }
 
+/**
+ * Two ways an answer signals urgency, both drawn from what the tools return.
+ *
+ * `critical` and `out of stock` are vocabulary the server puts in the payload,
+ * so matching them is reading our own words back rather than guessing at the
+ * model's. The day count is the one inference: "3 days" inside a bullet about
+ * stock is a deadline, and a week is the shortest lead time worth planning
+ * around.
+ *
+ * Kept deliberately narrow. Highlighting on every number would turn an answer
+ * into a highlighter test and stop meaning anything by the third bullet.
+ */
+const CRITICAL = /\b(critical|out of stock|stockout|urgent)\b/i;
+const SOON = /\b([0-7])(?:\.\d)?\s*days?\b/i;
+
+function UrgentAwareItem({ children }: { children: React.ReactNode }) {
+  const text = extractText(children);
+  const critical = CRITICAL.test(text);
+  const soon = !critical && SOON.test(text);
+
+  if (!critical && !soon) return <li>{children}</li>;
+
+  return (
+    <li
+      className={cn(
+        "-ml-2 border-l-2 pl-2",
+        critical ? "border-danger" : "border-warning",
+      )}
+    >
+      {children}
+    </li>
+  );
+}
+
+/** Flatten a React subtree to its text, so a regex can read it. */
+function extractText(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (node && typeof node === "object" && "props" in node) {
+    return extractText((node as { props: { children?: React.ReactNode } }).props.children);
+  }
+  return "";
+}
+
 function TurnBlock({ turn }: { turn: Turn }) {
   if (turn.role === "user") {
     return (
@@ -252,6 +296,12 @@ function TurnBlock({ turn }: { turn: Turn }) {
                   {children}
                 </code>
               ),
+              // Urgency, marked where the model actually expresses it: in a
+              // list of things that need attention. Highlighting every number
+              // would make the emphasis meaningless, so the rule is narrow --
+              // a bullet that names a deadline or a shortage gets a coloured
+              // rule in the margin, and nothing else changes.
+              li: ({ children }) => <UrgentAwareItem>{children}</UrgentAwareItem>,
               a: ({ children, href }) => (
                 <a href={href} className="text-accent underline underline-offset-2">
                   {children}

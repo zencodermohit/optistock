@@ -447,3 +447,51 @@ export function useDecideAction() {
     },
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Stockout risk                                                               */
+/* -------------------------------------------------------------------------- */
+
+export interface StockoutRisk {
+  product_id: string;
+  warehouse_id: string;
+  sku: string;
+  product_name: string;
+  warehouse_name: string;
+  on_hand: number;
+  reorder_point: number;
+  daily_usage: number;
+  days_remaining: number | null;
+  stockout_date: string | null;
+  days_to_reorder_point: number | null;
+  severity: "critical" | "warning" | "watch" | "ok" | "idle";
+  units_sold: number;
+  active_days: number;
+  confidence: "high" | "medium" | "low";
+  lookback_days: number;
+  /** One checkable sentence, computed server-side so every surface agrees. */
+  explanation: string;
+}
+
+export interface StockoutSummary {
+  counts: Record<StockoutRisk["severity"], number>;
+  at_risk: number;
+  soonest: {
+    sku: string;
+    days_remaining: number;
+    warehouse_name: string;
+  } | null;
+}
+
+export function useStockoutRisk(lookbackDays = 30) {
+  return useQuery({
+    queryKey: ["insights", "stockout-risk", lookbackDays] as const,
+    queryFn: () =>
+      api<{
+        lookback_days: number;
+        summary: StockoutSummary;
+        data: StockoutRisk[];
+      }>(`/insights/stockout-risk?lookback_days=${lookbackDays}&limit=200`),
+    staleTime: 60_000,
+  });
+}

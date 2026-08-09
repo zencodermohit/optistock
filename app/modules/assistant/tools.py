@@ -12,9 +12,12 @@ is the whole security model:
     and is bound by the caller. It is deliberately absent from every schema
     below, so the model cannot supply it, cannot be argued into changing it, and
     cannot leak another company's data no matter what the user types.
-*   **Nothing writes.** No tool adjusts stock, dismisses an alert or creates a
-    record. An assistant that can only read cannot be talked into doing damage,
-    and the actions all remain where a human clicks them.
+*   **Nothing here changes the business.** No tool adjusts stock, dismisses an
+    alert or places an order. One tool writes at all -- create_purchase_order --
+    and what it writes is a proposal in a table nothing downstream watches. It
+    becomes a purchase order when a person approves it on the Approvals screen
+    and not before, so the worst a confused model can do is put a bad
+    suggestion in a human's queue.
 
 Every tool returns its rows *and* the citations for them, so an answer can point
 at the records it came from rather than asking to be believed.
@@ -27,11 +30,11 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.modules.assistant import cache
-
 from app.modules.alerts.models import STATUS_OPEN, Alert
 from app.modules.analytics.accuracy import accuracy_summary
 from app.modules.analytics.projections import recent_metrics
+from app.modules.analytics.stockout import stockout_risks, summarise
+from app.modules.assistant import cache
 from app.modules.events.models import EventOutbox
 from app.modules.inventory.models import Inventory
 from app.modules.products.models import Product
@@ -257,6 +260,48 @@ def warehouse_overview(db: Session, company_id: UUID):
     }
 
 
+def stockout_risk(db: Session, company_id: UUID, days: int = 0, limit: int = 10):
+    """What runs out first, with the numbers behind each prediction.
+
+    The explanation is computed server-side and handed to the model rather than
+    left for it to assemble. A model given four numbers will write a fifth, and
+    a stockout date it derived itself is a stockout date nobody can check.
+    """
+    risks = stockout_risks(db, company_id, limit=min(max(int(limit or 10), 1), MAX_ROWS))
+
+    if days:
+        window = max(int(days), 1)
+        risks = [
+            r
+            for r in risks
+            if r.days_remaining is not None and r.days_remaining <= window
+        ]
+
+    return {
+        "summary": summarise(risks),
+        "at_risk": [
+            {
+                "sku": r.sku,
+                "product_name": r.product_name,
+                "warehouse": r.warehouse_name,
+                "on_hand": r.on_hand,
+                "reorder_point": r.reorder_point,
+                "daily_usage": r.daily_usage,
+                "days_remaining": r.days_remaining,
+                "runs_out_on": r.stockout_date,
+                "severity": r.severity,
+                "confidence": r.confidence,
+                "why": r.explanation,
+            }
+            for r in risks
+        ],
+        "_citations": [
+            _cite("stock", f"{r.sku} @ {r.warehouse_name}", r.product_name)
+            for r in risks[:8]
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # The one tool that is not a read
 #
@@ -336,6 +381,7 @@ EXECUTORS: Dict[str, Callable[..., Dict[str, Any]]] = {
     "forecast_accuracy": forecast_accuracy,
     "recent_events": recent_events,
     "warehouse_overview": warehouse_overview,
+    "stockout_risk": stockout_risk,
 }
 
 # Descriptions say WHEN to call each tool, not just what it does. A description
@@ -461,6 +507,33 @@ TOOLS: List[Dict[str, Any]] = [
             "this when the user asks about locations, sites, or where stock sits."
         ),
         "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "stockout_risk",
+        "description": (
+            "Predicts WHEN each product runs out, ranked soonest first, with the "
+            "numbers behind each prediction: units on hand, reorder point, daily "
+            "usage rate, days remaining and the projected date. Call this for "
+            "'what will run out', 'what should I worry about', 'how long will X "
+            "last', or any question about urgency or timing. Prefer this over "
+            "check_stock when the user cares about WHEN rather than HOW MUCH -- "
+            "check_stock compares against a static threshold, this one uses "
+            "actual sales velocity. Each row carries a 'why' sentence; quote it "
+            "rather than recomputing the arithmetic yourself."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "description": (
+                        "Only return lines running out within this many days. "
+                        "Omit for everything, ranked by urgency."
+                    ),
+                },
+                "limit": {"type": "integer", "description": "How many rows (1-25)."},
+            },
+        },
     },
     {
         "name": "create_purchase_order",
