@@ -57,8 +57,28 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Skip rather than fail when there is nowhere to deploy yet. Without this
+      # the job dies inside the SSH action with "missing server host", which is
+      # a red build on every push that says nothing about the cause. It starts
+      # deploying on its own the moment EC2_HOST exists.
+      - name: Check a deploy target is configured
+        id: preflight
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          if [ -z "$EC2_HOST" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EC2_HOST is not set, so there is no server to deploy to. Provision the instance (terraform/) and add the EC2_HOST, EC2_SSH_KEY and PUBLIC_ORIGIN secrets to enable deployment."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@master
+        if: steps.preflight.outputs.configured == 'true'
+        # Pinned to a release, not @master. This action is handed the SSH
+        # private key for the production host, so a floating ref means any
+        # future commit on that branch runs with that key in scope.
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu

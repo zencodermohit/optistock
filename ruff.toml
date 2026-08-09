@@ -1,0 +1,29 @@
+# Lint configuration, made explicit on purpose.
+#
+# There was none before, so the rule set was whatever the installed ruff
+# happened to default to -- and CI installs ruff unpinned. A newer release
+# widened those defaults and the first push produced 562 errors in code that
+# passed locally, none of them real. A lint that changes its mind when an
+# unrelated release ships is a lint the team learns to ignore.
+#
+# Selecting rules by name makes the set a decision rather than a default, and
+# the pinned version in .github/workflows/ci.yml keeps formatting and fixes
+# identical everywhere. Widening this list is then a deliberate change with its
+# own diff, which is how it should be.
+
+target-version = "py312"
+line-length = 88
+
+[lint]
+select = [
+    "E4", # imports: shadowing, misplaced
+    "E7", # statement-level mistakes
+    "E9", # syntax and IO errors
+    "F",  # pyflakes: undefined names, unused imports and variables
+]
+
+[format]
+# Matches how the codebase is already written; stated so a future default
+# change cannot silently reformat every file.
+quote-style = "double"
+indent-style = "space"
