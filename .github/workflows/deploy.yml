@@ -105,7 +105,7 @@ jobs:
             echo "ALLOWED_ORIGINS=[\"${{ secrets.PUBLIC_ORIGIN }}\"]" >> .env
             # Optional. Absent or empty, the Assistant screen says it is not
             # configured and the rest of the application is unaffected.
-            echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
             # pgAdmin is gated behind the "dev" Compose profile and will not start
             # here, but Compose interpolates the whole file, so these must exist.
             echo "PGADMIN_EMAIL=disabled@example.com" >> .env

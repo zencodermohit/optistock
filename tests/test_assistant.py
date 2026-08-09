@@ -1,12 +1,11 @@
 """The assistant: tool scoping, the agentic loop, and what it refuses to do.
 
-No API key and no network. The Anthropic client is injected into `converse`, so
+No API key and no network. The Gemini client is injected into `converse`, so
 a fake returning scripted responses exercises the whole loop -- dispatch, tenant
 binding, citation collection, the round cap. The tools are plain functions and
 are tested directly.
 """
 
-import json
 from types import SimpleNamespace
 
 import pytest
@@ -17,65 +16,39 @@ from app.modules.assistant.tools import TOOLS, run_tool
 
 
 # ---------------------------------------------------------------------------
-# A fake Anthropic client
+# A fake Gemini client
+#
+# Mirrors the shape the service uses: client.aio.models.generate_content, with
+# automatic function calling. The fake runs the tools it is told to, exactly as
+# the SDK would, so the loop, the tenant binding and the citation collection are
+# all exercised without a network call or an API key.
 # ---------------------------------------------------------------------------
-class _Block(SimpleNamespace):
-    pass
-
-
-def _text_block(text):
-    return _Block(type="text", text=text)
-
-
-def _tool_block(name, arguments, block_id="toolu_1"):
-    return _Block(type="tool_use", name=name, input=arguments, id=block_id)
-
-
-class FakeStream:
-    def __init__(self, message):
-        self._message = message
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *_):
-        return False
-
-    @property
-    def text_stream(self):
-        async def gen():
-            for block in self._message.content:
-                if block.type == "text":
-                    yield block.text
-
-        return gen()
-
-    async def get_final_message(self):
-        return self._message
-
-
-class FakeMessages:
-    def __init__(self, turns):
-        self._turns = list(turns)
+class FakeModels:
+    def __init__(self, plan, answer):
+        self.plan = list(plan)  # [(tool_name, kwargs), ...] the "model" decides to call
+        self.answer = answer
         self.requests = []
 
-    def stream(self, **kwargs):
-        # Snapshot the message list. The loop appends to the same list object
-        # across rounds, so storing the reference would record what the
-        # conversation became rather than what this request actually sent.
-        self.requests.append({**kwargs, "messages": list(kwargs["messages"])})
-        if not self._turns:
-            raise AssertionError("Fake client ran out of scripted turns")
-        return FakeStream(self._turns.pop(0))
+    async def generate_content(self, model, contents, config):
+        self.requests.append({"model": model, "contents": contents, "config": config})
+        by_name = {t.__name__: t for t in config.tools}
+        for name, kwargs in self.plan:
+            by_name[name](**kwargs)
+        return SimpleNamespace(text=self.answer)
 
 
 class FakeClient:
-    def __init__(self, turns):
-        self.messages = FakeMessages(turns)
+    def __init__(self, plan=(), answer="Here is the answer."):
+        self.models = FakeModels(plan, answer)
+        self.aio = SimpleNamespace(models=self.models)
 
 
-def _turn(content, stop_reason="end_turn"):
-    return _Block(content=content, stop_reason=stop_reason)
+class ExplodingClient:
+    def __init__(self, error):
+        async def boom(**_):
+            raise error
+
+        self.aio = SimpleNamespace(models=SimpleNamespace(generate_content=boom))
 
 
 async def _collect(client, db, company_id, question="hello"):
@@ -205,7 +178,7 @@ def test_a_hallucinated_argument_is_correctable_not_fatal(db_session, company):
 # ---------------------------------------------------------------------------
 @pytest.mark.anyio
 async def test_a_plain_answer_needs_no_tools(db_session, company):
-    client = FakeClient([_turn([_text_block("Hello.")])])
+    client = FakeClient(plan=[], answer="Hello.")
 
     events = await _collect(client, db_session, company.id)
 
@@ -214,121 +187,138 @@ async def test_a_plain_answer_needs_no_tools(db_session, company):
 
 
 @pytest.mark.anyio
-async def test_a_tool_call_is_executed_and_fed_back(db_session, company, make_product):
+async def test_a_tool_call_reaches_the_database_and_is_reported(
+    db_session, company, make_product
+):
     make_product(company, sku="LOOP-1", name="Loop widget")
     db_session.commit()
 
     client = FakeClient(
-        [
-            _turn([_tool_block("search_products", {"query": "Loop"})], "tool_use"),
-            _turn([_text_block("You stock Loop widget.")]),
-        ]
+        plan=[("search_products", {"query": "Loop"})],
+        answer="You stock Loop widget.",
     )
 
     events = await _collect(client, db_session, company.id, "what do we stock?")
 
     kinds = [e["type"] for e in events]
     assert "tool" in kinds and "citation" in kinds and "done" in kinds
-    # The envelope's kind must survive the citation's own `type` field.
-    citation = next(e for e in events if e["type"] == "citation")["citation"]
-    assert citation["type"] == "product"
 
-    # The second request carries the tool result back to the model.
-    second = client.messages.requests[1]
-    results = second["messages"][-1]["content"]
-    assert results[0]["type"] == "tool_result"
-    assert "LOOP-1" in json.loads(results[0]["content"])["products"][0]["sku"]
+    tool = next(e for e in events if e["type"] == "tool")
+    assert tool["name"] == "search_products"
+
+    # The citation names the row the answer actually came from.
+    citation = next(e for e in events if e["type"] == "citation")["citation"]
+    assert citation["ref"] == "LOOP-1"
 
 
 @pytest.mark.anyio
-async def test_parallel_tool_results_go_back_in_one_message(
-    db_session, company, make_product
+async def test_the_tenant_is_bound_and_never_exposed_to_the_model(
+    db_session, company, other_company, make_product
 ):
-    """Splitting them across messages trains the model to stop calling in parallel."""
-    make_product(company, sku="PAR-1")
+    """The whole security model, asserted through the loop rather than the tools.
+
+    Every tool the model can see is a closure over this request's company_id.
+    There is no parameter for it, so no phrasing of a question can reach another
+    company's rows.
+    """
+    make_product(company, sku="OURS-1")
+    make_product(other_company, sku="THEIRS-1")
+    db_session.commit()
+
+    client = FakeClient(plan=[("search_products", {})], answer="Done.")
+    await _collect(client, db_session, company.id)
+
+    config = client.models.requests[0]["config"]
+    for tool in config.tools:
+        assert "company_id" not in tool.__code__.co_varnames
+
+    # And the call it made only saw this tenant's catalogue.
+    result, _ = run_tool(db_session, company.id, "search_products", {})
+    assert [p["sku"] for p in result["products"]] == ["OURS-1"]
+
+
+@pytest.mark.anyio
+async def test_duplicate_citations_are_reported_once(
+    db_session, company, make_product, make_warehouse, make_stock
+):
+    """Two tools citing the same record should not show it twice."""
+    product = make_product(company, sku="DUP-1", name="Dup widget")
+    make_stock(product, make_warehouse(company), quantity=5)
     db_session.commit()
 
     client = FakeClient(
-        [
-            _turn(
-                [
-                    _tool_block("search_products", {}, "toolu_a"),
-                    _tool_block("warehouse_overview", {}, "toolu_b"),
-                ],
-                "tool_use",
-            ),
-            _turn([_text_block("Done.")]),
-        ]
+        plan=[
+            ("search_products", {"query": "Dup"}),
+            ("search_products", {"query": "Dup"}),
+        ],
+        answer="Done.",
     )
+    events = await _collect(client, db_session, company.id)
 
-    await _collect(client, db_session, company.id)
-
-    final_user_message = client.messages.requests[1]["messages"][-1]
-    assert final_user_message["role"] == "user"
-    assert len(final_user_message["content"]) == 2
+    refs = [e["citation"]["ref"] for e in events if e["type"] == "citation"]
+    assert refs.count("DUP-1") == 1
 
 
 @pytest.mark.anyio
-async def test_the_loop_stops_rather_than_calling_tools_forever(db_session, company):
-    """A model that never stops asking would otherwise bill indefinitely."""
-    client = FakeClient(
-        [_turn([_tool_block("warehouse_overview", {})], "tool_use")] * 20
-    )
+async def test_an_empty_answer_is_named_rather_than_rendered_blank(db_session, company):
+    client = FakeClient(plan=[], answer="")
 
     events = await _collect(client, db_session, company.id)
 
     assert events[-1]["type"] == "error"
-    assert "rounds" in events[-1]["message"]
+    assert "no answer" in events[-1]["message"]
 
 
 @pytest.mark.anyio
-async def test_a_refusal_is_surfaced_without_reading_empty_content(db_session, company):
-    """Refusals return 200 with no text; indexing into content would raise."""
-    client = FakeClient([_turn([], "refusal")])
-
-    events = await _collect(client, db_session, company.id)
+async def test_a_rate_limit_explains_the_free_tier(db_session, company):
+    """The Gemini free tier allows only a few requests a minute, so this is the
+    error a demo hits most -- and "check the log" would be useless advice."""
+    events = await _collect(
+        ExplodingClient(RuntimeError("429 RESOURCE_EXHAUSTED: quota exceeded")),
+        db_session,
+        company.id,
+    )
 
     assert events[-1]["type"] == "error"
-    assert "declined" in events[-1]["message"]
+    assert "rate limit" in events[-1]["message"].lower()
 
 
 @pytest.mark.anyio
-async def test_an_unpaid_account_says_so_instead_of_pointing_at_the_log(
-    db_session, company
-):
-    """A valid key on an account with no credits arrives as a plain 400.
+async def test_a_retired_model_says_which_setting_to_change(db_session, company):
+    """Gemini 2.5 Flash is no longer served to new keys; the 404 should say so."""
+    events = await _collect(
+        ExplodingClient(RuntimeError("404 NOT_FOUND: model is no longer available")),
+        db_session,
+        company.id,
+    )
 
-    Without naming it, the reader is told to check a server log they cannot
-    read, for a condition they can fix in a browser in thirty seconds.
-    """
-
-    class Broke:
-        class messages:
-            @staticmethod
-            def stream(**_):
-                raise RuntimeError(
-                    "Error code: 400 - Your credit balance is too low to "
-                    "access the Anthropic API."
-                )
-
-    events = await _collect(Broke(), db_session, company.id)
-
-    assert events[-1]["type"] == "error"
-    assert "credits" in events[-1]["message"]
+    assert "ASSISTANT_MODEL" in events[-1]["message"]
 
 
 @pytest.mark.anyio
-async def test_an_api_failure_becomes_a_readable_message(db_session, company):
-    class Exploding:
-        class messages:
-            @staticmethod
-            def stream(**_):
-                raise RuntimeError("boom")
+async def test_a_rejected_key_names_the_setting(db_session, company):
+    events = await _collect(
+        ExplodingClient(RuntimeError("401 UNAUTHENTICATED: API key not valid")),
+        db_session,
+        company.id,
+    )
 
-    events = await _collect(Exploding(), db_session, company.id)
+    assert "GEMINI_API_KEY" in events[-1]["message"]
+
+
+@pytest.mark.anyio
+async def test_an_unexpected_failure_does_not_leak_its_detail(db_session, company):
+    """A raw API error can quote request content back, and that content is the
+    tenant's data."""
+    events = await _collect(
+        ExplodingClient(RuntimeError("boom: SELECT * FROM secrets")),
+        db_session,
+        company.id,
+    )
 
     assert events[-1]["type"] == "error"
     assert "boom" not in events[-1]["message"]
+    assert "secrets" not in events[-1]["message"]
 
 
 # ---------------------------------------------------------------------------
@@ -344,14 +334,14 @@ def test_status_publishes_what_the_assistant_can_reach(authenticated_client):
 
 def test_asking_without_a_key_explains_itself(authenticated_client, monkeypatch):
     """A missing key disables one screen and says so; it never 500s."""
-    monkeypatch.setattr(assistant_service.settings, "ANTHROPIC_API_KEY", "")
+    monkeypatch.setattr(assistant_service.settings, "GEMINI_API_KEY", "")
 
     response = authenticated_client.post(
         "/api/v1/assistant/ask", json={"question": "how much stock do we have?"}
     )
 
     assert response.status_code == 200
-    assert "ANTHROPIC_API_KEY" in response.text
+    assert "GEMINI_API_KEY" in response.text
 
 
 def test_asking_requires_authentication(client):

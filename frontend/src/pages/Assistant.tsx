@@ -1,4 +1,5 @@
 import { ArrowUp, Square, Wrench } from "lucide-react";
+import Markdown from "react-markdown";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { PageHeader } from "@/components/layout/AppShell";
@@ -48,9 +49,9 @@ export function Assistant() {
         <Band className="mb-4 p-4">
           <p className="eyebrow">Not configured</p>
           <p className="mt-2 text-sm text-ink-muted">
-            The server has no <span className="tnum">ANTHROPIC_API_KEY</span> set, so
+            The server has no <span className="tnum">GEMINI_API_KEY</span> set, so
             the assistant is switched off. Everything else in OptiStock works
-            without it.
+            without it. A free key comes from aistudio.google.com/apikey.
           </p>
         </Band>
       )}
@@ -198,8 +199,47 @@ function TurnBlock({ turn }: { turn: Turn }) {
       )}
 
       {turn.text && (
-        <div className="text-sm leading-relaxed whitespace-pre-wrap">
-          {turn.text}
+        <div className="text-sm leading-relaxed">
+          {/* The model answers in Markdown -- lists of SKUs, bold figures,
+              small headings. Rendered as plain text it showed literal ** and
+              ###, which reads as a broken integration rather than a formatting
+              choice. Each element is mapped onto the design tokens instead of
+              inheriting a stylesheet, so an answer looks like the rest of the
+              product rather than like a README. */}
+          <Markdown
+            components={{
+              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+              strong: ({ children }) => (
+                <strong className="font-semibold text-ink">{children}</strong>
+              ),
+              ul: ({ children }) => (
+                <ul className="mb-2 ml-4 list-disc space-y-0.5 last:mb-0">{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="mb-2 ml-4 list-decimal space-y-0.5 last:mb-0">
+                  {children}
+                </ol>
+              ),
+              // Headings inside a chat bubble are a paragraph with emphasis, not
+              // a document outline -- an <h3> here would outrank the page title.
+              h1: ({ children }) => <p className="eyebrow mt-3 mb-1">{children}</p>,
+              h2: ({ children }) => <p className="eyebrow mt-3 mb-1">{children}</p>,
+              h3: ({ children }) => <p className="eyebrow mt-3 mb-1">{children}</p>,
+              code: ({ children }) => (
+                <code className="tnum rounded-sm bg-sunken px-1 py-0.5 text-2xs">
+                  {children}
+                </code>
+              ),
+              a: ({ children, href }) => (
+                <a href={href} className="text-accent underline underline-offset-2">
+                  {children}
+                </a>
+              ),
+              hr: () => <hr className="my-3 border-border" />,
+            }}
+          >
+            {turn.text}
+          </Markdown>
           {turn.streaming && (
             <span className="ml-0.5 inline-block h-3.5 w-1.5 translate-y-0.5 animate-pulse bg-accent" />
           )}

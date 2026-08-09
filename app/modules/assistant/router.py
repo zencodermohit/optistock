@@ -67,7 +67,7 @@ async def ask(
                     "type": "error",
                     "message": (
                         "The assistant isn't configured on this server. Set "
-                        "ANTHROPIC_API_KEY to enable it."
+                        "GEMINI_API_KEY to enable it."
                     ),
                 }
             )
@@ -88,8 +88,6 @@ async def ask(
             yield _sse(
                 {"type": "error", "message": "The assistant stopped unexpectedly."}
             )
-        finally:
-            await client.close()
 
     return StreamingResponse(
         events(),

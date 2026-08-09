@@ -41,9 +41,20 @@ from app.modules.warehouses.models import Warehouse
 MAX_ROWS = 25
 
 
-def _cite(kind: str, label: str, reference: str | None = None) -> Dict[str, str]:
-    """One pointer back to a real record, for the UI to render under the answer."""
-    return {"type": kind, "label": label, "ref": reference or label}
+def _cite(kind: str, ref: str, label: str | None = None) -> Dict[str, str]:
+    """One pointer back to a real record, for the UI to render under the answer.
+
+    `ref` identifies the record -- a SKU, an alert title, an event sequence --
+    and is what de-duplication keys on. `label` is the human description shown
+    alongside it.
+
+    These two were reversed, and every call site already passed them in this
+    order, so the identifier ended up in `label` and the description in `ref`.
+    Cosmetic for products, but alerts cite their severity as the description:
+    with that in `ref`, every open warning de-duplicated to a single citation
+    and an answer drawing on six alerts appeared to rest on one.
+    """
+    return {"type": kind, "ref": ref, "label": label or ref}
 
 
 # ---------------------------------------------------------------------------

@@ -238,9 +238,9 @@ DATABASE_URL=postgresql://optistock:optistock_password@db:5432/optistock_db
 REDIS_URL=redis://redis:6379/0
 SECRET_KEY=your_super_secret_key_change_in_production
 # Optional. Without it the Assistant screen says so and switches itself off;
-# nothing else in the application depends on it.
-ANTHROPIC_API_KEY=
-ASSISTANT_MODEL=claude-opus-5
+# nothing else in the application depends on it. Free tier: aistudio.google.com/apikey
+GEMINI_API_KEY=
+ASSISTANT_MODEL=gemini-3.6-flash
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ALLOWED_ORIGINS=["http://localhost:3000", "https://yourfrontend.com"]
@@ -338,7 +338,7 @@ git clone https://github.com/<you>/optistock.git /home/ubuntu/project_IV
 | `DB_PASSWORD` | Postgres password. Generated, not chosen — it is written into `.env` on the host |
 | `PROD_SECRET_KEY` | JWT signing key. `openssl rand -hex 32`. Changing it invalidates every existing session |
 | `PUBLIC_ORIGIN` | The deployed URL, e.g. `http://<elastic-ip>` until a domain exists |
-| `ANTHROPIC_API_KEY` | Optional. Without it the Assistant screen says it is unconfigured and nothing else changes |
+| `GEMINI_API_KEY` | Optional. From aistudio.google.com/apikey; the Flash models are free. Without it the Assistant screen says it is unconfigured and nothing else changes |
 
 The deploy writes `.env` on the host from these on every run, so `.env` is never
 committed and the instance never holds a credential the repository knows.

@@ -27,8 +27,10 @@ class Settings(BaseSettings):
     # Deliberately defaults to empty rather than being required. The whole app
     # must run without it -- a missing key disables one screen and says so,
     # instead of stopping the server from booting.
-    ANTHROPIC_API_KEY: str = ""
-    ASSISTANT_MODEL: str = "claude-opus-5"
+    GEMINI_API_KEY: str = ""
+    # Gemini 3.x. The 2.5 Flash models are no longer served to new API keys,
+    # so an older default would 404 for anyone setting this up today.
+    ASSISTANT_MODEL: str = "gemini-3.6-flash"
 
     # Where the nightly ETL writes Parquet. Must be backed by a Docker volume in
     # any deployed environment or the analytical history is destroyed on restart.
