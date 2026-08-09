@@ -293,6 +293,31 @@ async def test_a_refusal_is_surfaced_without_reading_empty_content(db_session, c
 
 
 @pytest.mark.anyio
+async def test_an_unpaid_account_says_so_instead_of_pointing_at_the_log(
+    db_session, company
+):
+    """A valid key on an account with no credits arrives as a plain 400.
+
+    Without naming it, the reader is told to check a server log they cannot
+    read, for a condition they can fix in a browser in thirty seconds.
+    """
+
+    class Broke:
+        class messages:
+            @staticmethod
+            def stream(**_):
+                raise RuntimeError(
+                    "Error code: 400 - Your credit balance is too low to "
+                    "access the Anthropic API."
+                )
+
+    events = await _collect(Broke(), db_session, company.id)
+
+    assert events[-1]["type"] == "error"
+    assert "credits" in events[-1]["message"]
+
+
+@pytest.mark.anyio
 async def test_an_api_failure_becomes_a_readable_message(db_session, company):
     class Exploding:
         class messages:

@@ -174,10 +174,26 @@ async def converse(
 
 
 def _describe(error: Exception) -> str:
-    """Turn an SDK exception into something worth showing a person."""
+    """Turn an SDK exception into something worth showing a person.
+
+    Deliberately vague as a fallback -- an API error can quote request content
+    back, and that content is this tenant's data. But conditions the reader can
+    actually fix are named, because "check the server log" is useless advice to
+    someone who cannot read it.
+    """
     name = type(error).__name__
+    message = str(error).lower()
+
     if "Authentication" in name:
         return "The assistant's API key was rejected. Check ANTHROPIC_API_KEY."
+    # Valid key, unpaid account. Worth its own message: it arrives as a generic
+    # 400 and is otherwise indistinguishable from a malformed request, which
+    # sends whoever is debugging it looking in entirely the wrong place.
+    if "credit balance" in message or "billing" in message:
+        return (
+            "The Anthropic account has no credits. Add them under Plans & "
+            "Billing at console.anthropic.com; the key itself is fine."
+        )
     if "RateLimit" in name:
         return "The assistant is rate limited right now. Try again shortly."
     if "Connection" in name or "Timeout" in name:
