@@ -1,6 +1,7 @@
 import { ArrowUp, ShieldCheck, Square, Wrench } from "lucide-react";
 import Markdown from "react-markdown";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 
 import { PageHeader } from "@/components/layout/AppShell";
 import { Badge } from "@/components/ui/Badge";
@@ -73,9 +74,10 @@ export function Assistant() {
             {turns.length === 0 ? (
               <div className="mx-auto max-w-lg py-8">
                 <p className="text-sm text-ink-muted">
-                  This assistant can only read. It answers from the same records
-                  the rest of the app shows, and it will say so when a question
-                  falls outside what it can see.
+                  This assistant answers from the same records the rest of the
+                  app shows, and says so when a question falls outside what it
+                  can see. Ask it to reorder something and it will propose an
+                  order for you to approve — it never places one itself.
                 </p>
                 <div className="mt-5 flex flex-col gap-2">
                   {STARTERS.map((starter) => (
@@ -160,8 +162,13 @@ export function Assistant() {
             ))}
           </ul>
           <p className="mt-4 border-t border-border pt-3 text-2xs text-ink-subtle">
-            Read-only, and scoped to your company by the server rather than by
-            the question. It cannot change stock, dismiss alerts or place orders.
+            Scoped to your company by the server rather than by the question. It
+            reads, and it can propose a purchase order — which lands on{" "}
+            <Link to="/approvals" className="text-accent underline underline-offset-2">
+              Approvals
+            </Link>{" "}
+            for you to accept, amend or reject. It cannot place an order, change
+            stock or dismiss an alert itself.
           </p>
 
           {status.data?.data_mode?.mode === "demo" && (

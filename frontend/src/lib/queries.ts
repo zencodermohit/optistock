@@ -89,6 +89,7 @@ export const keys = {
   suggestions: () => ["insights", "recommendations"] as const,
   accuracy: () => ["insights", "accuracy"] as const,
   assistantStatus: () => ["assistant", "status"] as const,
+  assistantActions: (status?: string) => ["assistant", "actions", status] as const,
   warehouses: () => ["warehouses"] as const,
   recommendations: () => ["recommendations"] as const,
 };
@@ -361,5 +362,88 @@ export function useRecommendations() {
   return useQuery({
     queryKey: keys.recommendations(),
     queryFn: () => api<Paginated<Recommendation>>("/recommendations/?limit=50"),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Assistant proposals                                                         */
+/* -------------------------------------------------------------------------- */
+
+export interface ProposedOrder {
+  sku: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_cost: number;
+  estimated_total: number;
+  warehouse_id: string;
+  warehouse_name: string;
+  supplier_id: string;
+  supplier_name: string;
+}
+
+export interface AssistantAction {
+  id: string;
+  action_type: string;
+  status: "proposed" | "approved" | "rejected" | "failed" | "expired";
+  proposed: ProposedOrder;
+  executed: ProposedOrder | null;
+  rationale: string | null;
+  source_question: string | null;
+  model: string | null;
+  proposed_at: string;
+  expires_at: string;
+  decided_at: string | null;
+  result_id: string | null;
+  error: string | null;
+  is_actionable: boolean;
+  /** True when the approver changed what the model asked for. */
+  amended: boolean;
+}
+
+export function useAssistantActions(status?: string) {
+  return useQuery({
+    queryKey: keys.assistantActions(status),
+    queryFn: () =>
+      api<{ actions: AssistantAction[] }>(
+        `/assistant/actions${status ? `?status=${status}` : ""}`,
+      ),
+    // Short, because a proposal made in the Assistant tab should be waiting on
+    // the Approvals tab by the time the user switches to it.
+    staleTime: 10_000,
+  });
+}
+
+/**
+ * Approve or reject one proposal.
+ *
+ * Both verbs share a hook because they share everything that matters: the same
+ * row, the same invalidation, the same optimistic-update hazard. `quantity`
+ * amends the order before it runs.
+ */
+export function useDecideAction() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      decision,
+      quantity,
+      reason,
+    }: {
+      id: string;
+      decision: "approve" | "reject";
+      quantity?: number;
+      reason?: string;
+    }) =>
+      api<AssistantAction>(`/assistant/actions/${id}/${decision}`, {
+        method: "POST",
+        body: JSON.stringify({ quantity, reason }),
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["assistant", "actions"] });
+      // An approval creates a purchase order, so anything counting them is now
+      // wrong. Cheaper to refetch than to reason about which panels care.
+      void client.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 }

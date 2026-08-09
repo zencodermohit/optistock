@@ -20,6 +20,7 @@ from app.core.database import Base
 from app.modules.alerts.models import Alert
 from app.modules.analytics.models import ForecastRun
 from app.modules.analytics.projection_models import DailyMetric
+from app.modules.assistant.models import AssistantAction
 from app.modules.audit.models import AuditLog
 from app.modules.companies.models import Company
 from app.modules.events.models import EventOutbox
@@ -37,6 +38,7 @@ from app.modules.warehouses.models import Warehouse
 __all__ = [
     "Base",
     "Alert",
+    "AssistantAction",
     "AuditLog",
     "Company",
     "DailyMetric",

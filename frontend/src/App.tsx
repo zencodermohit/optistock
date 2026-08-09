@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/lib/auth";
 import { Alerts } from "@/pages/Alerts";
+import { Approvals } from "@/pages/Approvals";
 import { Assistant } from "@/pages/Assistant";
 import { EventStream } from "@/pages/EventStream";
 import { Insights } from "@/pages/Insights";
@@ -59,6 +60,7 @@ export default function App() {
           }
         />
         <Route path="assistant" element={<Assistant />} />
+        <Route path="approvals" element={<Approvals />} />
         <Route path="insights" element={<Insights />} />
         <Route path="alerts" element={<Alerts />} />
         <Route path="system/events" element={<EventStream />} />

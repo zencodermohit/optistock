@@ -258,9 +258,77 @@ def warehouse_overview(db: Session, company_id: UUID):
 
 
 # ---------------------------------------------------------------------------
+# The one tool that is not a read
+#
+# And it still is not a write. It records a suggestion and returns its id. The
+# purchase order does not exist until a person opens the approvals screen and
+# says so, which is why the return value leads with requires_approval -- the
+# model is being told, in the same breath as its success, that it has not
+# actually done anything.
+# ---------------------------------------------------------------------------
+def create_purchase_order(
+    db: Session,
+    company_id: UUID,
+    sku: str = "",
+    quantity: int = 0,
+    reason: str = "",
+    _context: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    from app.modules.assistant.actions import ActionService
+
+    context = _context or {}
+    action, error = ActionService(db).propose_purchase_order(
+        company_id=company_id,
+        sku=sku,
+        quantity=quantity,
+        rationale=reason,
+        source_question=context.get("question"),
+        model=context.get("model"),
+        requested_by_user_id=context.get("user_id"),
+    )
+
+    if error is not None:
+        # Correctable, like every other tool failure -- the model can fix the
+        # SKU and try again rather than apologising for a crash.
+        return {"error": error, "requires_approval": True, "_citations": []}
+
+    # Committed here rather than left to a router. This endpoint streams, so
+    # there is no tidy request boundary to commit at, and a proposal that
+    # vanished because the model errored two seconds later would be a proposal
+    # the user watched being made and then could not find.
+    db.commit()
+
+    payload = action.proposed_payload
+    return {
+        "status": "proposed",
+        "requires_approval": True,
+        "action_id": str(action.id),
+        "message": (
+            "Nothing has been ordered. This is a proposal awaiting human "
+            "approval on the Approvals screen."
+        ),
+        "sku": payload["sku"],
+        "product_name": payload["product_name"],
+        "quantity": payload["quantity"],
+        "estimated_total": payload["estimated_total"],
+        "destination": payload["warehouse_name"],
+        "supplier": payload["supplier_name"],
+        "expires_in_hours": 24,
+        "_citations": [
+            _cite("proposal", f"Proposed order: {payload['quantity']} x {payload['sku']}")
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
 # The catalogue
 # ---------------------------------------------------------------------------
+#: Tools that need to know who is asking. Their context is injected by
+#: `run_tool` from the request, never from the model's arguments.
+NEEDS_CONTEXT = frozenset({"create_purchase_order"})
+
 EXECUTORS: Dict[str, Callable[..., Dict[str, Any]]] = {
+    "create_purchase_order": create_purchase_order,
     "search_products": search_products,
     "check_stock": check_stock,
     "list_alerts": list_alerts,
@@ -394,16 +462,62 @@ TOOLS: List[Dict[str, Any]] = [
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "create_purchase_order",
+        "description": (
+            "PROPOSE a purchase order for a human to approve. This does NOT place "
+            "an order and does NOT change stock -- it creates a suggestion that "
+            "appears on the Approvals screen, where a person accepts, amends or "
+            "rejects it. Call this when the user asks you to reorder or restock "
+            "something, or agrees to a reorder you recommended. Always tell the "
+            "user afterwards that it is awaiting their approval and that nothing "
+            "has been ordered yet. Check the current level with check_stock first "
+            "so the quantity is justified, and say why in the reason."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "sku": {
+                    "type": "string",
+                    "description": "Exact SKU of the product to reorder.",
+                },
+                "quantity": {
+                    "type": "integer",
+                    "description": "Units to order. Must be positive.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": (
+                        "Why this quantity, in one sentence, citing the numbers "
+                        "you saw. The approver reads this."
+                    ),
+                },
+            },
+            "required": ["sku", "quantity"],
+        },
+    },
 ]
 
 
-def run_tool(db: Session, company_id: UUID, name: str, arguments: Dict[str, Any]):
+def run_tool(
+    db: Session,
+    company_id: UUID,
+    name: str,
+    arguments: Dict[str, Any],
+    context: Dict[str, Any] | None = None,
+):
     """Execute one tool call. Returns (payload_for_the_model, citations).
 
     `company_id` is passed positionally by this function and is never read from
     `arguments` -- the model's arguments are merged in around it, so a model
     that invented a company_id field would have it silently ignored rather than
     honoured.
+
+    `context` carries who is asking, for the tools that must record it. It comes
+    from the request and is stripped from the model's arguments for the same
+    reason company_id is: a field the model can set is a field an injection can
+    set, and "who requested this order" is not a question the model gets a vote
+    on.
     """
     executor = EXECUTORS.get(name)
     if executor is None:
@@ -412,7 +526,7 @@ def run_tool(db: Session, company_id: UUID, name: str, arguments: Dict[str, Any]
     safe_arguments = {
         key: value
         for key, value in (arguments or {}).items()
-        if key not in {"company_id", "db"}
+        if key not in {"company_id", "db", "_context"}
     }
 
     # Cached on the normalised arguments, after the tenant fields are stripped,
@@ -425,6 +539,9 @@ def run_tool(db: Session, company_id: UUID, name: str, arguments: Dict[str, Any]
         # does exactly that -- must not be editing the cached entry, or the next
         # reader gets someone's pseudonyms.
         return deepcopy(payload), deepcopy(citations)
+
+    if name in NEEDS_CONTEXT:
+        safe_arguments["_context"] = context or {}
 
     try:
         result = executor(db, company_id, **safe_arguments)

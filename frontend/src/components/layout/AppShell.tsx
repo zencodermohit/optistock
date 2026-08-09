@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Boxes,
   ChevronDown,
+  ClipboardCheck,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -50,6 +51,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
       { to: "/assistant", label: "Assistant", icon: MessageSquare },
+      { to: "/approvals", label: "Approvals", icon: ClipboardCheck },
     ],
   },
   {

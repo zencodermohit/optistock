@@ -3,7 +3,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.rate_limit import limiter
 from app.modules.assistant import service
+from app.modules.assistant.actions import ActionService
 from app.modules.assistant.redaction import describe_mode
 from app.modules.assistant.runtime import get_runtime
 from app.modules.assistant.tools import TOOLS
@@ -19,6 +20,11 @@ from app.modules.assistant.tools import TOOLS
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["Assistant"])
+
+#: Deliberately the same roles that POST /purchase-orders requires. An assistant
+#: suggestion must not become a way around the permission governing the same
+#: action taken by hand.
+APPROVER_ROLES = {"admin", "supply_chain"}
 
 
 class AskRequest(BaseModel):
@@ -90,6 +96,7 @@ async def ask(
                 company_id=company_id,
                 question=body.question,
                 history=body.history,
+                user_id=UUID(current_user["id"]),
             ):
                 yield _sse(event)
         except Exception:
@@ -113,3 +120,106 @@ async def ask(
 
 def _sse(payload: Dict[str, Any]) -> str:
     return f"data: {json.dumps(payload, default=str)}\n\n"
+
+
+# ---------------------------------------------------------------------------
+# Proposed actions
+#
+# The half of the write path that a human drives. The assistant can reach the
+# POST /ask endpoint above and nothing else; these three routes are the only
+# way a proposal becomes a purchase order, and every one of them requires a
+# session belonging to a real person.
+# ---------------------------------------------------------------------------
+class DecisionRequest(BaseModel):
+    #: Lets the approver change the quantity before agreeing. The proposal keeps
+    #: what the model asked for; the audit log ends up holding both.
+    quantity: Optional[int] = Field(default=None, gt=0, le=10_000)
+    reason: str = Field(default="", max_length=500)
+
+
+def _as_json(action) -> Dict[str, Any]:
+    return {
+        "id": str(action.id),
+        "action_type": action.action_type,
+        "status": action.status,
+        "proposed": action.proposed_payload,
+        "executed": action.executed_payload,
+        "rationale": action.rationale,
+        "source_question": action.source_question,
+        "model": action.proposed_by_model,
+        "proposed_at": action.proposed_at,
+        "expires_at": action.expires_at,
+        "decided_at": action.decided_at,
+        "result_id": str(action.result_id) if action.result_id else None,
+        "error": action.error,
+        "is_actionable": action.is_actionable,
+        # Computed here rather than in the browser so the screen cannot disagree
+        # with the audit log about whether a human amended the machine.
+        "amended": bool(
+            action.executed_payload
+            and action.executed_payload.get("quantity")
+            != action.proposed_payload.get("quantity")
+        ),
+    }
+
+
+@router.get("/actions")
+def list_actions(
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Proposals for this company, newest first."""
+    actions = ActionService(db).list_actions(
+        UUID(current_user["company_id"]), status=status
+    )
+    return {"actions": [_as_json(a) for a in actions]}
+
+
+@router.post("/actions/{action_id}/approve")
+def approve_action(
+    action_id: UUID,
+    body: DecisionRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Execute a proposal, on the authority of the person calling this.
+
+    Restricted to the roles that can create a purchase order by hand. An
+    assistant suggestion must not become a way around the permission that
+    governs the same action taken deliberately.
+    """
+    if current_user["role"] not in APPROVER_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail="Your role cannot approve purchase orders.",
+        )
+
+    action = ActionService(db).approve(
+        company_id=UUID(current_user["company_id"]),
+        action_id=action_id,
+        user_id=UUID(current_user["id"]),
+        overrides={"quantity": body.quantity} if body.quantity else None,
+    )
+    db.commit()
+    db.refresh(action)
+    return _as_json(action)
+
+
+@router.post("/actions/{action_id}/reject")
+def reject_action(
+    action_id: UUID,
+    body: DecisionRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Decline a proposal, and keep the record of having declined it."""
+    action = ActionService(db).reject(
+        company_id=UUID(current_user["company_id"]),
+        action_id=action_id,
+        user_id=UUID(current_user["id"]),
+        reason=body.reason,
+    )
+    db.commit()
+    db.refresh(action)
+    return _as_json(action)
