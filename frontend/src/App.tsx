@@ -5,13 +5,14 @@ import { useAuth } from "@/lib/auth";
 import { Alerts } from "@/pages/Alerts";
 import { Approvals } from "@/pages/Approvals";
 import { Assistant } from "@/pages/Assistant";
+import { Customers } from "@/pages/Customers";
 import { EventStream } from "@/pages/EventStream";
 import { Insights } from "@/pages/Insights";
 import { Inventory } from "@/pages/Inventory";
 import { Login } from "@/pages/Login";
 import { Overview } from "@/pages/Overview";
-import { Placeholder } from "@/pages/Placeholder";
 import { Products } from "@/pages/Products";
+import { Sales } from "@/pages/Sales";
 import { PurchaseOrders } from "@/pages/PurchaseOrders";
 import { StockoutRisk } from "@/pages/StockoutRisk";
 
@@ -41,26 +42,8 @@ export default function App() {
         <Route index element={<Overview />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="products" element={<Products />} />
-        <Route
-          path="sales"
-          element={
-            <Placeholder
-              title="Sales"
-              description="Orders and revenue over time."
-              building="The API is live — this screen is queued behind the Overview dashboard."
-            />
-          }
-        />
-        <Route
-          path="customers"
-          element={
-            <Placeholder
-              title="Customers"
-              description="Accounts and their order history."
-              building="The API and lifetime-value calculation are live; the screen is queued behind the Overview dashboard."
-            />
-          }
-        />
+        <Route path="sales" element={<Sales />} />
+        <Route path="customers" element={<Customers />} />
         <Route path="assistant" element={<Assistant />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="purchase-orders" element={<PurchaseOrders />} />

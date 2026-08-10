@@ -78,6 +78,33 @@ def get_sales(
     return {"total": total, "skip": skip, "limit": limit, "data": sales}
 
 
+@router.get("/ledger")
+def get_ledger(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    status: Optional[str] = Query(None, description="e.g. completed"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Sales with customer and warehouse names joined in, plus page totals.
+
+    Above /{sale_id} for exactly the reason the comment below spells out.
+    """
+    rows, total, summary = SaleService(db).ledger(
+        company_id=UUID(current_user["company_id"]),
+        skip=skip,
+        limit=limit,
+        status=status,
+    )
+    return {
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "summary": summary,
+        "data": rows,
+    }
+
+
 # Parameterised path last. FastAPI matches in declaration order and stops at the
 # first hit, so a literal route added later (e.g. /summary) would be swallowed
 # by /{sale_id} if this sat above it.

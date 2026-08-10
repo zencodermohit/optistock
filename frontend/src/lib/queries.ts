@@ -569,3 +569,80 @@ export function useReceiveDelivery() {
     },
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Sales ledger                                                                */
+/* -------------------------------------------------------------------------- */
+
+export interface SaleRow {
+  id: string;
+  status: string;
+  created_at: string;
+  total_amount: number;
+  customer_name: string;
+  customer_id: string;
+  warehouse_name: string;
+  units: number;
+  lines: number;
+}
+
+export interface SaleLine {
+  id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+}
+
+export function useSalesLedger(params: { status?: string; limit?: number } = {}) {
+  return useQuery({
+    queryKey: ["sales", "ledger", params] as const,
+    queryFn: () =>
+      api<{
+        total: number;
+        summary: { revenue: number; units: number; orders: number };
+        data: SaleRow[];
+      }>(`/sales/ledger${queryString({ limit: 100, ...params })}`),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/**
+ * One sale's line items, fetched only when a row is opened.
+ *
+ * The list endpoint leaves items out on purpose — a page of a hundred sales
+ * would drag several hundred item rows across the wire that nothing renders.
+ * This is the other half of that decision: pay for the detail exactly when
+ * somebody asks to see it.
+ */
+export function useSaleDetail(id: string | null) {
+  return useQuery({
+    queryKey: ["sales", "detail", id] as const,
+    queryFn: () => api<{ items: SaleLine[] }>(`/sales/${id}`),
+    enabled: Boolean(id),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Customer directory                                                          */
+/* -------------------------------------------------------------------------- */
+
+export interface CustomerRow {
+  id: string;
+  name: string;
+  email: string | null;
+  is_active: boolean;
+  orders: number;
+  lifetime_value: number;
+  last_order_at: string | null;
+  average_order_value: number | null;
+}
+
+export function useCustomerDirectory(search?: string) {
+  return useQuery({
+    queryKey: ["customers", "directory", search] as const,
+    queryFn: () =>
+      api<{ data: CustomerRow[] }>(`/customers/directory${queryString({ search })}`),
+    placeholderData: (previous) => previous,
+  });
+}

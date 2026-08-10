@@ -66,6 +66,25 @@ def list_customers(
     return {"total": total, "skip": skip, "limit": limit, "data": customers}
 
 
+@router.get("/directory")
+def get_directory(
+    search: Optional[str] = Query(None, description="Match name or email"),
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Customers ranked by what they are worth, with their trading history.
+
+    Above /{customer_id}: FastAPI matches in declaration order, and below it
+    "directory" would be read as a customer id and rejected as a bad UUID.
+    """
+    return {
+        "data": CustomerService(db).directory(
+            company_id=UUID(current_user["company_id"]), search=search, limit=limit
+        )
+    }
+
+
 @router.get("/{customer_id}", response_model=CustomerResponse)
 def get_customer(
     customer_id: UUID,

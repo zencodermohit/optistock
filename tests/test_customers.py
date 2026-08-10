@@ -182,3 +182,96 @@ def test_order_history_of_another_tenants_customer_is_not_reachable(
         authenticated_client.get(f"/api/v1/customers/{foreign.id}/orders").status_code
         == 404
     )
+
+
+# ---------------------------------------------------------------------------
+# The directory read model
+# ---------------------------------------------------------------------------
+def test_the_directory_ranks_customers_by_what_they_are_worth(
+    db_session, company, make_customer, make_warehouse, make_product, make_stock
+):
+    """Alphabetical order answers a question nobody arrived with."""
+    from app.modules.customers.service import CustomerService
+    from app.modules.sales.schemas import SaleCreate, SaleItemCreate
+    from app.modules.sales.service import SaleService
+
+    warehouse = make_warehouse(company)
+    product = make_product(company)
+    make_stock(product, warehouse, quantity=1000)
+
+    big = make_customer(company, name="Alpha Big")
+    small = make_customer(company, name="Zeta Small")
+    sales = SaleService(db_session)
+    for customer, quantity in ((small, 1), (big, 50)):
+        sales.create_sale(
+            SaleCreate(
+                customer_id=customer.id,
+                source_warehouse_id=warehouse.id,
+                items=[
+                    SaleItemCreate(product_id=product.id, quantity=quantity, unit_price=10.0)
+                ],
+            ),
+            company.id,
+        )
+    db_session.commit()
+
+    rows = CustomerService(db_session).directory(company.id)
+
+    assert rows[0]["name"] == "Alpha Big"
+    assert rows[0]["lifetime_value"] == 500.0
+    assert rows[0]["orders"] == 1
+    assert rows[0]["average_order_value"] == 500.0
+    assert rows[0]["last_order_at"] is not None
+
+
+def test_a_customer_who_never_ordered_still_appears(
+    db_session, company, make_customer
+):
+    """A LEFT join, deliberately. Someone who has never ordered is the row worth
+    a phone call, and an inner join would hide them."""
+    from app.modules.customers.service import CustomerService
+
+    make_customer(company, name="Never Ordered")
+    db_session.commit()
+
+    rows = CustomerService(db_session).directory(company.id)
+
+    assert len(rows) == 1
+    assert rows[0]["orders"] == 0
+    assert rows[0]["lifetime_value"] == 0.0
+    assert rows[0]["last_order_at"] is None
+    # Not zero: an average of nothing is not 0, it does not exist.
+    assert rows[0]["average_order_value"] is None
+
+
+def test_the_directory_is_scoped_to_the_company(
+    db_session, company, other_company, make_customer
+):
+    from app.modules.customers.service import CustomerService
+
+    make_customer(company, name="Mine Only")
+    make_customer(other_company, name="Theirs Only")
+    db_session.commit()
+
+    names = [r["name"] for r in CustomerService(db_session).directory(company.id)]
+
+    assert names == ["Mine Only"]
+
+
+def test_the_directory_can_be_searched(db_session, company, make_customer):
+    from app.modules.customers.service import CustomerService
+
+    make_customer(company, name="Findable Ltd")
+    make_customer(company, name="Other Corp")
+    db_session.commit()
+
+    rows = CustomerService(db_session).directory(company.id, search="findable")
+
+    assert [r["name"] for r in rows] == ["Findable Ltd"]
+
+
+def test_directory_is_routed_above_the_id_lookup(authenticated_client):
+    response = authenticated_client.get("/api/v1/customers/directory")
+
+    assert response.status_code == 200
+    assert "data" in response.json()

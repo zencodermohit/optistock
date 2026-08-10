@@ -190,3 +190,84 @@ def test_analyst_cannot_create_sales(
         },
     )
     assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# The ledger read model
+# ---------------------------------------------------------------------------
+def test_the_ledger_joins_names_and_counts_units(
+    db_session, company, make_customer, make_warehouse, make_product, make_stock
+):
+    """SaleResponse returns UUIDs; a page rendering those at a person is not a
+    page. Units come from a grouped query rather than one per row."""
+    from app.modules.sales.schemas import SaleCreate, SaleItemCreate
+    from app.modules.sales.service import SaleService
+
+    customer = make_customer(company, name="Ledger Buyer")
+    warehouse = make_warehouse(company, name="Ledger Depot")
+    product = make_product(company, sku="LEDG-1")
+    other = make_product(company, sku="LEDG-2")
+    make_stock(product, warehouse, quantity=100)
+    make_stock(other, warehouse, quantity=100)
+
+    SaleService(db_session).create_sale(
+        SaleCreate(
+            customer_id=customer.id,
+            source_warehouse_id=warehouse.id,
+            items=[
+                SaleItemCreate(product_id=product.id, quantity=3, unit_price=10.0),
+                SaleItemCreate(product_id=other.id, quantity=4, unit_price=5.0),
+            ],
+        ),
+        company.id,
+    )
+    db_session.commit()
+
+    rows, total, summary = SaleService(db_session).ledger(company.id)
+
+    assert total == 1
+    row = rows[0]
+    assert row["customer_name"] == "Ledger Buyer"
+    assert row["warehouse_name"] == "Ledger Depot"
+    assert row["units"] == 7
+    assert row["lines"] == 2
+    assert row["total_amount"] == 50.0
+    # The footer totals what is on screen, so a reader can check it against the
+    # rows in front of them.
+    assert summary == {"revenue": 50.0, "units": 7, "orders": 1}
+
+
+def test_the_ledger_is_scoped_to_the_company(
+    db_session, company, other_company, make_customer, make_warehouse, make_product,
+    make_stock,
+):
+    from app.modules.sales.schemas import SaleCreate, SaleItemCreate
+    from app.modules.sales.service import SaleService
+
+    for owner, name in ((company, "Mine"), (other_company, "Theirs")):
+        customer = make_customer(owner, name=name)
+        warehouse = make_warehouse(owner)
+        product = make_product(owner)
+        make_stock(product, warehouse, quantity=50)
+        SaleService(db_session).create_sale(
+            SaleCreate(
+                customer_id=customer.id,
+                source_warehouse_id=warehouse.id,
+                items=[SaleItemCreate(product_id=product.id, quantity=1, unit_price=1.0)],
+            ),
+            owner.id,
+        )
+    db_session.commit()
+
+    rows, _, _ = SaleService(db_session).ledger(company.id)
+
+    assert [r["customer_name"] for r in rows] == ["Mine"]
+
+
+def test_ledger_is_routed_above_the_id_lookup(authenticated_client):
+    """The router's own comment warns about this: a literal route below
+    /{sale_id} is swallowed and rejected as a malformed UUID."""
+    response = authenticated_client.get("/api/v1/sales/ledger")
+
+    assert response.status_code == 200
+    assert "summary" in response.json()

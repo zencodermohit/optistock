@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
 from typing import List, Tuple
@@ -33,6 +34,95 @@ class SaleService:
         sales = query.order_by(Sale.created_at.desc()).offset(skip).limit(limit).all()
 
         return sales, total
+
+    def ledger(
+        self,
+        company_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        status: str = None,
+    ) -> Tuple[List[dict], int, dict]:
+        """Sales with names joined in, plus the totals for the window shown.
+
+        The read model for the Sales screen, in the same sense as the purchase
+        order pipeline: SaleResponse returns customer_id and warehouse_id, and
+        a page rendering UUIDs at a person is not a page.
+
+        Line items stay out, deliberately -- SaleResponse leaves them out
+        because a page of fifty sales would drag several hundred item rows
+        across the wire that the list never shows, and that reasoning does not
+        stop being true here. What IS included is each sale's unit count, which
+        is the one thing about the items a ledger row needs: it is the demand
+        signal every forecast on this system is built from.
+        """
+        base = self.db.query(Sale).filter(Sale.company_id == company_id)
+        if status:
+            base = base.filter(Sale.status == status)
+
+        total = base.count()
+        sales = (
+            base.order_by(Sale.created_at.desc()).offset(skip).limit(limit).all()
+        )
+        if not sales:
+            return [], total, {"revenue": 0.0, "units": 0, "orders": 0}
+
+        sale_ids = [s.id for s in sales]
+
+        customers = dict(
+            self.db.query(Customer.id, Customer.name)
+            .filter(Customer.company_id == company_id)
+            .all()
+        )
+        warehouses = dict(
+            self.db.query(Warehouse.id, Warehouse.name)
+            .filter(Warehouse.company_id == company_id)
+            .all()
+        )
+        # One grouped query for every unit count on the page, rather than one
+        # per row. The N+1 here would be invisible at ten sales and painful at
+        # a hundred.
+        units = dict(
+            self.db.query(
+                SaleItem.sale_id,
+                func.coalesce(func.sum(SaleItem.quantity), 0),
+            )
+            .filter(SaleItem.sale_id.in_(sale_ids))
+            .group_by(SaleItem.sale_id)
+            .all()
+        )
+        lines = dict(
+            self.db.query(SaleItem.sale_id, func.count(SaleItem.id))
+            .filter(SaleItem.sale_id.in_(sale_ids))
+            .group_by(SaleItem.sale_id)
+            .all()
+        )
+
+        rows = [
+            {
+                "id": str(sale.id),
+                "status": sale.status,
+                "created_at": sale.created_at,
+                "total_amount": float(sale.total_amount or 0),
+                "customer_name": customers.get(sale.customer_id, "Unknown customer"),
+                "customer_id": str(sale.customer_id),
+                "warehouse_name": warehouses.get(
+                    sale.source_warehouse_id, "Unknown warehouse"
+                ),
+                "units": int(units.get(sale.id, 0)),
+                "lines": int(lines.get(sale.id, 0)),
+            }
+            for sale in sales
+        ]
+
+        # Totals for what is on screen, not for all time. A footer claiming a
+        # figure the reader cannot see the rows behind is a footer they cannot
+        # check.
+        summary = {
+            "revenue": round(sum(r["total_amount"] for r in rows), 2),
+            "units": sum(r["units"] for r in rows),
+            "orders": len(rows),
+        }
+        return rows, total, summary
 
     def get_sale_by_id(self, sale_id: UUID, company_id: UUID) -> Sale:
         """A single sale with its line items.
