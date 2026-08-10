@@ -30,6 +30,7 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.modules.alerts.models import STATUS_OPEN, Alert
 from app.modules.analytics.accuracy import accuracy_summary
 from app.modules.analytics.projections import recent_metrics
@@ -279,6 +280,19 @@ def stockout_risk(db: Session, company_id: UUID, days: int = 0, limit: int = 10)
 
     return {
         "summary": summarise(risks),
+        # Stated with the answers rather than buried in a config file. An
+        # "optimal" order quantity is only as meaningful as the costs it was
+        # optimised against, and the model should be able to say so when asked
+        # where the number came from.
+        "assumptions": {
+            "lead_time_days": settings.SUPPLIER_LEAD_TIME_DAYS,
+            "order_cost": settings.ORDER_COST,
+            "holding_cost_rate": settings.HOLDING_COST_RATE,
+            "note": (
+                "Order quantity is EOQ; the reorder point covers the lead time "
+                "plus a buffer for days busier than average."
+            ),
+        },
         "at_risk": [
             {
                 "sku": r.sku,
@@ -291,6 +305,8 @@ def stockout_risk(db: Session, company_id: UUID, days: int = 0, limit: int = 10)
                 "runs_out_on": r.stockout_date,
                 "severity": r.severity,
                 "confidence": r.confidence,
+                "order_quantity": r.order_quantity,
+                "suggested_reorder_point": r.suggested_reorder_point,
                 "why": r.explanation,
             }
             for r in risks

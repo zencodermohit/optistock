@@ -60,6 +60,13 @@ def supplier_scorecard(db: Session, company_id: UUID) -> List[Dict[str, Any]]:
             func.sum(case((PurchaseOrder.status == "delivered", 1), else_=0)).label(
                 "delivered"
             ),
+            # Orders that actually left the building. A draft has not been sent,
+            # so it has had no opportunity to arrive -- counting it against the
+            # supplier would drop their rate the instant somebody raises an
+            # order, which blames them for our paperwork.
+            func.sum(case((PurchaseOrder.status != "draft", 1), else_=0)).label(
+                "placed"
+            ),
             func.max(PurchaseOrder.created_at).label("last_order_at"),
         )
         .filter(PurchaseOrder.company_id == company_id)
@@ -77,6 +84,7 @@ def supplier_scorecard(db: Session, company_id: UUID) -> List[Dict[str, Any]]:
             orders.c.orders,
             orders.c.spend,
             orders.c.delivered,
+            orders.c.placed,
             orders.c.last_order_at,
         )
         # Outer, because a supplier you have never ordered from is a real row —
@@ -97,13 +105,15 @@ def supplier_scorecard(db: Session, company_id: UUID) -> List[Dict[str, Any]]:
             "orders": int(row.orders or 0),
             "spend": float(row.spend or 0),
             "delivered": int(row.delivered or 0),
+            "placed": int(row.placed or 0),
             "last_order_at": row.last_order_at,
-            # None rather than 0 when nothing has been ordered: a delivery rate
-            # of "no orders" is not a rate of zero, and showing 0% would libel
-            # a supplier for the crime of being new.
+            # None rather than 0 in both of the cases where a rate would be a
+            # lie: nothing ordered at all, and nothing yet SENT. A supplier
+            # whose only order is still a draft has not failed to deliver
+            # anything, and 0% would say they had.
             "delivery_rate": (
-                round(int(row.delivered or 0) / int(row.orders), 3)
-                if row.orders
+                round(int(row.delivered or 0) / int(row.placed), 3)
+                if row.placed
                 else None
             ),
         }

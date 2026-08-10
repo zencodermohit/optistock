@@ -62,8 +62,41 @@ def test_delivery_rate_is_counted_from_orders_not_asserted(
 
     assert row["orders"] == 4
     assert row["delivered"] == 1
-    assert row["delivery_rate"] == 0.25
+    # Only the delivered one ever left draft, so it is the only order that had
+    # a chance to arrive -- and a supplier is not judged on our paperwork.
+    assert row["placed"] == 1
+    assert row["delivery_rate"] == 1.0
     assert row["spend"] == 40.0
+
+
+def test_a_draft_order_does_not_count_against_a_supplier(
+    db_session, company, supplier, make_product, make_warehouse
+):
+    """Raising an order must not instantly drop the supplier to 0%.
+
+    A draft has not been sent, so it has had no opportunity to be late. Found
+    on real data: two suppliers showed 0% while every order against them was
+    still sitting in draft.
+    """
+    product = make_product(company, sku="DRAFT-1")
+    warehouse = make_warehouse(company)
+    PurchaseOrderService(db_session).create_po(
+        PurchaseOrderCreate(
+            supplier_id=supplier.id,
+            destination_warehouse_id=warehouse.id,
+            items=[POItemBase(product_id=product.id, quantity=1, unit_price=10.0)],
+        ),
+        company.id,
+    )
+    db_session.commit()
+
+    row = next(
+        r for r in supplier_scorecard(db_session, company.id) if r["name"] == "Acme Supply"
+    )
+
+    assert row["orders"] == 1
+    assert row["placed"] == 0
+    assert row["delivery_rate"] is None
 
 
 def test_a_supplier_with_no_orders_has_no_delivery_rate(db_session, company, supplier):

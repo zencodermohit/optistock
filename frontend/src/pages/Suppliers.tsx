@@ -98,7 +98,7 @@ export function Suppliers() {
                       {row.orders > 0 ? count(row.orders) : "—"}
                     </TD>
                     <TD numeric className="text-ink-muted">
-                      {row.orders > 0 ? count(row.delivered) : "—"}
+                      {row.placed > 0 ? `${count(row.delivered)} of ${count(row.placed)}` : "—"}
                     </TD>
                     <TD>
                       <DeliveryRate row={row} />
@@ -139,7 +139,11 @@ export function Suppliers() {
  */
 function DeliveryRate({ row }: { row: SupplierScore }) {
   if (row.delivery_rate === null) {
-    return <span className="text-2xs text-ink-subtle">no orders yet</span>;
+    return (
+      <span className="text-2xs text-ink-subtle">
+        {row.orders > 0 ? "none sent yet" : "no orders yet"}
+      </span>
+    );
   }
   const pct = row.delivery_rate * 100;
   const poor = row.delivery_rate < 0.6;

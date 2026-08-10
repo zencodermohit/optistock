@@ -96,7 +96,11 @@ export function StockoutRisk() {
       <Band>
         <BandHeader
           label="By urgency"
-          description={`Sales velocity measured over the last ${query.data?.lookback_days ?? 30} days, divided by the whole window rather than by the days that happened to have sales.`}
+          description={
+            query.data
+              ? `Velocity measured over the last ${query.data.lookback_days} days, divided by the whole window rather than by the days that happened to have sales. Order quantity is EOQ, assuming ${query.data.assumptions.lead_time_days}-day lead time, ${query.data.assumptions.order_cost.toLocaleString()} per order and ${(query.data.assumptions.holding_cost_rate * 100).toFixed(0)}% annual holding cost.`
+              : undefined
+          }
           action={
             <div className="flex flex-wrap gap-1">
               <FilterChip
@@ -136,6 +140,8 @@ export function StockoutRisk() {
                   <Th align="right">Usage/day</Th>
                   <Th align="right">Days left</Th>
                   <Th>Runs out</Th>
+                  <Th align="right">Order</Th>
+                  <Th align="right">Reorder at</Th>
                   <Th>Confidence</Th>
                 </tr>
               </thead>
@@ -184,6 +190,25 @@ export function StockoutRisk() {
                       )}
                     </Td>
                     <Td muted>{row.stockout_date ?? "—"}</Td>
+                    {/* What to do about it. EOQ balances the cost of ordering
+                        against the cost of holding; the reorder point covers
+                        the lead time plus the days busier than average. Both
+                        are blank rather than zero where there is no demand or
+                        no unit cost to optimise against. */}
+                    <Td align="right">
+                      {row.order_quantity != null ? (
+                        <span className="font-medium">
+                          {row.order_quantity.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-ink-subtle">—</span>
+                      )}
+                    </Td>
+                    <Td align="right" muted>
+                      {row.suggested_reorder_point != null
+                        ? row.suggested_reorder_point.toLocaleString()
+                        : "—"}
+                    </Td>
                     <Td muted>
                       {row.confidence}
                       <span className="ml-1 text-ink-subtle">

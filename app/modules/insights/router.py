@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.modules.analytics.accuracy import accuracy_summary
@@ -83,5 +84,13 @@ def stockout_risk(
     return {
         "lookback_days": lookback_days,
         "summary": summarise(risks),
+        # Published with the figures they produced. An "optimal" order quantity
+        # is only as meaningful as the costs it was optimised against, and a
+        # reader who cannot see the assumption cannot judge the answer.
+        "assumptions": {
+            "lead_time_days": settings.SUPPLIER_LEAD_TIME_DAYS,
+            "order_cost": settings.ORDER_COST,
+            "holding_cost_rate": settings.HOLDING_COST_RATE,
+        },
         "data": [r.to_dict() for r in risks],
     }

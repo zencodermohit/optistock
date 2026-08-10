@@ -471,6 +471,11 @@ export interface StockoutRisk {
   lookback_days: number;
   /** One checkable sentence, computed server-side so every surface agrees. */
   explanation: string;
+  /** EOQ. Null when there is no demand or no unit cost to optimise against. */
+  order_quantity: number | null;
+  safety_stock: number | null;
+  suggested_reorder_point: number | null;
+  peak_daily_usage: number;
 }
 
 export interface StockoutSummary {
@@ -490,6 +495,11 @@ export function useStockoutRisk(lookbackDays = 30) {
       api<{
         lookback_days: number;
         summary: StockoutSummary;
+        assumptions: {
+          lead_time_days: number;
+          order_cost: number;
+          holding_cost_rate: number;
+        };
         data: StockoutRisk[];
       }>(`/insights/stockout-risk?lookback_days=${lookbackDays}&limit=200`),
     staleTime: 60_000,
@@ -660,8 +670,10 @@ export interface SupplierScore {
   orders: number;
   spend: number;
   delivered: number;
+  /** Orders that actually left draft — the only ones that could arrive. */
+  placed: number;
   last_order_at: string | null;
-  /** Null when nothing has been ordered — not zero. */
+  /** Null when nothing has been SENT — not zero. */
   delivery_rate: number | null;
 }
 

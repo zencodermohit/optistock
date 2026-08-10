@@ -55,6 +55,24 @@ class Settings(BaseSettings):
     FORECAST_LOOKBACK_DAYS: int = 30
     FORECAST_HORIZON_DAYS: int = 7
 
+    # --- Reorder policy ----------------------------------------------------
+    # EOQ and safety stock need three numbers this schema does not hold. They
+    # are settings rather than hardcoded constants, and the screen states them
+    # beside the figures they produce -- an optimal order quantity is only as
+    # meaningful as the costs it was optimised against, and a reader who cannot
+    # see the assumption cannot judge the answer.
+    #
+    # Fixed cost of raising one order: paperwork, delivery, receiving.
+    ORDER_COST: float = 500.0
+    # Annual cost of holding one unit, as a fraction of its value -- capital,
+    # storage, insurance, obsolescence. 20% is the usual industry starting
+    # point and is meant to be tuned per business.
+    HOLDING_COST_RATE: float = 0.20
+    # Days between placing an order and it landing on the shelf. A single
+    # figure because no supplier lead time is measured yet; when purchase
+    # orders carry real delivery dates this should come from them.
+    SUPPLIER_LEAD_TIME_DAYS: int = 7
+
     # .env is shared between this application and docker-compose.yml, which needs
     # infrastructure variables the app does not own (POSTGRES_PASSWORD, PGADMIN_*).
     # Ignore anything undeclared here rather than refusing to boot; the fields

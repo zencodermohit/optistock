@@ -39,6 +39,8 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.modules.analytics.eoq import calculate_eoq, calculate_safety_stock
 from app.modules.inventory.models import Inventory
 from app.modules.products.models import Product
 from app.modules.sales.models import Sale, SaleItem
@@ -92,6 +94,17 @@ class StockoutRisk:
     lookback_days: int
     explanation: str
 
+    # -- what to do about it -------------------------------------------------
+    #: Economic order quantity: the order size where ordering cost and holding
+    #: cost balance. None when there is no demand to optimise against.
+    order_quantity: Optional[int] = None
+    #: Buffer covering demand variability across the lead time.
+    safety_stock: Optional[int] = None
+    #: The level at which ordering `order_quantity` arrives just in time.
+    suggested_reorder_point: Optional[int] = None
+    #: The busiest single day observed, which is what safety stock is sized on.
+    peak_daily_usage: float = 0.0
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
@@ -127,6 +140,73 @@ def _confidence(active_days: int, lookback_days: int) -> str:
     if coverage >= 0.15:
         return "medium"
     return "low"
+
+
+def _reorder_policy(
+    daily_usage: float, peak_daily: float, unit_cost: float
+) -> Dict[str, Optional[int]]:
+    """What to order, and when — from the textbook formulas and real demand.
+
+    `calculate_eoq` and `calculate_safety_stock` have been in the codebase,
+    unit-tested and uncalled, since the analytics module was written. Nothing
+    was wrong with them; they needed three numbers the schema does not hold, and
+    inventing those numbers quietly would have been worse than leaving the
+    functions unused. They are settings now, stated on screen beside the answers
+    they produce.
+
+    One honest simplification. The safety stock formula wants demand
+    variability AND lead-time variability, and this system measures the first
+    but not the second: sales are recorded per day, so the busiest day observed
+    is a real number, while no purchase order records when it was actually
+    promised versus when it landed. So lead time is passed as its own average
+    for both arguments, which reduces the formula to demand variability alone:
+
+        safety stock = (peak daily - average daily) x lead time
+
+    That under-covers a supplier who is late as well as busy. Saying so is
+    better than a figure that looks like it accounts for something it does not.
+    """
+    if daily_usage <= 0 or unit_cost <= 0:
+        return {
+            "order_quantity": None,
+            "safety_stock": None,
+            "suggested_reorder_point": None,
+        }
+
+    lead_time = max(settings.SUPPLIER_LEAD_TIME_DAYS, 1)
+    holding_cost = unit_cost * settings.HOLDING_COST_RATE
+
+    try:
+        eoq = calculate_eoq(
+            annual_demand=daily_usage * 365,
+            order_cost=settings.ORDER_COST,
+            holding_cost_per_unit=holding_cost,
+        )
+    except ValueError:
+        # The helper refuses nonsense inputs rather than returning one. A
+        # product priced at zero lands here, and no recommendation is the right
+        # answer for it.
+        return {
+            "order_quantity": None,
+            "safety_stock": None,
+            "suggested_reorder_point": None,
+        }
+
+    safety = calculate_safety_stock(
+        max_daily_demand=max(peak_daily, daily_usage),
+        max_lead_time_days=lead_time,
+        avg_daily_demand=daily_usage,
+        avg_lead_time_days=lead_time,
+    )
+    # Reorder point: cover the lead time at the usual rate, plus the buffer for
+    # the days that are busier than usual.
+    reorder_point = daily_usage * lead_time + safety
+
+    return {
+        "order_quantity": max(1, round(eoq)),
+        "safety_stock": round(safety),
+        "suggested_reorder_point": max(1, round(reorder_point)),
+    }
 
 
 def _explain(row: StockoutRisk) -> str:
@@ -192,6 +272,7 @@ def stockout_risks(
             Inventory.reorder_point,
             Product.sku,
             Product.name.label("product_name"),
+            Product.unit_cost,
             Warehouse.name.label("warehouse_name"),
         )
         .join(Product, Product.id == Inventory.product_id)
@@ -230,6 +311,37 @@ def stockout_risks(
             int(row.days or 0),
         )
         for row in sold
+    }
+
+    # The busiest single day per line, in two stages: sum each day, then take
+    # the largest. Safety stock is sized on the gap between a normal day and a
+    # bad one, so an average cannot produce it -- this is the one figure in the
+    # policy that has to come from daily grain.
+    per_day = (
+        db.query(
+            SaleItem.product_id.label("product_id"),
+            Sale.source_warehouse_id.label("warehouse_id"),
+            func.date(Sale.created_at).label("day"),
+            func.sum(SaleItem.quantity).label("units"),
+        )
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .filter(
+            Sale.company_id == company_id,
+            Sale.created_at >= cutoff,
+            Sale.created_at < now,
+        )
+        .group_by(SaleItem.product_id, Sale.source_warehouse_id, func.date(Sale.created_at))
+        .subquery()
+    )
+    peaks = {
+        (str(row.product_id), str(row.warehouse_id)): float(row.peak or 0)
+        for row in db.query(
+            per_day.c.product_id,
+            per_day.c.warehouse_id,
+            func.max(per_day.c.units).label("peak"),
+        )
+        .group_by(per_day.c.product_id, per_day.c.warehouse_id)
+        .all()
     }
 
     results: List[StockoutRisk] = []
@@ -272,6 +384,12 @@ def stockout_risks(
             confidence=_confidence(active_days, lookback_days),
             lookback_days=lookback_days,
             explanation="",
+            peak_daily_usage=round(peaks.get(key, daily_usage), 2),
+            **_reorder_policy(
+                daily_usage=daily_usage,
+                peak_daily=peaks.get(key, daily_usage),
+                unit_cost=float(line.unit_cost or 0),
+            ),
         )
         risk.explanation = _explain(risk)
         results.append(risk)

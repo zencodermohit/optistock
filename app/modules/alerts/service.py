@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
@@ -7,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import OptiStockException, ResourceNotFoundError
+from app.modules.alerts.notifications import notify_critical
 from app.modules.alerts.models import (
     SEVERITY_CRITICAL,
     SEVERITY_INFO,
@@ -31,6 +33,9 @@ _SEVERITY_RANK = case(
     value=Alert.severity,
     else_=3,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class AlertService:
@@ -79,6 +84,21 @@ class AlertService:
                 self.db.flush()
         except IntegrityError:
             return None
+
+        # After the row exists, and outside anything that could undo it. A
+        # critical alert is the one case where waiting for someone to open the
+        # app is too late; everything below warning stays on screen only.
+        #
+        # Wrapped because the alert is the durable record and the email is a
+        # courtesy: an unreachable mail server must not roll back the consumer's
+        # transaction and lose the alert it was trying to announce.
+        try:
+            notify_critical(self.db, alert)
+        except Exception:
+            logger.exception(
+                "alerts.notification_failed", extra={"alert_id": str(alert.id)}
+            )
+
         return alert
 
     def resolve_matching(
