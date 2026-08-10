@@ -12,6 +12,7 @@ import {
   Package,
   ShoppingCart,
   Sparkles,
+  Truck,
   Users,
   X,
   type LucideIcon,
@@ -60,6 +61,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/inventory", label: "Inventory", icon: Boxes },
       { to: "/products", label: "Products", icon: Package },
+      { to: "/purchase-orders", label: "Purchase orders", icon: Truck },
       { to: "/sales", label: "Sales", icon: ShoppingCart },
       { to: "/customers", label: "Customers", icon: Users },
     ],

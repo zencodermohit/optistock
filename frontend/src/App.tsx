@@ -12,6 +12,7 @@ import { Login } from "@/pages/Login";
 import { Overview } from "@/pages/Overview";
 import { Placeholder } from "@/pages/Placeholder";
 import { Products } from "@/pages/Products";
+import { PurchaseOrders } from "@/pages/PurchaseOrders";
 import { StockoutRisk } from "@/pages/StockoutRisk";
 
 /** Bounce anonymous visitors to login, remembering where they were going. */
@@ -62,6 +63,7 @@ export default function App() {
         />
         <Route path="assistant" element={<Assistant />} />
         <Route path="approvals" element={<Approvals />} />
+        <Route path="purchase-orders" element={<PurchaseOrders />} />
         <Route path="insights" element={<Insights />} />
         <Route path="stockout-risk" element={<StockoutRisk />} />
         <Route path="alerts" element={<Alerts />} />

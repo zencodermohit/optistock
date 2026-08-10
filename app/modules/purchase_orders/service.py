@@ -34,6 +34,118 @@ class PurchaseOrderService:
         pos = query.offset(skip).limit(limit).all()
         return pos, total
 
+    def pipeline(self, company_id: UUID, limit: int = 100) -> List[dict]:
+        """Purchase orders with the names and the provenance a screen needs.
+
+        The read model for the Purchase Orders page, in the same sense as
+        InsightsService.recommendations: the ORM response returns supplier_id
+        and product_id, and a page that renders raw UUIDs at a stock controller
+        is not a page. Names are joined here, once, rather than reassembled from
+        four more requests in the browser.
+
+        Provenance is the part that does not exist anywhere else. Some of these
+        orders began as an assistant proposal that a human amended and approved,
+        and the screen says so -- including what the model asked for when that
+        differs from what was signed. Without it, an approved suggestion becomes
+        an anonymous order and the whole human-in-the-loop story disappears at
+        the last step.
+        """
+        # Imported inside the method because the dependency runs the other way
+        # at import time: assistant.actions imports this service to execute an
+        # approval. Same lazy-import reason as assistant.tools.
+        from app.modules.assistant.models import AssistantAction
+
+        orders = (
+            self.db.query(PurchaseOrder)
+            .options(joinedload(PurchaseOrder.items))
+            .filter(PurchaseOrder.company_id == company_id)
+            .order_by(PurchaseOrder.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        if not orders:
+            return []
+
+        order_ids = [po.id for po in orders]
+
+        suppliers = dict(
+            self.db.query(Supplier.id, Supplier.name)
+            .filter(Supplier.company_id == company_id)
+            .all()
+        )
+        warehouses = dict(
+            self.db.query(Warehouse.id, Warehouse.name)
+            .filter(Warehouse.company_id == company_id)
+            .all()
+        )
+        products = {
+            row.id: (row.sku, row.name)
+            for row in self.db.query(Product.id, Product.sku, Product.name)
+            .filter(Product.company_id == company_id)
+            .all()
+        }
+
+        # One query for every order's provenance, keyed by the order it became.
+        origins = {
+            action.result_id: action
+            for action in self.db.query(AssistantAction)
+            .filter(
+                AssistantAction.company_id == company_id,
+                AssistantAction.result_id.in_(order_ids),
+            )
+            .all()
+        }
+
+        results = []
+        for po in orders:
+            action = origins.get(po.id)
+            proposed = (action.proposed_payload or {}) if action else {}
+            executed = (action.executed_payload or {}) if action else {}
+
+            results.append(
+                {
+                    "id": str(po.id),
+                    "status": po.status,
+                    "created_at": po.created_at,
+                    "expected_delivery_date": po.expected_delivery_date,
+                    "total_amount": float(po.total_amount or 0),
+                    "supplier_name": suppliers.get(po.supplier_id, "Unknown supplier"),
+                    "warehouse_name": warehouses.get(
+                        po.destination_warehouse_id, "Unknown warehouse"
+                    ),
+                    "items": [
+                        {
+                            "sku": products.get(item.product_id, ("?", "?"))[0],
+                            "product_name": products.get(item.product_id, ("?", "?"))[1],
+                            "quantity": item.quantity,
+                            "unit_price": float(item.unit_price or 0),
+                            "line_total": float(item.unit_price or 0) * item.quantity,
+                        }
+                        for item in po.items
+                    ],
+                    "units": sum(item.quantity for item in po.items),
+                    # Null for an order somebody typed in by hand, which is the
+                    # honest answer -- absence of provenance is not "human", it
+                    # is "no proposal behind this".
+                    "origin": (
+                        {
+                            "model": action.proposed_by_model,
+                            "rationale": action.rationale,
+                            "source_question": action.source_question,
+                            "decided_at": action.decided_at,
+                            "proposed_quantity": proposed.get("quantity"),
+                            "executed_quantity": executed.get("quantity"),
+                            "amended": (
+                                executed.get("quantity") != proposed.get("quantity")
+                            ),
+                        }
+                        if action
+                        else None
+                    ),
+                }
+            )
+        return results
+
     def get_po_by_id(self, po_id: UUID, company_id: UUID) -> PurchaseOrder:
         po = (
             self.db.query(PurchaseOrder)

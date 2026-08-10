@@ -74,6 +74,25 @@ def get_purchase_orders(
     return {"total": total, "skip": skip, "limit": limit, "data": pos}
 
 
+@router.get("/pipeline")
+def get_pipeline(
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Orders with supplier, warehouse and product names joined in, plus origin.
+
+    Declared above `/{po_id}` deliberately: FastAPI matches routes in
+    declaration order, and below it "pipeline" would be read as a purchase
+    order id and rejected as a malformed UUID.
+    """
+    return {
+        "data": PurchaseOrderService(db).pipeline(
+            company_id=UUID(current_user["company_id"]), limit=limit
+        )
+    }
+
+
 @router.get("/{po_id}", response_model=PurchaseOrderResponse)
 def get_purchase_order(
     po_id: UUID,

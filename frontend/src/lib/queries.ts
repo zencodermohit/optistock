@@ -495,3 +495,77 @@ export function useStockoutRisk(lookbackDays = 30) {
     staleTime: 60_000,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Purchase orders                                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface POLine {
+  sku: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
+
+/** Where an order came from. Null when a person typed it in themselves. */
+export interface POOrigin {
+  model: string | null;
+  rationale: string | null;
+  source_question: string | null;
+  decided_at: string | null;
+  proposed_quantity: number | null;
+  executed_quantity: number | null;
+  /** True when the approver changed what the model asked for. */
+  amended: boolean;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  status: "draft" | "submitted" | "delivered" | "cancelled";
+  created_at: string;
+  expected_delivery_date: string | null;
+  total_amount: number;
+  supplier_name: string;
+  warehouse_name: string;
+  items: POLine[];
+  units: number;
+  origin: POOrigin | null;
+}
+
+export function usePurchaseOrders() {
+  return useQuery({
+    queryKey: ["purchase-orders", "pipeline"] as const,
+    queryFn: () => api<{ data: PurchaseOrder[] }>("/purchase_orders/pipeline"),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Receive a delivery.
+ *
+ * This is the one mutation in the app that moves physical stock: the endpoint
+ * increments inventory inside the same transaction. Everything that counts
+ * stock is therefore stale the moment it succeeds, which is why the
+ * invalidation list is broad rather than surgical.
+ */
+export function useReceiveDelivery() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<{ id: string; status: string }>(`/purchase_orders/${id}/deliver`, {
+        method: "PATCH",
+      }),
+    onSuccess: () => {
+      for (const key of [
+        ["purchase-orders"],
+        ["inventory"],
+        ["dashboard"],
+        ["insights"],
+        ["alerts"],
+      ]) {
+        void client.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+}
