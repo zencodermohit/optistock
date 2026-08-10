@@ -444,3 +444,114 @@ def test_the_approvals_list_is_scoped_to_the_company(
     assert len(body["actions"]) == 1
     assert body["actions"][0]["proposed"]["sku"] == "REORDER-1"
     assert body["actions"][0]["status"] == STATUS_PROPOSED
+
+
+# ---------------------------------------------------------------------------
+# Status codes
+#
+# Every one of these was a 500 before. The router raised domain exceptions the
+# global handler had no case for, so "you already approved that" -- which is
+# what a double-click produces -- reported a server failure. Found by clicking
+# through the real screen rather than by any test, which is why they are here
+# now.
+# ---------------------------------------------------------------------------
+def test_another_tenants_proposal_is_a_404_over_http(
+    authenticated_client, db_session, company, other_company, orderable, other_auth_headers
+):
+    """404 rather than 403, deliberately: a 403 confirms the id exists."""
+    action, _ = ActionService(db_session).propose_purchase_order(
+        company_id=company.id, sku="REORDER-1", quantity=10
+    )
+    db_session.commit()
+
+    response = authenticated_client.post(
+        f"/api/v1/assistant/actions/{action.id}/approve",
+        json={},
+        headers=other_auth_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_a_missing_proposal_is_a_404(authenticated_client):
+    import uuid
+
+    response = authenticated_client.post(
+        f"/api/v1/assistant/actions/{uuid.uuid4()}/approve", json={}
+    )
+
+    assert response.status_code == 404
+
+
+def test_approving_twice_is_a_409_not_a_500(
+    authenticated_client, db_session, company, orderable
+):
+    """The double-click case. A user will hit this by accident on day one."""
+    action, _ = ActionService(db_session).propose_purchase_order(
+        company_id=company.id, sku="REORDER-1", quantity=10
+    )
+    db_session.commit()
+
+    first = authenticated_client.post(
+        f"/api/v1/assistant/actions/{action.id}/approve", json={}
+    )
+    second = authenticated_client.post(
+        f"/api/v1/assistant/actions/{action.id}/approve", json={}
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert "already" in second.json()["detail"].lower()
+
+
+def test_an_expired_proposal_is_a_409_with_a_useful_message(
+    authenticated_client, db_session, company, orderable
+):
+    action, _ = ActionService(db_session).propose_purchase_order(
+        company_id=company.id, sku="REORDER-1", quantity=10
+    )
+    action.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    db_session.commit()
+
+    response = authenticated_client.post(
+        f"/api/v1/assistant/actions/{action.id}/approve", json={}
+    )
+
+    assert response.status_code == 409
+    assert "out of date" in response.json()["detail"]
+
+
+def test_rejecting_a_decided_proposal_is_also_a_409(
+    authenticated_client, db_session, company, orderable
+):
+    action, _ = ActionService(db_session).propose_purchase_order(
+        company_id=company.id, sku="REORDER-1", quantity=10
+    )
+    db_session.commit()
+
+    authenticated_client.post(f"/api/v1/assistant/actions/{action.id}/reject", json={})
+    again = authenticated_client.post(
+        f"/api/v1/assistant/actions/{action.id}/reject", json={}
+    )
+
+    assert again.status_code == 409
+
+
+def test_a_read_only_role_cannot_approve(
+    authenticated_client, db_session, company, orderable, analyst_headers
+):
+    """The same roles as creating a purchase order by hand. An assistant
+    suggestion must not be a way around the permission."""
+    action, _ = ActionService(db_session).propose_purchase_order(
+        company_id=company.id, sku="REORDER-1", quantity=10
+    )
+    db_session.commit()
+
+    response = authenticated_client.post(
+        f"/api/v1/assistant/actions/{action.id}/approve",
+        json={},
+        headers=analyst_headers,
+    )
+
+    assert response.status_code == 403
+    assert action.status == STATUS_PROPOSED

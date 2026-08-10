@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.exceptions import OptiStockException, ResourceNotFoundError
 from app.core.rate_limit import limiter
 from app.modules.assistant import service
 from app.modules.assistant.actions import ActionService
@@ -137,6 +138,36 @@ class DecisionRequest(BaseModel):
     reason: str = Field(default="", max_length=500)
 
 
+#: Domain errors that are ordinary outcomes rather than faults, mapped to the
+#: status that says so. Without this every one of them surfaced as a 500 --
+#: including "you already approved that", which is what a double-click produces
+#: and which the screen then reported as a server failure.
+_STATUS_FOR = {
+    "NOT_FOUND": 404,
+    "ALREADY_DECIDED": 409,
+    "PROPOSAL_EXPIRED": 409,
+    "INVALID_QUANTITY": 400,
+}
+
+
+def _decide(operation):
+    """Run one decision, translating domain errors the way this codebase does.
+
+    A proposal id is a UUID a client supplies, and `ActionService.get` filters
+    on company_id rather than checking it afterwards -- so another tenant's id
+    arrives here as NOT_FOUND. Answering 404 is deliberate: a 403 would confirm
+    the id exists, which is a small leak but a free one to avoid.
+    """
+    try:
+        return operation()
+    except ResourceNotFoundError as error:
+        raise HTTPException(status_code=404, detail=error.message)
+    except OptiStockException as error:
+        raise HTTPException(
+            status_code=_STATUS_FOR.get(error.code, 400), detail=error.message
+        )
+
+
 def _as_json(action) -> Dict[str, Any]:
     return {
         "id": str(action.id),
@@ -195,11 +226,13 @@ def approve_action(
             detail="Your role cannot approve purchase orders.",
         )
 
-    action = ActionService(db).approve(
-        company_id=UUID(current_user["company_id"]),
-        action_id=action_id,
-        user_id=UUID(current_user["id"]),
-        overrides={"quantity": body.quantity} if body.quantity else None,
+    action = _decide(
+        lambda: ActionService(db).approve(
+            company_id=UUID(current_user["company_id"]),
+            action_id=action_id,
+            user_id=UUID(current_user["id"]),
+            overrides={"quantity": body.quantity} if body.quantity else None,
+        )
     )
     db.commit()
     db.refresh(action)
@@ -214,11 +247,13 @@ def reject_action(
     current_user: dict = Depends(get_current_user),
 ):
     """Decline a proposal, and keep the record of having declined it."""
-    action = ActionService(db).reject(
-        company_id=UUID(current_user["company_id"]),
-        action_id=action_id,
-        user_id=UUID(current_user["id"]),
-        reason=body.reason,
+    action = _decide(
+        lambda: ActionService(db).reject(
+            company_id=UUID(current_user["company_id"]),
+            action_id=action_id,
+            user_id=UUID(current_user["id"]),
+            reason=body.reason,
+        )
     )
     db.commit()
     db.refresh(action)
