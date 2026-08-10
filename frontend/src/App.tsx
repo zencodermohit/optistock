@@ -5,6 +5,10 @@ import { useAuth } from "@/lib/auth";
 import { Alerts } from "@/pages/Alerts";
 import { Approvals } from "@/pages/Approvals";
 import { Assistant } from "@/pages/Assistant";
+import { Transfers } from "@/pages/Transfers";
+import { Suppliers } from "@/pages/Suppliers";
+import { Reconciliation } from "@/pages/Reconciliation";
+import { AuditLog } from "@/pages/AuditLog";
 import { Customers } from "@/pages/Customers";
 import { EventStream } from "@/pages/EventStream";
 import { Insights } from "@/pages/Insights";
@@ -47,10 +51,14 @@ export default function App() {
         <Route path="assistant" element={<Assistant />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="purchase-orders" element={<PurchaseOrders />} />
+        <Route path="suppliers" element={<Suppliers />} />
+        <Route path="transfers" element={<Transfers />} />
+        <Route path="stock-counts" element={<Reconciliation />} />
         <Route path="insights" element={<Insights />} />
         <Route path="stockout-risk" element={<StockoutRisk />} />
         <Route path="alerts" element={<Alerts />} />
         <Route path="system/events" element={<EventStream />} />
+        <Route path="system/audit" element={<AuditLog />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

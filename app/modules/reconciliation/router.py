@@ -15,6 +15,8 @@ from app.modules.reconciliation.schemas import (
 )
 from app.modules.reconciliation.service import ReconciliationService
 
+from app.modules.analytics.readmodels import reconciliation_board
+
 router = APIRouter(prefix="/api/v1/reconciliations", tags=["Reconciliation"])
 
 
@@ -66,6 +68,15 @@ def get_reconciliations(
     )
 
     return {"total": total, "skip": skip, "limit": limit, "data": recons}
+
+
+@router.get("/board")
+def get_board(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Cycle counts with the variance worked out, newest first."""
+    return {"data": reconciliation_board(db, UUID(current_user["company_id"]))}
 
 
 @router.get("/{recon_id}", response_model=ReconciliationResponse)

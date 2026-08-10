@@ -1,15 +1,19 @@
 import {
   Activity,
   AlertTriangle,
+  ArrowLeftRight,
   Boxes,
   ChevronDown,
   ClipboardCheck,
+  ClipboardList,
+  Factory,
   Hourglass,
   LayoutDashboard,
   LogOut,
   Menu,
   MessageSquare,
   Package,
+  ScrollText,
   ShoppingCart,
   Sparkles,
   Truck,
@@ -62,6 +66,9 @@ const NAV: NavGroup[] = [
       { to: "/inventory", label: "Inventory", icon: Boxes },
       { to: "/products", label: "Products", icon: Package },
       { to: "/purchase-orders", label: "Purchase orders", icon: Truck },
+      { to: "/suppliers", label: "Suppliers", icon: Factory },
+      { to: "/transfers", label: "Transfers", icon: ArrowLeftRight },
+      { to: "/stock-counts", label: "Stock counts", icon: ClipboardList },
       { to: "/sales", label: "Sales", icon: ShoppingCart },
       { to: "/customers", label: "Customers", icon: Users },
     ],
@@ -81,7 +88,10 @@ const NAV: NavGroup[] = [
   },
   {
     heading: "System",
-    items: [{ to: "/system/events", label: "Event stream", icon: Activity }],
+    items: [
+      { to: "/system/events", label: "Event stream", icon: Activity },
+      { to: "/system/audit", label: "Audit trail", icon: ScrollText },
+    ],
   },
 ];
 

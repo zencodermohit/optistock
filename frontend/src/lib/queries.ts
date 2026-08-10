@@ -646,3 +646,130 @@ export function useCustomerDirectory(search?: string) {
     placeholderData: (previous) => previous,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Suppliers, transfers, reconciliations, audit                                */
+/* -------------------------------------------------------------------------- */
+
+export interface SupplierScore {
+  id: string;
+  name: string;
+  contact_email: string | null;
+  reliability_score: number;
+  is_active: boolean;
+  orders: number;
+  spend: number;
+  delivered: number;
+  last_order_at: string | null;
+  /** Null when nothing has been ordered — not zero. */
+  delivery_rate: number | null;
+}
+
+export function useSupplierScorecard() {
+  return useQuery({
+    queryKey: ["suppliers", "scorecard"] as const,
+    queryFn: () => api<{ data: SupplierScore[] }>("/suppliers/scorecard"),
+    staleTime: 60_000,
+  });
+}
+
+export interface TransferRow {
+  id: string;
+  status: string;
+  created_at: string;
+  shipped_at: string | null;
+  received_at: string | null;
+  source_name: string;
+  destination_name: string;
+  items: { sku: string; product_name: string; quantity: number }[];
+  units: number;
+}
+
+export function useTransfers() {
+  return useQuery({
+    queryKey: ["transfers", "board"] as const,
+    queryFn: () => api<{ data: TransferRow[] }>("/transfers/board"),
+    staleTime: 30_000,
+  });
+}
+
+/** Ship or complete a transfer. Completing is what lands the stock. */
+export function useTransferAction() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "ship" | "complete" }) =>
+      api<TransferRow>(`/transfers/${id}/${action}`, { method: "PATCH" }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["transfers"] });
+      void client.invalidateQueries({ queryKey: ["inventory"] });
+    },
+  });
+}
+
+export interface ReconLine {
+  sku: string;
+  product_name: string;
+  expected: number;
+  actual: number;
+  variance: number;
+  reason: string | null;
+}
+
+export interface ReconRow {
+  id: string;
+  status: string;
+  created_at: string;
+  warehouse_name: string;
+  items: ReconLine[];
+  counted: number;
+  discrepancies: number;
+  units_short: number;
+  units_over: number;
+}
+
+export function useReconciliations() {
+  return useQuery({
+    queryKey: ["reconciliations", "board"] as const,
+    queryFn: () => api<{ data: ReconRow[] }>("/reconciliations/board"),
+    staleTime: 30_000,
+  });
+}
+
+export function useReconDecision() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: "approve" | "reject" }) =>
+      api<ReconRow>(`/reconciliations/${id}/${decision}`, { method: "PATCH" }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["reconciliations"] });
+      // Approving a count writes the shelf's number over the system's.
+      void client.invalidateQueries({ queryKey: ["inventory"] });
+      void client.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export interface AuditEntry {
+  id: string;
+  entity_name: string;
+  entity_id: string;
+  action: string;
+  timestamp: string;
+  actor: string;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+}
+
+export function useAuditTrail(params: { entity_name?: string; action?: string } = {}) {
+  return useQuery({
+    queryKey: ["audit", "trail", params] as const,
+    queryFn: () =>
+      api<{
+        total: number;
+        entities: string[];
+        actions: string[];
+        data: AuditEntry[];
+      }>(`/audit/trail${queryString({ limit: 150, ...params })}`),
+    placeholderData: (previous) => previous,
+  });
+}

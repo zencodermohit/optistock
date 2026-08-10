@@ -15,6 +15,8 @@ from app.modules.transfers.schemas import (
 )
 from app.modules.transfers.service import TransferService
 
+from app.modules.analytics.readmodels import transfer_board
+
 router = APIRouter(prefix="/api/v1/transfers", tags=["Transfers"])
 
 
@@ -69,6 +71,15 @@ def get_transfers(
     )
 
     return {"total": total, "skip": skip, "limit": limit, "data": transfers}
+
+
+@router.get("/board")
+def get_board(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Transfers with warehouse and product names resolved."""
+    return {"data": transfer_board(db, UUID(current_user["company_id"]))}
 
 
 @router.get("/{transfer_id}", response_model=TransferResponse)

@@ -16,6 +16,8 @@ from app.modules.suppliers.schemas import (
 )
 from app.modules.suppliers.service import SupplierService
 
+from app.modules.analytics.readmodels import supplier_scorecard
+
 router = APIRouter(prefix="/api/v1/suppliers", tags=["Suppliers"])
 
 
@@ -68,6 +70,21 @@ def get_suppliers(
     )
 
     return {"total": total, "skip": skip, "limit": limit, "data": suppliers}
+
+
+@router.get("/scorecard")
+def get_scorecard(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Suppliers with the order history that justifies their reliability score.
+
+    Above /{supplier_id}: FastAPI matches in declaration order, and below it
+    "scorecard" would be read as a supplier id and rejected as a bad UUID.
+    """
+    return {
+        "data": supplier_scorecard(db, UUID(current_user["company_id"]))
+    }
 
 
 @router.get("/{supplier_id}", response_model=SupplierResponse)
