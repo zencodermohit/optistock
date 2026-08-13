@@ -81,6 +81,7 @@ WAREHOUSES = [
     ("Delhi Distribution Center", "WH-DEL-002", 35000),
     ("Bangalore Tech Park", "WH-BLR-003", 25000),
     ("Chennai Port Facility", "WH-CHN-004", 40000),
+    ("Pune Logistics Park", "WH-PUN-005", 30000),
 ]
 
 SUPPLIERS = [

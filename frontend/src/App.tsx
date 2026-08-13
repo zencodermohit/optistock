@@ -15,6 +15,7 @@ import { Insights } from "@/pages/Insights";
 import { Inventory } from "@/pages/Inventory";
 import { Login } from "@/pages/Login";
 import { Overview } from "@/pages/Overview";
+import { Site } from "@/pages/Site";
 import { Products } from "@/pages/Products";
 import { Sales } from "@/pages/Sales";
 import { PurchaseOrders } from "@/pages/PurchaseOrders";
@@ -43,7 +44,8 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<Overview />} />
+        <Route index element={<Site />} />
+        <Route path="analytics" element={<Overview />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="products" element={<Products />} />
         <Route path="sales" element={<Sales />} />

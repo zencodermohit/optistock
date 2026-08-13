@@ -21,7 +21,9 @@ from uuid import UUID
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
+from app.modules.alerts.models import Alert
 from app.modules.audit.models import AuditLog
+from app.modules.inventory.models import Inventory
 from app.modules.products.models import Product
 from app.modules.purchase_orders.models import PurchaseOrder
 from app.modules.reconciliation.models import Reconciliation, ReconciliationItem
@@ -36,6 +38,102 @@ def _names(db: Session, model, company_id: UUID) -> Dict[UUID, str]:
     return dict(
         db.query(model.id, model.name).filter(model.company_id == company_id).all()
     )
+
+
+# ---------------------------------------------------------------------------
+# The site
+# ---------------------------------------------------------------------------
+def warehouse_site(db: Session, company_id: UUID) -> List[Dict[str, Any]]:
+    """Every warehouse as a place: how big, how full, how much trouble.
+
+    This is what the landing screen renders as buildings. The figures here are
+    not labels printed beside a picture -- they are the picture. A building's
+    footprint comes from `capacity_units`, how lit it is comes from
+    `utilisation`, and the marker floating above it comes from `out_lines`.
+    Draw the scene from anything else and it becomes decoration that happens to
+    sit near a dashboard.
+
+    One query per fact rather than one per warehouse. There are four buildings
+    today, so an N+1 would be invisible -- and would still be the wrong habit to
+    leave in a read model that a landing page hits on every login.
+    """
+    warehouses = (
+        db.query(Warehouse)
+        .filter(Warehouse.company_id == company_id)
+        .order_by(Warehouse.capacity_units.desc(), Warehouse.name)
+        .all()
+    )
+    if not warehouses:
+        return []
+
+    ids = [w.id for w in warehouses]
+
+    # Stock held, lines carried, and how many of those lines are in trouble.
+    stock = {
+        row.warehouse_id: row
+        for row in db.query(
+            Inventory.warehouse_id.label("warehouse_id"),
+            func.coalesce(func.sum(Inventory.quantity), 0).label("units"),
+            func.count(Inventory.id).label("lines"),
+            func.sum(
+                case(
+                    (
+                        (Inventory.reorder_point > 0)
+                        & (Inventory.quantity <= Inventory.reorder_point)
+                        & (Inventory.quantity > 0),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("low"),
+            func.sum(case((Inventory.quantity <= 0, 1), else_=0)).label("out"),
+        )
+        .filter(Inventory.warehouse_id.in_(ids))
+        .group_by(Inventory.warehouse_id)
+        .all()
+    }
+
+    # Open alerts, reached through the inventory line they were raised against.
+    # An alert carries a subject_id rather than a warehouse_id, so the join is
+    # how a building learns it has a problem.
+    alerts = dict(
+        db.query(Inventory.warehouse_id, func.count(Alert.id))
+        .join(Alert, Alert.subject_id == Inventory.id)
+        .filter(
+            Alert.company_id == company_id,
+            Alert.status == "open",
+            Alert.subject_type == "inventory",
+            Inventory.warehouse_id.in_(ids),
+        )
+        .group_by(Inventory.warehouse_id)
+        .all()
+    )
+
+    site = []
+    for warehouse in warehouses:
+        row = stock.get(warehouse.id)
+        units = int(row.units) if row else 0
+        capacity = int(warehouse.capacity_units or 0)
+        site.append(
+            {
+                "id": str(warehouse.id),
+                "name": warehouse.name,
+                "location_code": warehouse.location_code,
+                "capacity_units": capacity,
+                "units_held": units,
+                "stock_lines": int(row.lines) if row else 0,
+                "low_lines": int(row.low or 0) if row else 0,
+                "out_lines": int(row.out or 0) if row else 0,
+                "open_alerts": int(alerts.get(warehouse.id, 0)),
+                # Clamped, because a warehouse over its stated capacity is a
+                # data problem and should not render as a building taller than
+                # the scene. It still reports the raw numbers above.
+                "utilisation": (
+                    round(min(units / capacity, 1.0), 4) if capacity > 0 else None
+                ),
+            }
+        )
+    return site
 
 
 # ---------------------------------------------------------------------------

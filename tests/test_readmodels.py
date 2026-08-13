@@ -300,3 +300,88 @@ def test_the_boards_are_routed_above_their_id_lookups(authenticated_client):
         "/api/v1/reconciliations/board",
     ):
         assert authenticated_client.get(path).status_code == 200, path
+
+
+# ---------------------------------------------------------------------------
+# The site
+#
+# This read model IS the landing screen's geometry: capacity sizes a building,
+# utilisation lights it, and out-of-stock lines put a marker on its roof. A
+# wrong number here is a wrong picture, not a wrong label.
+# ---------------------------------------------------------------------------
+def test_the_site_reports_capacity_fill_and_trouble(
+    db_session, company, make_warehouse, make_product, make_stock
+):
+    from app.modules.analytics.readmodels import warehouse_site
+
+    warehouse = make_warehouse(company, name="Site Depot", capacity_units=1000)
+    healthy = make_stock(make_product(company, sku="SITE-OK"), warehouse, quantity=300)
+    healthy.reorder_point = 10
+    low = make_stock(make_product(company, sku="SITE-LOW"), warehouse, quantity=5)
+    low.reorder_point = 50
+    make_stock(make_product(company, sku="SITE-OUT"), warehouse, quantity=0)
+    db_session.commit()
+
+    row = next(r for r in warehouse_site(db_session, company.id) if r["name"] == "Site Depot")
+
+    assert row["capacity_units"] == 1000
+    assert row["units_held"] == 305
+    assert row["stock_lines"] == 3
+    assert row["low_lines"] == 1
+    assert row["out_lines"] == 1
+    assert row["utilisation"] == 0.305
+
+
+def test_utilisation_is_clamped_so_a_building_cannot_exceed_the_scene(
+    db_session, company, make_warehouse, make_product, make_stock
+):
+    """Over-capacity is a data problem. It must not render as a building taller
+    than the world, and the raw figures still report the overflow."""
+    from app.modules.analytics.readmodels import warehouse_site
+
+    warehouse = make_warehouse(company, name="Overfull", capacity_units=100)
+    make_stock(make_product(company, sku="OVER-1"), warehouse, quantity=450)
+    db_session.commit()
+
+    row = next(r for r in warehouse_site(db_session, company.id) if r["name"] == "Overfull")
+
+    assert row["utilisation"] == 1.0
+    assert row["units_held"] == 450
+
+
+def test_a_warehouse_with_no_stock_still_appears(
+    db_session, company, make_warehouse
+):
+    """A new site is an empty building, not a missing one."""
+    from app.modules.analytics.readmodels import warehouse_site
+
+    make_warehouse(company, name="Brand New", capacity_units=500)
+    db_session.commit()
+
+    row = next(r for r in warehouse_site(db_session, company.id) if r["name"] == "Brand New")
+
+    assert row["units_held"] == 0
+    assert row["stock_lines"] == 0
+    assert row["utilisation"] == 0.0
+
+
+def test_the_site_is_scoped_to_the_company(
+    db_session, company, other_company, make_warehouse
+):
+    from app.modules.analytics.readmodels import warehouse_site
+
+    make_warehouse(company, name="Mine Site")
+    make_warehouse(other_company, name="Theirs Site")
+    db_session.commit()
+
+    names = [r["name"] for r in warehouse_site(db_session, company.id)]
+
+    assert "Mine Site" in names
+    assert "Theirs Site" not in names
+
+
+def test_the_site_endpoint_answers(authenticated_client):
+    response = authenticated_client.get("/api/v1/warehouses/site")
+
+    assert response.status_code == 200
+    assert "data" in response.json()

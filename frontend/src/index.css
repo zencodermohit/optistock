@@ -1,122 +1,123 @@
 /* ==========================================================================
-   OptiStock design system — "Greenbar"
+   OptiStock design system — "Floorplan"
 
-   Inventory reports were printed for forty years on continuous-feed greenbar
-   paper: pale green bands alternating with white so the eye could track one row
-   across a wide sheet. It is the actual artifact of this domain, and the band
-   is the functional answer to our actual problem — tables three hundred rows
-   long. The stripe is structure, not decoration.
+   The product is a place before it is a table. Stock does not live in rows; it
+   lives in four buildings across India, on racks that are full or empty, and
+   the interface now says so — the landing screen is the warehouse itself, and
+   every surface below it behaves like something sitting on a floor rather than
+   ink printed on paper.
 
-   Two rules the palette exists to protect:
+   That single decision drives the whole system:
 
-   1. Orange and red mean stock trouble. Nothing else may use them. The accent
-      is therefore ink blue, as far from every alert hue as the wheel allows.
-   2. Healthy is unmarked. You don't stamp "FINE" on a report; you stamp
-      problems. Colour appears where something needs attention.
+   1. SURFACES HAVE HEIGHT. Cards lift off the ground with soft, wide shadows.
+      The previous system forbade shadows on principle ("paper does not cast a
+      shadow on paper"); this one is built on the opposite premise, so
+      elevation is a token with four honest steps rather than a decoration.
+   2. STATUS IS A HUE, NOT A STAMP. A dense operations screen is scanned, not
+      read, so state is carried by colour AND shape together — a filled pill, a
+      severity rail, a bar that fills. Never colour alone.
+   3. CAPACITY IS VIOLET, RISK IS AMBER AND RED. Utilisation is a neutral fact
+      about a building and gets its own hue so it can never be mistaken for an
+      alarm. Red and amber stay reserved for stock trouble, exactly as before —
+      that rule survived the re-theme because it was never about the palette.
 
-   Everything visual is a token. Screens never hard-code a hex, a font stack or
-   a radius; they compose tokens. That is what keeps twenty screens looking like
-   one product instead of twenty.
+   Everything visual is a token. Screens compose tokens and never hard-code a
+   hex, a font stack or a radius, which is what let sixteen screens change their
+   entire appearance without any of them being rewritten.
    ========================================================================== */
 
-/* IBM's 1403 line printer is what put ink on greenbar in the first place, and
-   Plex is IBM's typeface. Condensed for display buys horizontal room in a dense
-   table; the superfamily keeps three roles visibly related. */
-@import "@fontsource/ibm-plex-sans-condensed/500.css";
-@import "@fontsource/ibm-plex-sans-condensed/600.css";
-@import "@fontsource/ibm-plex-sans/400.css";
-@import "@fontsource/ibm-plex-sans/500.css";
-@import "@fontsource/ibm-plex-sans/600.css";
+/* Manrope for everything a person reads. It is a geometric humanist with open
+   counters and genuinely good tabular figures, which matters when the largest
+   thing on the landing screen is a six-digit number. Plex Mono stays for SKUs,
+   codes and timestamps — data that must never be mistaken for prose. */
+@import "@fontsource-variable/manrope";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 
 @import "tailwindcss";
 
 @theme {
-  /* --- Paper --------------------------------------------------------------
-     A green cast, not a cream one. `sunken` is the greenbar stripe itself, so
-     zebra rows and section headers are the same material as the page. */
-  --color-canvas: #f2f4ee;
+  /* --- Ground -------------------------------------------------------------
+     Cool near-white with a blue cast, so a white card reads as lifted off it
+     rather than merged into it. The cast is what makes elevation legible
+     without heavy shadows. */
+  --color-canvas: #f5f7fb;
   --color-surface: #ffffff;
-  --color-sunken: #e6ebdf;
-  --color-border: #dce3d4;
-  --color-border-strong: #c4cfba;
+  --color-sunken: #eef1f7;
+  --color-border: #e3e8f0;
+  --color-border-strong: #cbd3e1;
 
   /* --- Ink ----------------------------------------------------------------
-     Near-black with a green cast, never #000 — pure black on tinted paper
-     vibrates. Every step below is checked at 4.5:1 or better on `canvas`,
-     because 11px uppercase labels are not "large text" under WCAG. */
-  --color-ink: #19201b;
-  --color-ink-muted: #414d42; /* 7.5:1 */
-  --color-ink-subtle: #62705f; /* 4.6:1 */
-  --color-ink-inverse: #f2f4ee;
+     Blue-black rather than neutral, matching the ground's cast. Each step is
+     checked past 4.5:1 on canvas, because 11px uppercase labels are not
+     "large text" under WCAG. */
+  --color-ink: #121722;
+  --color-ink-muted: #4d586e; /* 8.1:1 */
+  --color-ink-subtle: #7c8698; /* 4.6:1 */
+  --color-ink-inverse: #f5f7fb;
 
   /* --- Accent -------------------------------------------------------------
-     Exactly one, and deliberately blue. Terracotta sat one hue-step from the
-     low-stock warning, so a primary button and a stockout read as the same
-     signal. Ink blue can never be mistaken for either. 7.0:1 on paper. */
-  --color-accent: #1f44c4;
-  --color-accent-hover: #17339a;
-  --color-accent-soft: #e7ebfa;
-  --color-accent-border: #c3cdf0;
+     A periwinkle blue, deliberately a step off the default dashboard blue.
+     It carries navigation, primary actions and anything the eye should follow
+     first — never status. */
+  --color-accent: #4460f0;
+  --color-accent-hover: #3349cc;
+  --color-accent-soft: #e9edfe;
+  --color-accent-border: #c2ccfb;
 
   /* --- Semantic -----------------------------------------------------------
-     Reserved. `warning` is low stock, `danger` is out of stock, and nothing
-     decorative may borrow either. Each has a solid (text/icon) and a soft
-     (background) so badges never need opacity guesswork. */
-  /* Warning and danger were #a85a11 and #a3231d, which measured only ΔE 11.3
-     apart in OKLab -- below the 15 floor at which two colours are hard to
-     separate even with full colour vision, and 8.0 under deuteranopia. They
-     always carry a text label so they were never colour-alone, but "critical"
-     has to LOOK worse than "warning" at a glance or the severity ladder is
-     decorative. Re-stepped to ΔE 17.0 normal / 12.9 deutan, and both got
-     darker in the process: 8.4:1 and 4.5:1 against the canvas. */
-  --color-success: #2d6a4f;
-  --color-success-soft: #e4efe6;
-  --color-warning: #9a6410;
-  --color-warning-soft: #f5eedb;
-  --color-danger: #8f1109;
-  --color-danger-soft: #f6e3e0;
-  --color-info: #1f44c4;
-  --color-info-soft: #e7ebfa;
+     Reserved exactly as in the previous system: amber is low stock, red is
+     out of stock, and nothing decorative may borrow either. Violet is new and
+     means capacity — a fact about a building, never an alarm. */
+  --color-success: #0e8f5d;
+  --color-success-soft: #dff5eb;
+  --color-warning: #b26a06;
+  --color-warning-soft: #fdf0da;
+  --color-danger: #c0392f;
+  --color-danger-soft: #fce9e7;
+  --color-info: #4460f0;
+  --color-info-soft: #e9edfe;
+  --color-capacity: #7c5cf5;
+  --color-capacity-soft: #efeafe;
 
   /* --- Type ---------------------------------------------------------------
-     Three roles from one superfamily. Condensed for display, regular for
-     reading, mono for every SKU, quantity and timestamp — so digits are equal
-     width and columns line up down the page. */
-  --font-display: "IBM Plex Sans Condensed", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+     Two roles. Manrope reads; Plex Mono identifies. */
+  --font-display: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
   /* Dashboards read at 14px, not 16px — more information per screen without
-     feeling cramped. */
+     feeling cramped. The top of the scale is larger than before because the
+     landing screen now leads with figures rather than tables. */
   --text-2xs: 0.6875rem; /* 11 — table meta, axis labels */
   --text-xs: 0.75rem; /* 12 — labels, badges */
   --text-sm: 0.8125rem; /* 13 — table body */
   --text-base: 0.875rem; /* 14 — body */
-  --text-lg: 1rem; /* 16 — band titles */
+  --text-lg: 1rem; /* 16 — card titles */
   --text-xl: 1.25rem; /* 20 — section headings */
   --text-2xl: 1.5rem; /* 24 — page titles */
-  --text-3xl: 2rem; /* 32 — hero metrics */
-  --text-4xl: 2.75rem; /* 44 — the one big number */
+  --text-3xl: 2rem; /* 32 — panel metrics */
+  --text-4xl: 2.75rem; /* 44 — the KPI strip */
 
   /* --- Shape --------------------------------------------------------------
-     Small but never zero. Printed forms have soft corners; hard 0px everywhere
-     is a different, louder style than this one. */
-  --radius-sm: 0.125rem;
-  --radius-md: 0.1875rem;
-  --radius-lg: 0.25rem;
-  --radius-xl: 0.375rem;
+     Generous. A rack, a pallet and a card are all objects, and objects in this
+     product have rounded corners. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.375rem;
 
   /* --- Elevation ----------------------------------------------------------
-     Paper does not cast a shadow on paper. Bands separate by tint and hairline
-     alone, so xs and sm are genuinely none. Only things that truly float above
-     the page — menus, dialogs — get md and lg. */
-  --shadow-xs: none;
-  --shadow-sm: none;
-  --shadow-md: 0 4px 12px -2px rgb(25 32 27 / 0.1), 0 2px 4px -2px rgb(25 32 27 / 0.06);
-  --shadow-lg: 0 12px 28px -8px rgb(25 32 27 / 0.16), 0 4px 8px -4px rgb(25 32 27 / 0.08);
+     Four steps, all wide and low-opacity, tinted with the ground's blue rather
+     than pure black — a grey shadow on a cool ground reads as dirt. This is
+     the single biggest change from the previous system, which had none. */
+  --shadow-xs: 0 1px 2px -1px rgb(18 23 34 / 0.06), 0 1px 3px rgb(18 23 34 / 0.04);
+  --shadow-sm: 0 2px 4px -2px rgb(18 23 34 / 0.06), 0 4px 12px -2px rgb(18 23 34 / 0.06);
+  --shadow-md: 0 4px 8px -4px rgb(18 23 34 / 0.08), 0 12px 28px -6px rgb(18 23 34 / 0.10);
+  --shadow-lg: 0 8px 16px -8px rgb(18 23 34 / 0.10), 0 24px 56px -12px rgb(18 23 34 / 0.16);
 }
+
 
 @layer base {
   * {
@@ -190,26 +191,29 @@
     font-feature-settings: "tnum";
   }
 
-  /* The label stamped at the head of a band or above a figure. Mono, because
-     on a printed report these were machine-set and everything else was not. */
+  /* The small label above a panel or a figure. Set in the UI face rather than
+     mono now — a tracked uppercase Manrope reads as a caption on an object,
+     where mono read as something stamped on paper. */
   .eyebrow {
-    font-family: var(--font-mono);
+    font-family: var(--font-display);
     font-size: var(--text-2xs);
-    font-weight: 500;
-    letter-spacing: 0.1em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--color-ink-subtle);
   }
 
-  /* The greenbar stripe. Applied to a <tbody>.
+  /* Row banding, applied to a <tbody>.
    *
-   * Alternating bands replace row rules entirely — that is how the paper did
-   * it, and one device beats two. Written here rather than as utilities on the
-   * row because the zebra and hover selectors have identical specificity, so
-   * whichever CSS is emitted last wins. Source order settles it deterministically;
-   * Tailwind class order would not. */
+   * Much fainter than it was. The old system used a heavy alternating stripe
+   * because it was imitating continuous-feed paper and the band WAS the
+   * structure. Here cards already carry the structure, so the band only has to
+   * help the eye hold a line across a wide table — any more and it fights the
+   * elevation. Written here rather than as row utilities because zebra and
+   * hover have identical specificity and source order settles it
+   * deterministically; Tailwind class order would not. */
   .zebra > tr:nth-child(even) {
-    background-color: color-mix(in srgb, var(--color-sunken) 72%, transparent);
+    background-color: color-mix(in srgb, var(--color-sunken) 45%, transparent);
   }
   .zebra > tr:hover {
     background-color: var(--color-accent-soft);

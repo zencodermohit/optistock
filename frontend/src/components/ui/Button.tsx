@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const button = cva(
   // Shared by every variant: layout, transition, focus ring, disabled state.
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md " +
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg " +
     "font-medium transition-all duration-150 " +
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " +
     "disabled:pointer-events-none disabled:opacity-50",

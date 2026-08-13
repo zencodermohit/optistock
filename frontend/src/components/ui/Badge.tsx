@@ -4,8 +4,8 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const badge = cva(
-  "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 " +
-    "font-mono text-2xs font-medium tracking-wide whitespace-nowrap uppercase",
+  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 " +
+    "font-display text-2xs font-bold tracking-wide whitespace-nowrap uppercase",
   {
     variants: {
       tone: {

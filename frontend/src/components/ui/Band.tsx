@@ -3,18 +3,24 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * A band is a section of the report.
+ * A panel — the surface everything else sits on.
  *
- * It replaces the floating card: hairline border, tinted header, no shadow.
- * Paper does not cast a shadow on paper, so separation comes from tint and rule
- * alone. That constraint is what stops twelve panels on a dashboard turning
- * into twelve competing planes.
+ * Named Band from the era when this was a printed report and separation came
+ * from tint alone. It now lifts: a soft wide shadow and a generous radius, so a
+ * panel reads as an object on a floor rather than ink on paper. The name stays
+ * because sixteen screens compose it, and renaming a working primitive to match
+ * a stylesheet is churn, not design.
+ *
+ * Elevation is one step only. Twelve panels each claiming a different height
+ * is how a dashboard turns into twelve competing planes — the thing the old
+ * no-shadow rule was protecting against. The answer is a single honest step,
+ * not zero.
  */
 export function Band({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-border bg-surface",
+        "overflow-hidden rounded-xl border border-border bg-surface shadow-sm",
         className,
       )}
       {...props}
@@ -41,7 +47,7 @@ export function BandHeader({
     <div
       className={cn(
         "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 " +
-          "border-b border-border bg-sunken px-4 py-2.5",
+          "border-b border-border px-4 py-3",
         className,
       )}
     >

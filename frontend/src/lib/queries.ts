@@ -785,3 +785,37 @@ export function useAuditTrail(params: { entity_name?: string; action?: string } 
     placeholderData: (previous) => previous,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* The site — warehouses as places                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface SiteWarehouse {
+  id: string;
+  name: string;
+  location_code: string;
+  capacity_units: number;
+  units_held: number;
+  stock_lines: number;
+  low_lines: number;
+  out_lines: number;
+  open_alerts: number;
+  /** 0–1, clamped. Null when no capacity is recorded. */
+  utilisation: number | null;
+}
+
+/**
+ * Drives the 3D landing screen.
+ *
+ * Refetched on an interval because the buildings are a live instrument: a
+ * consumer raising a stockout alert should put a marker on the roof without
+ * anybody reloading the page.
+ */
+export function useSite() {
+  return useQuery({
+    queryKey: ["warehouses", "site"] as const,
+    queryFn: () => api<{ data: SiteWarehouse[] }>("/warehouses/site"),
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+}

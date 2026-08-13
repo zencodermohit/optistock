@@ -13,6 +13,8 @@ from app.modules.warehouses.schemas import (
 )
 from app.modules.warehouses.service import WarehouseService
 
+from app.modules.analytics.readmodels import warehouse_site
+
 router = APIRouter(prefix="/api/v1/warehouses", tags=["Warehouses"])
 
 
@@ -37,6 +39,24 @@ def create_warehouse(
     except Exception as e:
         db.rollback()
         raise e
+
+
+@router.get("/site")
+def get_site(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Every warehouse as a place, for the 3D landing screen.
+
+    Capacity sizes the building, utilisation lights it, and out-of-stock lines
+    put a marker above it. The scene is drawn from these numbers rather than
+    beside them.
+
+    Declared ABOVE /{wh_id}. FastAPI matches in declaration order, and below it
+    "site" is read as a warehouse id and rejected as a malformed UUID -- which
+    is exactly how this was found.
+    """
+    return {"data": warehouse_site(db, UUID(current_user["company_id"]))}
 
 
 @router.get("/{wh_id}", response_model=WarehouseResponse)

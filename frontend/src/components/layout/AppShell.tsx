@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   Boxes,
+  Building2,
   ChevronDown,
   ClipboardCheck,
   ClipboardList,
@@ -55,7 +56,8 @@ interface NavGroup {
 const NAV: NavGroup[] = [
   {
     items: [
-      { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
+      { to: "/", label: "Site", icon: Building2, end: true },
+      { to: "/analytics", label: "Analytics", icon: LayoutDashboard },
       { to: "/assistant", label: "Assistant", icon: MessageSquare },
       { to: "/approvals", label: "Approvals", icon: ClipboardCheck },
     ],
