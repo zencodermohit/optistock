@@ -239,7 +239,43 @@
     );
     animation: shimmer 1.6s infinite;
   }
+
+  /* ------------------------------------------------------------------
+     Custom cursor.
+
+     The native cursor is hidden only while `cursor-custom` is on <html>,
+     which the CursorLayer adds on mount and removes on unmount. Doing it
+     from the component rather than in a blanket body rule means a browser
+     with JS disabled, a touch device, or a crashed component all fall back
+     to a working pointer instead of no pointer at all.
+
+     !important is deliberate and narrow. OrbitControls writes cursor:grab
+     as an INLINE style on the canvas while dragging, and Tailwind's
+     cursor-pointer sits on every button; a plain class rule loses to both.
+
+     Text inputs keep their native I-beam. A caret is positional information
+     -- it tells you where the next character lands -- and no decorative
+     circle replaces that. The layer hides itself over these instead.
+     ------------------------------------------------------------------ */
+  .cursor-custom,
+  .cursor-custom * {
+    cursor: none !important;
+  }
+
+  .cursor-custom input,
+  .cursor-custom textarea,
+  .cursor-custom select,
+  .cursor-custom [contenteditable="true"] {
+    cursor: auto !important;
+  }
+
+  .cursor-custom input[type="range"],
+  .cursor-custom input[type="checkbox"],
+  .cursor-custom input[type="radio"] {
+    cursor: none !important;
+  }
 }
+
 
 /* Users who ask their OS for less motion get less motion. */
 @media (prefers-reduced-motion: reduce) {

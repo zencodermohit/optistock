@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
+import { CursorLayer } from "@/components/cursor/CursorLayer";
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/lib/auth";
 import { Alerts } from "@/pages/Alerts";
@@ -33,8 +34,16 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const { session } = useAuth();
+  // The label is the collaborative-cursor look from the reference. Showing
+  // your OWN name is admittedly odd on a single-user session — pass no label
+  // to drop it, or keep it as the visible half of the multiplayer story.
+  const name = session?.email?.split("@")[0];
+
   return (
-    <Routes>
+    <>
+      <CursorLayer label={name} />
+      <Routes>
       <Route path="/login" element={<Login />} />
 
       <Route
@@ -64,6 +73,7 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
