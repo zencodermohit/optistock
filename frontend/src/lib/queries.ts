@@ -895,3 +895,137 @@ export function useAnalytics(days: number, warehouseId?: string) {
     placeholderData: (previous) => previous,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Inventory — network and command center                                      */
+/* -------------------------------------------------------------------------- */
+
+export interface NetworkNode {
+  id: string;
+  name: string;
+  location_code: string;
+  capacity_units: number;
+  units_held: number;
+  utilisation: number | null;
+  inventory_value: number;
+  stock_lines: number;
+  low_lines: number;
+  out_lines: number;
+  open_alerts: number;
+  active_orders: number;
+  health: number | null;
+  band: "healthy" | "moderate" | "at_risk" | "unknown";
+}
+
+export interface NetworkData {
+  nodes: NetworkNode[];
+  edges: {
+    id: string;
+    from: string;
+    to: string;
+    units: number;
+    status: string;
+    shipped_at: string | null;
+  }[];
+  summary: {
+    sites: number;
+    units_held: number;
+    inventory_value: number;
+    stock_lines: number;
+    utilisation: number;
+    in_flight: number;
+    low_lines: number;
+    out_lines: number;
+    bands: Record<string, number>;
+    counts_recorded: number;
+    counts_approved: number;
+  };
+  transfers: {
+    id: string;
+    from: string;
+    to: string;
+    units: number;
+    status: string;
+    created_at: string;
+  }[];
+  alerts: {
+    key: string;
+    severity: string;
+    count: number;
+    title: string;
+    detail: string;
+  }[];
+}
+
+export function useNetwork() {
+  return useQuery({
+    queryKey: ["warehouses", "network"] as const,
+    queryFn: () => api<NetworkData>("/warehouses/network"),
+    refetchInterval: 30_000,
+  });
+}
+
+export interface Zone {
+  id: string;
+  warehouse_id: string;
+  code: string;
+  name: string;
+  category: string;
+  capacity_units: number;
+  units_held: number;
+  available: number;
+  utilisation: number | null;
+  state: "ok" | "warning" | "critical";
+  inventory_value: number;
+  stock_lines: number;
+  low_lines: number;
+  out_lines: number;
+  open_alerts: number;
+  attention: {
+    sku: string;
+    product_name: string;
+    quantity: number;
+    reorder_point: number;
+    state: "out" | "low";
+  }[];
+}
+
+export interface CommandCenter {
+  warehouse: {
+    id: string;
+    name: string;
+    location_code: string;
+    capacity_units: number;
+    units_held: number;
+    available: number;
+    utilisation: number | null;
+    inventory_value: number;
+    stock_lines: number;
+  };
+  zones: Zone[];
+  operations: {
+    inbound_transfers: number;
+    outbound_transfers: number;
+    counts_awaiting_review: number;
+    zones_critical: number;
+    zones_warning: number;
+    lines_low: number;
+    lines_out: number;
+  };
+  feed: {
+    sequence: number;
+    type: string;
+    aggregate: string;
+    payload: Record<string, unknown>;
+    at: string;
+  }[];
+}
+
+export function useCommandCenter(warehouseId?: string) {
+  return useQuery({
+    queryKey: ["warehouses", "command", warehouseId] as const,
+    queryFn: () => api<CommandCenter>(`/warehouses/${warehouseId}/command-center`),
+    enabled: Boolean(warehouseId),
+    refetchInterval: 20_000,
+  });
+}

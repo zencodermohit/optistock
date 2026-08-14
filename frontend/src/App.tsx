@@ -14,6 +14,8 @@ import { Customers } from "@/pages/Customers";
 import { EventStream } from "@/pages/EventStream";
 import { Insights } from "@/pages/Insights";
 import { Inventory } from "@/pages/Inventory";
+import { InventoryNetwork } from "@/pages/InventoryNetwork";
+import { WarehouseCommand } from "@/pages/WarehouseCommand";
 import { Login } from "@/pages/Login";
 import { Analytics } from "@/pages/Analytics";
 import { Site } from "@/pages/Site";
@@ -55,7 +57,9 @@ export default function App() {
       >
         <Route index element={<Site />} />
         <Route path="analytics" element={<Analytics />} />
-        <Route path="inventory" element={<Inventory />} />
+        <Route path="inventory" element={<InventoryNetwork />} />
+        <Route path="inventory/all" element={<Inventory />} />
+        <Route path="inventory/:warehouseId" element={<WarehouseCommand />} />
         <Route path="products" element={<Products />} />
         <Route path="sales" element={<Sales />} />
         <Route path="customers" element={<Customers />} />

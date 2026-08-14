@@ -389,10 +389,10 @@ function SelectedSite({ warehouse }: { warehouse: SiteWarehouse }) {
           <Badge tone="warning">{warehouse.open_alerts} open alerts</Badge>
         )}
         <Link
-          to={`/inventory?warehouse=${warehouse.id}`}
+          to={`/inventory/${warehouse.id}`}
           className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-ink transition-colors hover:border-accent-border hover:text-accent"
         >
-          Open stock
+          Open command center
         </Link>
       </div>
     </div>
