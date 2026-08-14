@@ -19,6 +19,7 @@ from app.modules.products.schemas import (
 from app.modules.products.service import ProductService
 
 from app.modules.products.intelligence import product_intelligence
+from app.modules.products.command_center import product_command_center
 
 router = APIRouter(prefix="/api/v1/products", tags=["Products"])
 
@@ -176,6 +177,27 @@ def get_intelligence(
     return product_intelligence(
         db, UUID(current_user["company_id"]), days=days
     )
+
+
+@router.get("/{product_id}/command-center")
+def get_command_center(
+    product_id: UUID,
+    days: int = Query(90, ge=7, le=365),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Everything known about one SKU: demand, stock, supply and what to do.
+
+    Above the bare /{product_id} for the same reason "intelligence" is: FastAPI
+    matches in declaration order, and a suffixed path declared later never wins
+    against a bare parameter declared earlier.
+    """
+    data = product_command_center(
+        db, UUID(current_user["company_id"]), product_id, days=days
+    )
+    if data is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return data
 
 
 @router.get("/{product_id}", response_model=ProductResponse)

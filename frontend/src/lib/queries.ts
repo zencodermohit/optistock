@@ -1107,3 +1107,112 @@ export function useProductIntelligence(days: number) {
     staleTime: 60_000,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* SKU command center                                                          */
+/* -------------------------------------------------------------------------- */
+
+export interface ProductCommandCenter {
+  range_days: number;
+  product: {
+    id: string;
+    sku: string;
+    name: string;
+    category: string | null;
+    status: string;
+    abc_class: string | null;
+    unit_cost: number;
+    selling_price: number;
+    margin: number | null;
+    created_at: string | null;
+  };
+  health: {
+    score: number;
+    band: "strong" | "fair" | "weak" | "critical";
+    /** Empty when nothing is wrong. Each entry is a named deduction. */
+    factors: { label: string; impact: number; detail: string }[];
+  };
+  metrics: {
+    bucket: Bucket;
+    on_hand: number;
+    sites: number;
+    inventory_value: number;
+    units_sold: number;
+    revenue: number;
+    orders: number;
+    daily_rate: number;
+    days_cover: number | null;
+    growth: number | null;
+    prior_units: number;
+    prior_revenue: number;
+    days_since_sale: number | null;
+  };
+  series: { date: string; units: number }[];
+  seasonality: {
+    month: string;
+    units: number;
+    revenue: number;
+    partial: boolean;
+  }[];
+  warehouses: {
+    id: string;
+    name: string;
+    location_code: string | null;
+    quantity: number;
+    reorder_point: number;
+    share: number;
+    below_reorder: boolean;
+  }[];
+  lifetime: {
+    first_sale: string | null;
+    last_sale: string | null;
+    units: number;
+    revenue: number;
+    days_selling: number | null;
+    best_month: { month: string; units: number; revenue: number } | null;
+  };
+  bought_together: {
+    id: string;
+    sku: string;
+    name: string;
+    category: string | null;
+    orders: number;
+    attach_rate: number | null;
+  }[];
+  purchases: {
+    id: string;
+    supplier: string | null;
+    status: string;
+    quantity: number;
+    unit_price: number;
+    created_at: string | null;
+    expected: string | null;
+  }[];
+  /** Null when the product has no measured demand — an EOQ from a zero
+   *  denominator is not a recommendation, it is a division error. */
+  recommendation: {
+    eoq: number;
+    safety_stock: number;
+    reorder_point: number;
+    lead_time_days: number;
+    lead_time_source: string;
+    order_now: boolean;
+    assumptions: {
+      holding_cost_rate: number;
+      order_cost: number;
+      annual_demand: number;
+      peak_daily_demand: number;
+    };
+  } | null;
+}
+
+export function useProductCommand(productId: string | undefined, days: number) {
+  return useQuery({
+    queryKey: ["products", "command-center", productId, days] as const,
+    queryFn: () =>
+      api<ProductCommandCenter>(`/products/${productId}/command-center?days=${days}`),
+    enabled: Boolean(productId),
+    placeholderData: (previous) => previous,
+    staleTime: 60_000,
+  });
+}

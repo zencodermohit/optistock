@@ -20,6 +20,7 @@ import { Login } from "@/pages/Login";
 import { Analytics } from "@/pages/Analytics";
 import { Site } from "@/pages/Site";
 import { Products } from "@/pages/Products";
+import { ProductCommand } from "@/pages/ProductCommand";
 import { ProductsHub } from "@/pages/ProductsHub";
 import { Sales } from "@/pages/Sales";
 import { PurchaseOrders } from "@/pages/PurchaseOrders";
@@ -66,6 +67,7 @@ export default function App() {
             front door — the same move Inventory made. A table answers "where is
             SKU-0142"; it cannot answer "which product needs me today". */}
         <Route path="products/all" element={<Products />} />
+        <Route path="products/:productId" element={<ProductCommand />} />
         <Route path="sales" element={<Sales />} />
         <Route path="customers" element={<Customers />} />
         <Route path="assistant" element={<Assistant />} />

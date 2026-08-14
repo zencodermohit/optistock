@@ -1,6 +1,7 @@
 import {
   Activity,
   ArrowDownRight,
+  ChevronRight,
   ArrowUpRight,
   Ban,
   Boxes,
@@ -68,7 +69,7 @@ export function ProductsHub() {
         description="Every SKU sorted by how it is behaving — what is selling, what is stuck, and what is about to run out."
         action={
           <div className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1">
-            {[30, 60, 90].map((option) => (
+            {[30, 90, 180].map((option) => (
               <button
                 key={option}
                 type="button"
@@ -149,6 +150,7 @@ export function ProductsHub() {
       <Catalogue
         rows={rows}
         loading={query.isLoading}
+        days={days}
         filter={filter}
         onClear={() => setFilter(null)}
         total={data?.products.length ?? 0}
@@ -518,12 +520,14 @@ function Workspaces({
 function Catalogue({
   rows,
   loading,
+  days,
   filter,
   onClear,
   total,
 }: {
   rows: ProductRow[];
   loading: boolean;
+  days: number;
   filter: string | null;
   onClear: () => void;
   total: number;
@@ -573,46 +577,54 @@ function Catalogue({
       ) : (
         <ul className="divide-y divide-border">
           {rows.slice(0, 60).map((product) => (
-            <li
-              key={product.id}
-              className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-sunken/50"
-            >
-              <ProductMark sku={product.sku} category={product.category} />
-
-              <div className="min-w-0 flex-[2]">
-                <p className="truncate text-sm font-semibold">{product.name}</p>
-                <p className="truncate text-2xs text-ink-subtle">
-                  {product.sku}
-                  {product.category && ` · ${product.category}`}
-                </p>
-              </div>
-
-              <span
-                className={cn(
-                  "hidden shrink-0 rounded-full px-2 py-0.5 text-2xs font-bold sm:inline",
-                  BUCKET[product.bucket].soft,
-                  BUCKET[product.bucket].text,
-                )}
+            <li key={product.id}>
+              <Link
+                to={`/products/${product.id}?days=${days}`}
+                className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-sunken/50"
               >
-                {BUCKET[product.bucket].label}
-              </span>
+                <ProductMark sku={product.sku} category={product.category} />
 
-              <div className="hidden w-24 shrink-0 text-right md:block">
-                <p className="tnum text-sm font-bold">{count(product.on_hand)}</p>
-                <p className="text-2xs text-ink-subtle">on hand</p>
-              </div>
+                <div className="min-w-0 flex-[2]">
+                  <p className="truncate text-sm font-semibold">{product.name}</p>
+                  <p className="truncate text-2xs text-ink-subtle">
+                    {product.sku}
+                    {product.category && ` · ${product.category}`}
+                  </p>
+                </div>
 
-              <div className="hidden w-24 shrink-0 text-right lg:block">
-                <p className="tnum text-sm font-bold">
-                  {product.days_cover === null ? "—" : `${Math.round(product.days_cover)}d`}
-                </p>
-                <p className="text-2xs text-ink-subtle">cover</p>
-              </div>
+                <span
+                  className={cn(
+                    "hidden shrink-0 rounded-full px-2 py-0.5 text-2xs font-bold sm:inline",
+                    BUCKET[product.bucket].soft,
+                    BUCKET[product.bucket].text,
+                  )}
+                >
+                  {BUCKET[product.bucket].label}
+                </span>
 
-              <div className="w-28 shrink-0 text-right">
-                <p className="tnum text-sm font-bold">{currencyCompact(product.revenue)}</p>
-                <Growth value={product.growth} />
-              </div>
+                <div className="hidden w-24 shrink-0 text-right md:block">
+                  <p className="tnum text-sm font-bold">{count(product.on_hand)}</p>
+                  <p className="text-2xs text-ink-subtle">on hand</p>
+                </div>
+
+                <div className="hidden w-24 shrink-0 text-right lg:block">
+                  <p className="tnum text-sm font-bold">
+                    {product.days_cover === null
+                      ? "—"
+                      : `${Math.round(product.days_cover)}d`}
+                  </p>
+                  <p className="text-2xs text-ink-subtle">cover</p>
+                </div>
+
+                <div className="w-28 shrink-0 text-right">
+                  <p className="tnum text-sm font-bold">
+                    {currencyCompact(product.revenue)}
+                  </p>
+                  <Growth value={product.growth} />
+                </div>
+
+                <ChevronRight className="hidden h-4 w-4 shrink-0 text-ink-subtle sm:block" />
+              </Link>
             </li>
           ))}
         </ul>
