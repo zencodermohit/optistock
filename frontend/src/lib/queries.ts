@@ -819,3 +819,76 @@ export function useSite() {
     staleTime: 15_000,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Analytics                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export interface WarehousePerformance {
+  id: string;
+  name: string;
+  revenue: number;
+  inventory_value: number;
+  stock_lines: number;
+  stockouts: number;
+  below_reorder: number;
+  open_alerts: number;
+  /** Null when the warehouse holds no stock — a score of nothing is not zero. */
+  score: number | null;
+  out_penalty: number;
+  low_penalty: number;
+  alert_penalty: number;
+}
+
+export interface AnalyticsData {
+  range_days: number;
+  warehouse_id: string | null;
+  assumptions: {
+    dead_stock_days: number;
+    excess_cover_days: number;
+    turnover_note: string;
+    health_formula: string;
+  };
+  kpis: {
+    revenue: number;
+    revenue_change_pct: number | null;
+    inventory_value: number;
+    stock_lines: number;
+    at_risk: number;
+    critical: number;
+    dead_value: number;
+    dead_lines: number;
+    turnover: number | null;
+    active_pos: number;
+    delayed_pos: number;
+  };
+  revenue_trend: { date: string; revenue: number; orders: number }[];
+  warehouse_performance: WarehousePerformance[];
+  risk_bands: { key: string; label: string; count: number }[];
+  inventory_health: {
+    healthy: number;
+    excess: number;
+    dead: number;
+    total: number;
+  };
+  critical_alerts: {
+    id: string;
+    severity: string;
+    title: string;
+    detail: Record<string, unknown> | null;
+    raised_at: string;
+  }[];
+}
+
+export function useAnalytics(days: number, warehouseId?: string) {
+  return useQuery({
+    queryKey: ["dashboard", "analytics", days, warehouseId] as const,
+    queryFn: () =>
+      api<AnalyticsData>(
+        `/dashboard/analytics${queryString({ days, warehouse_id: warehouseId })}`,
+      ),
+    // Keep the previous figures on screen while a new range loads, so changing
+    // the window does not blank the whole page.
+    placeholderData: (previous) => previous,
+  });
+}

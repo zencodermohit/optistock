@@ -15,7 +15,7 @@ import { EventStream } from "@/pages/EventStream";
 import { Insights } from "@/pages/Insights";
 import { Inventory } from "@/pages/Inventory";
 import { Login } from "@/pages/Login";
-import { Overview } from "@/pages/Overview";
+import { Analytics } from "@/pages/Analytics";
 import { Site } from "@/pages/Site";
 import { Products } from "@/pages/Products";
 import { Sales } from "@/pages/Sales";
@@ -54,7 +54,7 @@ export default function App() {
         }
       >
         <Route index element={<Site />} />
-        <Route path="analytics" element={<Overview />} />
+        <Route path="analytics" element={<Analytics />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="products" element={<Products />} />
         <Route path="sales" element={<Sales />} />
