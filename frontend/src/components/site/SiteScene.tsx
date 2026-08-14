@@ -43,21 +43,27 @@ import type { SiteWarehouse } from "@/lib/queries";
 /* Mirrors the tokens in index.css. Duplicated rather than read through
    getComputedStyle because a WebGL material needs its value at construction,
    and re-reading CSS every frame costs something and buys nothing. */
+/* Values matter more than hues here. The first build put a near-white building
+   on a near-white ground and the whole scene read as fog -- there was nothing
+   for the eye to catch. Every surface below now sits at a deliberately
+   different lightness, and the ground is pushed well down so the building has
+   something to stand out against. */
 const PALETTE = {
-  ground: "#eaeef7",
-  road: "#dde3ee",
-  wall: "#f2f5fa",
-  wallWarm: "#e7ecf5",
-  roof: "#dbe2ee",
-  trim: "#c9d2e2",
-  glass: "#8fa8dd",
-  dock: "#5b6782",
+  ground: "#d3dcee",
+  road: "#c4cee4",
+  apron: "#cad4e8",
+  wall: "#fcfdff",
+  wallWarm: "#eef2fa",
+  roof: "#b9c5dc",
+  trim: "#9dabc6",
+  glass: "#6b86c4",
+  dock: "#46516b",
   capacity: "#7c5cf5",
   danger: "#e0483c",
-  foliage: "#7f9ad8",
-  foliageDeep: "#5f7cc4",
-  trunk: "#c3cbdb",
-  vehicle: "#f7f9fc",
+  foliage: "#6d8ad2",
+  foliageDeep: "#4c69b8",
+  trunk: "#aab6ce",
+  vehicle: "#ffffff",
 };
 
 /** Footprint from capacity, on a square-root curve.
@@ -270,19 +276,31 @@ function CapacityRing({
   radius: number;
   utilisation: number;
 }) {
-  const sweep = Math.max(utilisation, 0.045) * Math.PI * 2;
+  const sweep = Math.max(utilisation, 0.06) * Math.PI * 2;
+  const thickness = 0.26;
 
   return (
-    <group position={[0, 0.035, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      {/* Track */}
-      <mesh>
-        <ringGeometry args={[radius, radius + 0.11, 96]} />
-        <meshBasicMaterial color={PALETTE.capacity} transparent opacity={0.14} />
+    <group position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* A wide, very faint halo under everything, so the ring reads as
+          emitting light onto the apron rather than sitting on it like a
+          sticker. */}
+      <mesh position={[0, 0, -0.004]}>
+        <ringGeometry args={[radius - 0.5, radius + thickness + 0.5, 96]} />
+        <meshBasicMaterial color={PALETTE.capacity} transparent opacity={0.09} />
       </mesh>
-      {/* Filled arc — starts at 12 o'clock and sweeps clockwise. */}
+
+      {/* The unfilled remainder. Visible, or the arc has nothing to be a
+          proportion OF. */}
+      <mesh>
+        <ringGeometry args={[radius, radius + thickness, 96]} />
+        <meshBasicMaterial color={PALETTE.capacity} transparent opacity={0.22} />
+      </mesh>
+
+      {/* The filled arc. Starts at 12 o'clock. This is the only emissive thing
+          in the scene, which is what makes selective bloom worth the cost. */}
       <Select enabled>
         <mesh rotation={[0, 0, Math.PI / 2]}>
-          <ringGeometry args={[radius, radius + 0.11, 96, 1, 0, sweep]} />
+          <ringGeometry args={[radius, radius + thickness, 96, 1, 0, sweep]} />
           <meshBasicMaterial color={PALETTE.capacity} toneMapped={false} />
         </mesh>
       </Select>
@@ -323,7 +341,7 @@ function Marker({ height }: { height: number }) {
 function Warehouse({ warehouse, largest }: { warehouse: SiteWarehouse; largest: number }) {
   const size = dimensions(warehouse.capacity_units, largest);
   const fill = warehouse.utilisation ?? 0;
-  const ringRadius = Math.max(size.width, size.depth) * 0.78;
+  const ringRadius = Math.max(size.width, size.depth) * 0.62;
 
   const vans = useMemo(() => {
     const spots: { position: [number, number, number]; rotation: number }[] = [];
@@ -337,25 +355,35 @@ function Warehouse({ warehouse, largest }: { warehouse: SiteWarehouse; largest: 
     return spots;
   }, [size.width, size.depth]);
 
+  /* A grove, not a scatter. The first pass ringed the building with trees at
+     an offset, which spread the visual mass across the whole frame and left the
+     composition lopsided. Real sites have planting massed at a boundary, and
+     one dense clump reads better than eleven lonely ones. */
   const trees = useMemo(() => {
     const spots: { position: [number, number, number]; scale: number }[] = [];
-    for (let i = 0; i < 11; i++) {
-      const angle = (i / 11) * Math.PI * 0.8 - 0.35;
-      const r = ringRadius + 1.5 + (i % 3) * 0.42;
-      spots.push({
-        position: [Math.cos(angle) * r + 2.2, 0, Math.sin(angle) * r - 0.6],
-        scale: 0.82 + (i % 4) * 0.12,
-      });
+    const originX = size.width / 2 + 3.1;
+    const originZ = -size.depth / 2 - 0.6;
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        spots.push({
+          position: [
+            originX + col * 0.82 + (row % 2) * 0.34,
+            0,
+            originZ + row * 0.86 + (col % 2) * 0.22,
+          ],
+          scale: 0.78 + ((row + col) % 3) * 0.16,
+        });
+      }
     }
     return spots;
-  }, [ringRadius]);
+  }, [size.width, size.depth]);
 
   return (
     <group>
       {/* Apron the building stands on — stops it floating on the ground plane */}
       <mesh position={[0, 0.012, 0.3]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[size.width + 3.4, size.depth + 3.6]} />
-        <meshStandardMaterial color={PALETTE.road} roughness={0.95} />
+        <meshStandardMaterial color={PALETTE.apron} roughness={0.95} />
       </mesh>
 
       {/* Main shed */}
@@ -509,11 +537,11 @@ function Scene({
 
   return (
     <>
-      <ambientLight intensity={0.55} />
+      <ambientLight intensity={0.34} />
       <directionalLight
         ref={key}
         position={[6.5, 9, 5]}
-        intensity={2.1}
+        intensity={2.6}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0006}
@@ -525,7 +553,7 @@ function Scene({
       />
       {/* Cool bounce from the opposite side, so shadowed faces stay blue rather
           than going muddy grey. */}
-      <directionalLight position={[-7, 4, -5]} intensity={0.45} color="#c8d6f5" />
+      <directionalLight position={[-7, 4, -5]} intensity={0.5} color="#a8bdea" />
 
       {/* Reflections without a network fetch. These emissive planes are what the
           walls and silos actually mirror. */}
@@ -536,18 +564,19 @@ function Scene({
       </Environment>
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[90, 70]} />
+        <planeGeometry args={[70, 55]} />
         <meshStandardMaterial color={PALETTE.ground} roughness={1} />
       </mesh>
 
       <Stage warehouse={warehouse} largest={largest} direction={direction} />
 
       <ContactShadows
-        position={[0, 0.02, 0]}
-        opacity={0.42}
-        scale={30}
-        blur={2}
-        far={7}
+        position={[0, 0.018, 0]}
+        opacity={0.62}
+        scale={26}
+        blur={1.7}
+        far={6}
+        color="#3d4d75"
       />
     </>
   );
@@ -572,12 +601,12 @@ export function SiteScene({
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: [8.5, 6.4, 10.5], fov: 34 }}
+      camera={{ position: [7.2, 5.1, 8.6], fov: 32 }}
       gl={{ antialias: false }}
       style={{ touchAction: "none" }}
     >
-      <color attach="background" args={["#f5f7fb"]} />
-      <fog attach="fog" args={["#f5f7fb", 22, 46]} />
+      <color attach="background" args={["#eaeef8"]} />
+      <fog attach="fog" args={["#eaeef8", 17, 34]} />
 
       {/* Selection wraps the scene so the ring and the marker can be the only
           things bloom touches. */}
@@ -586,9 +615,9 @@ export function SiteScene({
           <N8AO
             aoRadius={1.1}
             distanceFalloff={0.9}
-            intensity={2.6}
+            intensity={4.2}
             quality="medium"
-            color="#9aa8c4"
+            color="#54648c"
             halfRes
           />
           <SelectiveBloom
@@ -612,13 +641,13 @@ export function SiteScene({
         enablePan={false}
         autoRotate={!stillness}
         autoRotateSpeed={0.3}
-        target={[0, 0.9, 0]}
+        target={[0.35, 0.8, 0]}
         minPolarAngle={Math.PI / 7}
         // Stops short of the horizon: below this the apron fills the frame and
         // the building stops reading as a site.
         maxPolarAngle={Math.PI / 2.5}
-        minDistance={8}
-        maxDistance={22}
+        minDistance={6.5}
+        maxDistance={17}
       />
     </Canvas>
   );
