@@ -265,7 +265,10 @@ function ZoneBay({
         className={cn(
           "absolute right-0 bottom-0 left-0 transition-[height] duration-700",
           STATE[zone.state].fill,
-          "opacity-25",
+          // 25% turned danger red into pale pink. A bay that says "overloaded"
+          // has to look overloaded, and the figure sits on the white part of
+          // the bay above the fill, so contrast is not at risk.
+          "opacity-40",
         )}
         style={{ height: `${fill * 100}%` }}
         aria-hidden
