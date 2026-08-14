@@ -14,6 +14,7 @@ from app.modules.warehouses.schemas import (
 from app.modules.warehouses.service import WarehouseService
 
 from app.modules.analytics.readmodels import warehouse_site
+from app.modules.warehouses.command import command_center, network
 
 router = APIRouter(prefix="/api/v1/warehouses", tags=["Warehouses"])
 
@@ -39,6 +40,28 @@ def create_warehouse(
     except Exception as e:
         db.rollback()
         raise e
+
+
+@router.get("/network")
+def get_network(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Layer 1: every site as a node, with the stock moving between them."""
+    return network(db, UUID(current_user["company_id"]))
+
+
+@router.get("/{wh_id}/command-center")
+def get_command_center(
+    wh_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Layer 2: one warehouse, broken into zones, with its live feed."""
+    data = command_center(db, UUID(current_user["company_id"]), wh_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Warehouse not found")
+    return data
 
 
 @router.get("/site")

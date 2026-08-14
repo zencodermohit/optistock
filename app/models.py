@@ -34,6 +34,7 @@ from app.modules.suppliers.models import Supplier
 from app.modules.transfers.models import Transfer, TransferItem
 from app.modules.users.models import User
 from app.modules.warehouses.models import Warehouse
+from app.modules.warehouses.zone_models import WarehouseZone
 
 __all__ = [
     "Base",
@@ -60,4 +61,5 @@ __all__ = [
     "TransferItem",
     "User",
     "Warehouse",
+    "WarehouseZone",
 ]
