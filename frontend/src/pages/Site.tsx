@@ -1,5 +1,13 @@
-import { AlertTriangle, Boxes, Layers, Maximize2, TrendingUp } from "lucide-react";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Boxes,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Maximize2,
+  TrendingUp,
+} from "lucide-react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { SiteScene } from "@/components/site/SiteScene";
@@ -26,6 +34,10 @@ export function Site() {
   const site = useSite();
   const overview = useOverview(30);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Which way the next building should travel. The transition reads as
+  // navigation only if it moves in the direction the arrow points.
+  const [direction, setDirection] = useState(1);
+  const settling = useRef(false);
 
   const warehouses = useMemo(() => site.data?.data ?? [], [site.data]);
 
@@ -39,7 +51,52 @@ export function Site() {
     setSelectedId(worst.id);
   }, [warehouses, selectedId]);
 
-  const selected = warehouses.find((w) => w.id === selectedId) ?? null;
+  const index = warehouses.findIndex((w) => w.id === selectedId);
+  const selected = index >= 0 ? warehouses[index] : null;
+  const largest = useMemo(
+    () => Math.max(...warehouses.map((w) => w.capacity_units), 1),
+    [warehouses],
+  );
+
+  /** Move one site along, wrapping at both ends. */
+  const step = useCallback(
+    (delta: number) => {
+      if (warehouses.length < 2 || settling.current) return;
+      const from = warehouses.findIndex((w) => w.id === selectedId);
+      const next = (from + delta + warehouses.length) % warehouses.length;
+      setDirection(delta);
+      setSelectedId(warehouses[next].id);
+      // The swap animation owns the next moment; queuing a second one on top
+      // of it would leave the building mid-arc.
+      settling.current = true;
+      window.setTimeout(() => {
+        settling.current = false;
+      }, 660);
+    },
+    [warehouses, selectedId],
+  );
+
+  const jumpTo = useCallback(
+    (id: string) => {
+      const from = warehouses.findIndex((w) => w.id === selectedId);
+      const to = warehouses.findIndex((w) => w.id === id);
+      if (to < 0 || to === from) return;
+      setDirection(to > from ? 1 : -1);
+      setSelectedId(id);
+    },
+    [warehouses, selectedId],
+  );
+
+  // Arrow keys drive it too. A carousel that only answers the mouse is a
+  // carousel half the people using it cannot reach.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "ArrowLeft") step(-1);
+      if (event.key === "ArrowRight") step(1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [step]);
 
   const totals = useMemo(() => {
     const units = warehouses.reduce((n, w) => n + w.units_held, 0);
@@ -68,7 +125,7 @@ export function Site() {
             key={warehouse.id}
             warehouse={warehouse}
             active={warehouse.id === selectedId}
-            onClick={() => setSelectedId(warehouse.id)}
+            onClick={() => jumpTo(warehouse.id)}
           />
         ))}
         {site.isLoading && (
@@ -78,8 +135,8 @@ export function Site() {
 
       {/* ---------------- The scene ---------------- */}
       <div className="relative overflow-hidden rounded-2xl border border-border bg-canvas shadow-md">
-        <div className="h-[clamp(20rem,58vh,36rem)] w-full">
-          {warehouses.length > 0 ? (
+        <div className="h-[clamp(20rem,60vh,38rem)] w-full">
+          {selected ? (
             <Suspense
               fallback={
                 <div className="flex h-full items-center justify-center text-sm text-ink-subtle">
@@ -88,9 +145,9 @@ export function Site() {
               }
             >
               <SiteScene
-                warehouses={warehouses}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
+                warehouse={selected}
+                largest={largest}
+                direction={direction}
               />
             </Suspense>
           ) : (
@@ -105,13 +162,50 @@ export function Site() {
         <div className="pointer-events-none absolute top-3 left-3 flex flex-col gap-1.5 rounded-xl border border-border bg-surface/85 px-3 py-2.5 backdrop-blur-sm">
           <p className="eyebrow">Reading the site</p>
           <Key swatch="bg-ink-subtle" label="Building size = capacity" />
-          <Key swatch="bg-capacity" label="Violet band = how full" />
+          <Key swatch="bg-capacity" label="Glowing ring = how full" />
           <Key swatch="bg-danger" label="Marker = stock at zero" />
         </div>
 
+        {/* Arrows. Placed against the canvas edges rather than under it, so
+            moving between sites is a gesture across the scene rather than a
+            control you look away to find. */}
+        {warehouses.length > 1 && (
+          <>
+            <Arrow side="left" onClick={() => step(-1)} label="Previous site" />
+            <Arrow side="right" onClick={() => step(1)} label="Next site" />
+          </>
+        )}
+
+        {/* Position in the set. Dots rather than "3 of 4" alone, because the
+            count is what you glance at and the position is what you click. */}
+        {warehouses.length > 1 && (
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-2.5 py-1.5 backdrop-blur-sm">
+              {warehouses.map((warehouse, i) => (
+                <button
+                  key={warehouse.id}
+                  type="button"
+                  onClick={() => jumpTo(warehouse.id)}
+                  aria-label={`Show ${warehouse.name}`}
+                  aria-current={i === index}
+                  className={cn(
+                    "h-1.5 cursor-pointer rounded-full transition-all",
+                    i === index
+                      ? "w-5 bg-accent"
+                      : "w-1.5 bg-border-strong hover:bg-ink-subtle",
+                  )}
+                />
+              ))}
+              <span className="tnum ml-1 text-2xs text-ink-subtle">
+                {index + 1} of {warehouses.length}
+              </span>
+            </div>
+          </div>
+        )}
+
         <p className="pointer-events-none absolute right-3 bottom-3 flex items-center gap-1.5 text-2xs text-ink-subtle">
           <Maximize2 className="h-3 w-3" />
-          Drag to orbit · scroll to zoom · click a building
+          Drag to orbit · scroll to zoom
         </p>
       </div>
 
@@ -164,6 +258,44 @@ export function Site() {
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * A canvas-edge navigation arrow.
+ *
+ * Deliberately a real button with a label rather than a decorated div: it sits
+ * on top of a WebGL surface that a screen reader cannot describe at all, so
+ * these two controls are the only way that user moves between sites.
+ */
+function Arrow({
+  side,
+  onClick,
+  label,
+}: {
+  side: "left" | "right";
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={cn(
+        "absolute top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center",
+        "rounded-full border border-border bg-surface/80 text-ink-muted shadow-md backdrop-blur-sm",
+        "transition-all hover:scale-105 hover:border-accent-border hover:bg-surface hover:text-accent",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        side === "left" ? "left-3" : "right-3",
+      )}
+    >
+      {side === "left" ? (
+        <ChevronLeft className="h-5 w-5" />
+      ) : (
+        <ChevronRight className="h-5 w-5" />
+      )}
+    </button>
   );
 }
 
