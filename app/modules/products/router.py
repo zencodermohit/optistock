@@ -18,6 +18,8 @@ from app.modules.products.schemas import (
 )
 from app.modules.products.service import ProductService
 
+from app.modules.products.intelligence import product_intelligence
+
 router = APIRouter(prefix="/api/v1/products", tags=["Products"])
 
 # ROUTE ORDER MATTERS. FastAPI matches in declaration order and stops at the
@@ -158,6 +160,22 @@ def export_products_csv(
 
 
 # --- parameterised paths: must stay below every literal path ----------------
+
+
+@router.get("/intelligence")
+def get_intelligence(
+    days: int = Query(30, ge=7, le=365),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Every SKU classified by how it is behaving, for the Products hub.
+
+    Above /{product_id}: FastAPI matches in declaration order, and below it
+    "intelligence" is read as a product id and rejected as a malformed UUID.
+    """
+    return product_intelligence(
+        db, UUID(current_user["company_id"]), days=days
+    )
 
 
 @router.get("/{product_id}", response_model=ProductResponse)

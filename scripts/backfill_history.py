@@ -204,12 +204,22 @@ def backfill(session: Session, company_id, dry_run: bool) -> dict:
     correction = (float(measured) / expected) if expected > 0 else 1.0
     mean_units *= correction
 
-    already = session.execute(
-        text("SELECT COUNT(*) FROM sales WHERE company_id = :c AND created_at < :s"),
-        {"c": company_id, "s": end - timedelta(days=1)},
-    ).scalar()
-    if already and already > 0:
-        return {"skipped": f"{already:,} historical sales already present"}
+    # Guard on the SPAN, not on "is there anything before the earliest row".
+    #
+    # The first version asked whether sales existed before the earliest sale,
+    # which is zero by definition and therefore never true. Running the script
+    # twice prepended a second three years in front of the first, and a third
+    # run added another -- leaving seven years with a visible seam at each join
+    # and a growth curve that went backwards across them.
+    span = session.execute(
+        text(
+            "SELECT COALESCE(MAX(created_at)::date - MIN(created_at)::date, 0) "
+            "FROM sales WHERE company_id = :c"
+        ),
+        {"c": company_id},
+    ).scalar() or 0
+    if span >= YEARS * 365:
+        return {"skipped": f"history already spans {span:,} days"}
 
     by_category = {}
     for product in products:
@@ -313,6 +323,39 @@ def backfill(session: Session, company_id, dry_run: bool) -> dict:
     return summary
 
 
+def align_product_ages(session: Session) -> int:
+    """Backdate each product to just before its first sale.
+
+    The seed stamps every product with the moment the database was built, which
+    was harmless when the sales history was twelve weeks old and is nonsense now
+    that it runs three years: a product cannot have been sold in 2022 and
+    created last month. It also made "new products" count the entire catalogue,
+    which is the same as counting nothing.
+
+    A few days before the first sale rather than exactly on it, because stock
+    has to be received before it can be sold. Products that have never sold keep
+    their original date and stay genuinely new.
+    """
+    result = session.execute(
+        text(
+            """
+            UPDATE products p
+            SET created_at = first_sale.at - INTERVAL '5 days'
+            FROM (
+                SELECT si.product_id, MIN(s.created_at) AS at
+                FROM sale_items si
+                JOIN sales s ON s.id = si.sale_id
+                GROUP BY si.product_id
+            ) first_sale
+            WHERE p.id = first_sale.product_id
+              AND p.created_at > first_sale.at
+            """
+        )
+    )
+    session.commit()
+    return result.rowcount
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true")
@@ -326,6 +369,10 @@ def main() -> int:
             print(f"\n{name}")
             for key, value in result.items():
                 print(f"  {key:10} {value:,}" if isinstance(value, int) else f"  {key:10} {value}")
+
+        if not args.dry_run:
+            aligned = align_product_ages(session)
+            print(f"\nBackdated {aligned:,} products to precede their first sale")
     return 0
 
 
