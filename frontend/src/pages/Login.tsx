@@ -95,7 +95,7 @@ export function Login() {
           </form>
 
           <p className="mt-8 text-xs text-ink-subtle">
-            Demo workspace — seeded with a year of simulated trading data.
+            Demo workspace — seeded with four years of simulated trading data.
             <br />
             <span className="tnum">admin@technova.com</span> ·{" "}
             <span className="tnum">Demo@12345</span>

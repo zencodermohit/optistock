@@ -20,6 +20,7 @@ import { Login } from "@/pages/Login";
 import { Analytics } from "@/pages/Analytics";
 import { Site } from "@/pages/Site";
 import { Products } from "@/pages/Products";
+import { ProductsHub } from "@/pages/ProductsHub";
 import { Sales } from "@/pages/Sales";
 import { PurchaseOrders } from "@/pages/PurchaseOrders";
 import { StockoutRisk } from "@/pages/StockoutRisk";
@@ -60,7 +61,11 @@ export default function App() {
         <Route path="inventory" element={<InventoryNetwork />} />
         <Route path="inventory/all" element={<Inventory />} />
         <Route path="inventory/:warehouseId" element={<WarehouseCommand />} />
-        <Route path="products" element={<Products />} />
+        <Route path="products" element={<ProductsHub />} />
+        {/* The searchable table still exists, as a drill-down rather than the
+            front door — the same move Inventory made. A table answers "where is
+            SKU-0142"; it cannot answer "which product needs me today". */}
+        <Route path="products/all" element={<Products />} />
         <Route path="sales" element={<Sales />} />
         <Route path="customers" element={<Customers />} />
         <Route path="assistant" element={<Assistant />} />

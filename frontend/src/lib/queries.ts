@@ -1029,3 +1029,81 @@ export function useCommandCenter(warehouseId?: string) {
     refetchInterval: 20_000,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Product intelligence                                                        */
+/* -------------------------------------------------------------------------- */
+
+export type Bucket =
+  | "critical"
+  | "at_risk"
+  | "dead"
+  | "overstocked"
+  | "growing"
+  | "healthy";
+
+export interface ProductRow {
+  id: string;
+  sku: string;
+  name: string;
+  category: string | null;
+  status: string;
+  abc_class: string | null;
+  created_at: string;
+  on_hand: number;
+  sites: number;
+  inventory_value: number;
+  units_sold: number;
+  revenue: number;
+  daily_rate: number;
+  days_cover: number | null;
+  days_since_sale: number | null;
+  /** Null when there is no prior period to compare against. */
+  growth: number | null;
+  bucket: Bucket;
+}
+
+export interface ProductIntelligence {
+  range_days: number;
+  definitions: {
+    dead_days: number;
+    overstock_cover_days: number;
+    at_risk_cover_days: number;
+    growth_threshold: number;
+    note: string;
+  };
+  kpis: {
+    total: number;
+    active: number;
+    best_sellers: number;
+    best_seller_revenue: number;
+    dead: number;
+    dead_value: number;
+    at_risk: number;
+    critical: number;
+    overstocked: number;
+    overstock_value: number;
+    growing: number;
+    inventory_value: number;
+  };
+  distribution: { key: Bucket; count: number; value: number }[];
+  workspaces: {
+    key: string;
+    label: string;
+    count: number;
+    value: number;
+    top_product: string | null;
+    sparkline: number[];
+  }[];
+  products: ProductRow[];
+}
+
+export function useProductIntelligence(days: number) {
+  return useQuery({
+    queryKey: ["products", "intelligence", days] as const,
+    queryFn: () =>
+      api<ProductIntelligence>(`/products/intelligence?days=${days}`),
+    placeholderData: (previous) => previous,
+    staleTime: 60_000,
+  });
+}
