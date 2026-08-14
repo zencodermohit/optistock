@@ -1065,6 +1065,9 @@ export interface ProductRow {
 
 export interface ProductIntelligence {
   range_days: number;
+  /** Which workspace `products` was narrowed to, or null for the whole
+   *  catalogue. The KPIs and distribution always describe everything. */
+  workspace: string | null;
   definitions: {
     dead_days: number;
     overstock_cover_days: number;
@@ -1098,11 +1101,14 @@ export interface ProductIntelligence {
   products: ProductRow[];
 }
 
-export function useProductIntelligence(days: number) {
+export function useProductIntelligence(days: number, workspace?: string) {
   return useQuery({
-    queryKey: ["products", "intelligence", days] as const,
+    queryKey: ["products", "intelligence", days, workspace ?? null] as const,
     queryFn: () =>
-      api<ProductIntelligence>(`/products/intelligence?days=${days}`),
+      api<ProductIntelligence>(
+        `/products/intelligence?days=${days}` +
+          (workspace ? `&workspace=${workspace}` : ""),
+      ),
     placeholderData: (previous) => previous,
     staleTime: 60_000,
   });

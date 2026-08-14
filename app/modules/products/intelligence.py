@@ -81,8 +81,19 @@ def _classify(
 
 
 def product_intelligence(
-    db: Session, company_id: UUID, days: int = 30
+    db: Session,
+    company_id: UUID,
+    days: int = 30,
+    workspace_key: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """The whole catalogue classified, optionally narrowed to one workspace.
+
+    The KPIs, the distribution and the workspace cards are identical either
+    way -- they describe the catalogue, and a page showing one group still
+    needs to say how big that group is against the whole. Only the `products`
+    list changes, which is what makes this one endpoint rather than two that
+    can disagree.
+    """
     now = datetime.now(timezone.utc)
     window_start = now - timedelta(days=days)
     prior_start = now - timedelta(days=days * 2)
@@ -213,6 +224,25 @@ def product_intelligence(
             "sparkline": [r[value_key] for r in items[:12]],
         }
 
+    #: Each workspace, with the order it should be read in. Sorting belongs here
+    #: rather than in the browser: a workspace opened on the wrong row first is
+    #: a list, and the point of a workspace is that the top row is the one that
+    #: matters most.
+    members = {
+        "best_sellers": (best_sellers, lambda r: -r["revenue"]),
+        "growing": (growing, lambda r: -(r["growth"] or 0)),
+        "dead": (by_bucket["dead"], lambda r: -r["inventory_value"]),
+        "at_risk": (
+            by_bucket["critical"] + by_bucket["at_risk"],
+            # Emptiest shelf first. Out of stock sorts above nearly out, which
+            # is why the None case is forced to the top rather than the bottom.
+            lambda r: (r["days_cover"] if r["days_cover"] is not None else -1),
+        ),
+        "overstocked": (by_bucket["overstocked"], lambda r: -r["inventory_value"]),
+        "new": (new_products, lambda r: -r["revenue"]),
+        "discontinued": (discontinued, lambda r: -r["inventory_value"]),
+    }
+
     return {
         "range_days": days,
         "definitions": {
@@ -266,6 +296,17 @@ def product_intelligence(
             workspace("discontinued", "Discontinued", discontinued),
         ],
         # The catalogue, already classified, so the hub can filter without a
-        # second request. Capped because a hub is not a data export.
-        "products": sorted(rows, key=lambda r: r["revenue"], reverse=True)[:200],
+        # second request.
+        #
+        # Capped, because a hub is not a data export -- but the cap is applied
+        # AFTER the workspace filter, never before. Sorting the whole catalogue
+        # by revenue and taking the top 200 would silently drop every dead
+        # product, since a dead product's defining feature is that it earned
+        # nothing. The workspace that exists to find them would find none.
+        "workspace": workspace_key,
+        "products": (
+            sorted(members[workspace_key][0], key=members[workspace_key][1])[:500]
+            if workspace_key in members
+            else sorted(rows, key=lambda r: r["revenue"], reverse=True)[:200]
+        ),
     }

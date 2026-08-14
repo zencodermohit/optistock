@@ -141,6 +141,7 @@ export function ProductsHub() {
         />
         <Workspaces
           data={data}
+          days={days}
           selected={filter}
           onSelect={(key) => setFilter((prev) => (prev === key ? null : key))}
         />
@@ -417,10 +418,12 @@ const WORKSPACE_UNIT: Record<string, string> = {
 
 function Workspaces({
   data,
+  days,
   selected,
   onSelect,
 }: {
   data?: ProductIntelligence;
+  days: number;
   selected: string | null;
   onSelect: (key: string) => void;
 }) {
@@ -442,21 +445,37 @@ function Workspaces({
         const active = selected === workspace.key;
         const empty = workspace.count === 0;
         const peak = Math.max(...workspace.sparkline, 1);
+        const hasPage = WORKSPACE_PAGES.has(workspace.key);
+
+        const className = cn(
+          "flex flex-col rounded-2xl border bg-surface p-4 text-left transition-all",
+          empty
+            ? "cursor-default border-border opacity-60"
+            : "cursor-pointer border-border shadow-sm hover:-translate-y-0.5 hover:border-accent-border hover:shadow-md",
+          active && "border-accent-border ring-2 ring-accent/25",
+        );
+
+        const Card = ({ children }: { children: React.ReactNode }) =>
+          hasPage && !empty ? (
+            <Link
+              to={`/products/workspace/${workspace.key}?days=${days}`}
+              className={className}
+            >
+              {children}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled={empty}
+              onClick={() => onSelect(workspace.key)}
+              className={className}
+            >
+              {children}
+            </button>
+          );
 
         return (
-          <button
-            key={workspace.key}
-            type="button"
-            disabled={empty}
-            onClick={() => onSelect(workspace.key)}
-            className={cn(
-              "flex flex-col rounded-2xl border bg-surface p-4 text-left transition-all",
-              empty
-                ? "cursor-default border-border opacity-60"
-                : "cursor-pointer border-border shadow-sm hover:-translate-y-0.5 hover:border-accent-border hover:shadow-md",
-              active && "border-accent-border ring-2 ring-accent/25",
-            )}
-          >
+          <Card key={workspace.key}>
             <div className="flex items-center gap-2">
               <span
                 className={cn(
@@ -508,12 +527,23 @@ function Workspaces({
                 )}
               </>
             )}
-          </button>
+          </Card>
         );
       })}
     </div>
   );
 }
+
+/** The groups that have a screen of their own. The other two -- new and
+ *  discontinued -- have nothing a dedicated page would add, so their cards
+ *  narrow the list in place instead of opening an emptier version of it. */
+const WORKSPACE_PAGES = new Set([
+  "best_sellers",
+  "growing",
+  "dead",
+  "at_risk",
+  "overstocked",
+]);
 
 /* -------------------------------------------------------------------------- */
 

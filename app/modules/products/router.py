@@ -166,6 +166,7 @@ def export_products_csv(
 @router.get("/intelligence")
 def get_intelligence(
     days: int = Query(30, ge=7, le=365),
+    workspace: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -175,7 +176,7 @@ def get_intelligence(
     "intelligence" is read as a product id and rejected as a malformed UUID.
     """
     return product_intelligence(
-        db, UUID(current_user["company_id"]), days=days
+        db, UUID(current_user["company_id"]), days=days, workspace_key=workspace
     )
 
 
