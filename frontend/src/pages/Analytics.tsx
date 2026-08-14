@@ -180,6 +180,8 @@ export function Analytics() {
         <RevenueTrend
           series={data?.revenue_trend ?? []}
           days={days}
+          source={data?.trend_source}
+          note={data?.assumptions.trend_note}
           loading={analytics.isLoading}
         />
         <CriticalAlerts
@@ -391,10 +393,14 @@ function HealthPill({ row }: { row: WarehousePerformance }) {
 function RevenueTrend({
   series,
   days,
+  source,
+  note,
   loading,
 }: {
   series: { date: string; revenue: number }[];
   days: number;
+  source?: "projection" | "sales";
+  note?: string;
   loading: boolean;
 }) {
   const peak = Math.max(...series.map((d) => d.revenue), 0);
@@ -464,8 +470,18 @@ function RevenueTrend({
           </ResponsiveContainer>
         )}
       </div>
-      <p className="border-t border-border px-4 py-2 text-2xs text-ink-subtle">
-        Daily revenue over {days} days, from the projection the consumers maintain.
+      {/* Which query answered this. The two sources can disagree — the
+          projection is maintained by background consumers and can lag — so
+          naming it is the difference between a discrepancy somebody can
+          explain and one they cannot. */}
+      <p
+        title={note}
+        className="cursor-help border-t border-border px-4 py-2 text-2xs text-ink-subtle"
+      >
+        Daily revenue over {days} days
+        {source === "sales"
+          ? " for this site, queried from sales."
+          : ", from the daily projection the consumers maintain."}
       </p>
     </Band>
   );

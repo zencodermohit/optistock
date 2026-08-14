@@ -294,3 +294,82 @@ def test_the_endpoint_answers(authenticated_client):
         "assumptions",
     ):
         assert key in body, key
+
+
+# ---------------------------------------------------------------------------
+# The warehouse filter reaches the trend
+#
+# It did not. `daily_metrics` is keyed on (company_id, metric_date) with no
+# warehouse dimension, so revenue, the change percentage and the whole trend
+# chart stayed company-wide while every other figure on the page narrowed.
+# Nothing errored -- it just quietly showed one site's stock beside the whole
+# company's revenue.
+# ---------------------------------------------------------------------------
+def test_filtering_by_site_narrows_the_revenue_trend(
+    db_session, company, make_product, make_warehouse, make_stock, sell
+):
+    a = make_warehouse(company, name="Trend A")
+    b = make_warehouse(company, name="Trend B")
+    pa = make_product(company, sku="TREND-A")
+    pb = make_product(company, sku="TREND-B")
+    make_stock(pa, a, quantity=500)
+    make_stock(pb, b, quantity=500)
+    # Twice as much trade through A as through B.
+    for day in range(1, 6):
+        sell(pa, a, 20, days_ago=day)
+        sell(pb, b, 10, days_ago=day)
+    db_session.commit()
+
+    just_a = analytics(db_session, company.id, days=30, warehouse_id=a.id)
+    just_b = analytics(db_session, company.id, days=30, warehouse_id=b.id)
+
+    a_rev = sum(p["revenue"] for p in just_a["revenue_trend"])
+    b_rev = sum(p["revenue"] for p in just_b["revenue_trend"])
+
+    assert a_rev > 0 and b_rev > 0
+    assert a_rev != b_rev, "both sites returned the same trend"
+    assert a_rev == pytest.approx(b_rev * 2, rel=0.01)
+    # And the KPI agrees with the chart beside it.
+    assert just_a["kpis"]["revenue"] == pytest.approx(a_rev, abs=0.01)
+
+    # Deliberately NOT compared against the unfiltered figure. That path reads
+    # daily_metrics, which the event consumers maintain and which no test runs,
+    # so it is empty here. That is not a flaw in this test -- it is the same
+    # asymmetry the page now labels: unfiltered reads a projection that can lag,
+    # filtered reads the sales themselves.
+
+
+def test_the_trend_names_which_query_answered_it(
+    db_session, company, make_warehouse
+):
+    """The two paths can disagree -- the projection is maintained by background
+    consumers and can lag -- so the page says which one it used."""
+    warehouse = make_warehouse(company)
+    db_session.commit()
+
+    assert analytics(db_session, company.id, days=30)["trend_source"] == "projection"
+    assert (
+        analytics(db_session, company.id, days=30, warehouse_id=warehouse.id)[
+            "trend_source"
+        ]
+        == "sales"
+    )
+
+
+def test_the_filtered_trend_still_fills_quiet_days(
+    db_session, company, make_product, make_warehouse, make_stock, sell
+):
+    """A chart that skips quiet days draws a straight line across them and
+    reports trading that never happened."""
+    warehouse = make_warehouse(company)
+    product = make_product(company, sku="GAPS-1")
+    make_stock(product, warehouse, quantity=200)
+    sell(product, warehouse, 5, days_ago=2)
+    db_session.commit()
+
+    trend = analytics(db_session, company.id, days=14, warehouse_id=warehouse.id)[
+        "revenue_trend"
+    ]
+
+    assert len(trend) == 14
+    assert sum(1 for p in trend if p["revenue"] == 0) == 13

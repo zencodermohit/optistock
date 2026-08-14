@@ -847,8 +847,11 @@ export interface AnalyticsData {
     dead_stock_days: number;
     excess_cover_days: number;
     turnover_note: string;
+    trend_note: string;
     health_formula: string;
   };
+  /** "projection" when unfiltered, "sales" when a site is selected. */
+  trend_source: "projection" | "sales";
   kpis: {
     revenue: number;
     revenue_change_pct: number | null;

@@ -87,6 +87,89 @@ def _health(lines: int, out: int, low: int, alerts: int) -> Dict[str, Any]:
     }
 
 
+def _trading_series(
+    db: Session,
+    company_id: UUID,
+    days: int,
+    warehouse_id: Optional[UUID],
+):
+    """Daily revenue, orders and units — for the whole company or for one site.
+
+    Two paths, and the reason is a real limitation rather than a preference.
+    `daily_metrics` is the CQRS read model the event consumers maintain, and it
+    is keyed on (company_id, metric_date) with NO warehouse dimension. It cannot
+    answer "revenue for Mumbai" at any price.
+
+    So an unfiltered page reads the projection, which is what it is for and what
+    makes the common case fast. A site-filtered page falls back to grouping the
+    sales themselves. Both return the same shape and both fill missing days with
+    zero, because a chart that skips quiet days draws a straight line across
+    them and reports trading that never happened.
+
+    The source comes back with the data so the page can say which one it used.
+    Adding warehouse_id to the projection would remove the fork, at the cost of
+    a migration, a consumer change and a backfill -- worth doing if this filter
+    becomes a common path, and not worth guessing at now.
+    """
+    if warehouse_id is None:
+        return recent_metrics(db, company_id, days=days), "projection"
+
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=days - 1)
+
+    # Revenue and order count come from the sale headers. Joining the items in
+    # here would multiply each header by its line count and inflate revenue.
+    headers = {
+        row.day: row
+        for row in db.query(
+            func.date(Sale.created_at).label("day"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
+            func.count(Sale.id).label("orders"),
+        )
+        .filter(
+            Sale.company_id == company_id,
+            Sale.source_warehouse_id == warehouse_id,
+            func.date(Sale.created_at) >= start,
+            func.date(Sale.created_at) <= end,
+        )
+        .group_by(func.date(Sale.created_at))
+        .all()
+    }
+
+    # Units need the items, so they are counted separately and merged.
+    units = dict(
+        db.query(
+            func.date(Sale.created_at),
+            func.coalesce(func.sum(SaleItem.quantity), 0),
+        )
+        .join(SaleItem, SaleItem.sale_id == Sale.id)
+        .filter(
+            Sale.company_id == company_id,
+            Sale.source_warehouse_id == warehouse_id,
+            func.date(Sale.created_at) >= start,
+            func.date(Sale.created_at) <= end,
+        )
+        .group_by(func.date(Sale.created_at))
+        .all()
+    )
+
+    series = []
+    for offset in range(days):
+        day = start + timedelta(days=offset)
+        row = headers.get(day)
+        series.append(
+            {
+                "date": day.isoformat(),
+                "revenue": float(row.revenue) if row else 0.0,
+                "orders": int(row.orders) if row else 0,
+                "units_sold": int(units.get(day, 0)),
+                "stock_movements": 0,
+                "units_received": 0,
+            }
+        )
+    return series, "sales"
+
+
 def analytics(
     db: Session,
     company_id: UUID,
@@ -254,8 +337,11 @@ def analytics(
     performance.sort(key=lambda p: p["revenue"], reverse=True)
 
     # ---- Trading, and the trend ---------------------------------------------
-    series = recent_metrics(db, company_id, days=days)
-    prior = recent_metrics(db, company_id, days=days * 2)[: max(len(series), 1)]
+    series, trend_source = _trading_series(db, company_id, days, warehouse_id)
+    # The window before this one, taken as the first half of a double-length
+    # series so both halves are measured the same way.
+    doubled, _ = _trading_series(db, company_id, days * 2, warehouse_id)
+    prior = doubled[: max(len(series), 1)]
     revenue = sum(d["revenue"] for d in series)
     prior_revenue = sum(d["revenue"] for d in prior)
 
@@ -295,6 +381,11 @@ def analytics(
                 "turnover uses average inventory across the period; no "
                 "historical stock snapshots are kept, so current value stands in."
             ),
+            "trend_note": (
+                "Unfiltered figures come from the daily projection the event "
+                "consumers maintain. Filtering by site queries the sales "
+                "directly, because that projection has no warehouse dimension."
+            ),
             "health_formula": (
                 "100 − 60×(out of stock ÷ lines) − 25×(below reorder ÷ lines) "
                 "− 15×(open alerts, capped at 5)"
@@ -317,6 +408,7 @@ def analytics(
             "active_pos": len(active_pos),
             "delayed_pos": delayed,
         },
+        "trend_source": trend_source,
         "revenue_trend": [
             {"date": d["date"], "revenue": d["revenue"], "orders": d["orders"]}
             for d in series
