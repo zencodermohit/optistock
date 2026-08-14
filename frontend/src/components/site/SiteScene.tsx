@@ -277,10 +277,10 @@ function CapacityRing({
   utilisation: number;
 }) {
   const sweep = Math.max(utilisation, 0.06) * Math.PI * 2;
-  const thickness = 0.26;
+  const thickness = 0.34;
 
   return (
-    <group position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <group position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       {/* A wide, very faint halo under everything, so the ring reads as
           emitting light onto the apron rather than sitting on it like a
           sticker. */}
@@ -293,7 +293,7 @@ function CapacityRing({
           proportion OF. */}
       <mesh>
         <ringGeometry args={[radius, radius + thickness, 96]} />
-        <meshBasicMaterial color={PALETTE.capacity} transparent opacity={0.22} />
+        <meshBasicMaterial color={PALETTE.capacity} transparent opacity={0.3} />
       </mesh>
 
       {/* The filled arc. Starts at 12 o'clock. This is the only emissive thing
@@ -361,17 +361,17 @@ function Warehouse({ warehouse, largest }: { warehouse: SiteWarehouse; largest: 
      one dense clump reads better than eleven lonely ones. */
   const trees = useMemo(() => {
     const spots: { position: [number, number, number]; scale: number }[] = [];
-    const originX = size.width / 2 + 3.1;
-    const originZ = -size.depth / 2 - 0.6;
+    const originX = size.width / 2 + 1.5;
+    const originZ = -size.depth / 2 - 1.9;
     for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
+      for (let col = 0; col < 4; col++) {
         spots.push({
           position: [
-            originX + col * 0.82 + (row % 2) * 0.34,
+            originX + col * 0.68 + (row % 2) * 0.3,
             0,
-            originZ + row * 0.86 + (col % 2) * 0.22,
+            originZ - row * 0.72 + (col % 2) * 0.2,
           ],
-          scale: 0.78 + ((row + col) % 3) * 0.16,
+          scale: 0.5 + ((row + col) % 3) * 0.09,
         });
       }
     }
@@ -380,9 +380,14 @@ function Warehouse({ warehouse, largest }: { warehouse: SiteWarehouse; largest: 
 
   return (
     <group>
-      {/* Apron the building stands on — stops it floating on the ground plane */}
-      <mesh position={[0, 0.012, 0.3]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[size.width + 3.4, size.depth + 3.6]} />
+      {/* The yard the building stands on.
+          A circle, not a rectangle. The rectangular version drew a hard
+          straight edge diagonally across the whole frame and read as a slab
+          floating in space rather than as ground. A disc has no corner to
+          catch the eye, and its rim sits under the tree line where nothing
+          reads it as an edge at all. */}
+      <mesh position={[0, 0.012, 0.1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[Math.max(size.width, size.depth) * 1.55, 64]} />
         <meshStandardMaterial color={PALETTE.apron} roughness={0.95} />
       </mesh>
 
@@ -564,7 +569,7 @@ function Scene({
       </Environment>
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[70, 55]} />
+        <planeGeometry args={[160, 160]} />
         <meshStandardMaterial color={PALETTE.ground} roughness={1} />
       </mesh>
 
@@ -601,7 +606,7 @@ export function SiteScene({
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: [7.2, 5.1, 8.6], fov: 32 }}
+      camera={{ position: [7.6, 4.6, 8.2], fov: 33 }}
       gl={{ antialias: false }}
       style={{ touchAction: "none" }}
     >
@@ -621,7 +626,7 @@ export function SiteScene({
             halfRes
           />
           <SelectiveBloom
-            intensity={2.2}
+            intensity={3.6}
             luminanceThreshold={0.15}
             luminanceSmoothing={0.35}
             mipmapBlur
@@ -641,7 +646,7 @@ export function SiteScene({
         enablePan={false}
         autoRotate={!stillness}
         autoRotateSpeed={0.3}
-        target={[0.35, 0.8, 0]}
+        target={[0, 0.75, 0]}
         minPolarAngle={Math.PI / 7}
         // Stops short of the horizon: below this the apron fills the frame and
         // the building stops reading as a site.
