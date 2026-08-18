@@ -55,12 +55,33 @@ variable "key_name" {
 }
 
 variable "ssh_allowed_cidr" {
-  description = "CIDR block permitted to reach SSH (port 22) on the app server. Set this to your VPN or office egress address, e.g. \"203.0.113.4/32\". Intentionally has no default so it must be an explicit decision."
+  description = <<-DESC
+    CIDR block permitted to reach SSH (port 22) on the app server.
+
+    This used to reject 0.0.0.0/0 outright, and that guard was wrong -- not
+    because locking SSH down is wrong, but because it assumed the only thing
+    that ever needs port 22 is a person. The deploy is a GitHub-hosted runner
+    with an address nobody can predict, so pinning this to an operator's IP
+    locked out the deployment itself. It failed as `dial tcp :22: i/o timeout`,
+    which reads as a broken server rather than a firewall doing its job.
+
+    GitHub publishes its Actions ranges, but there are thousands of them and
+    they rotate, which is far past what a security group can hold.
+
+    So 0.0.0.0/0 is now permitted, and what makes that defensible is on the
+    host rather than in the firewall: sshd has PasswordAuthentication no and
+    KbdInteractiveAuthentication no, so public key is the only way in and
+    there is no password to guess. An exposed port 22 then costs log noise
+    from scanners, not access. fail2ban is installed to absorb the noise.
+
+    Still set it to a single address if you do not need CI to deploy -- the
+    narrower value is better whenever it is possible.
+  DESC
   type        = string
 
   validation {
-    condition     = var.ssh_allowed_cidr != "0.0.0.0/0"
-    error_message = "ssh_allowed_cidr must not be 0.0.0.0/0. Restrict SSH to a specific address such as 203.0.113.4/32, or front it with AWS Systems Manager Session Manager."
+    condition     = can(cidrhost(var.ssh_allowed_cidr, 0))
+    error_message = "ssh_allowed_cidr must be valid CIDR notation, such as 203.0.113.4/32 or 0.0.0.0/0."
   }
 }
 

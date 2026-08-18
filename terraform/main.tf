@@ -190,6 +190,21 @@ resource "aws_instance" "app_server" {
                 echo '/swapfile none swap sw 0 0' >> /etc/fstab
               fi
 
+              # fail2ban. Port 22 is reachable from the whole internet because
+              # the deploy runs on a GitHub-hosted runner whose address cannot
+              # be predicted (see var.ssh_allowed_cidr). Password auth is off,
+              # so this is not what keeps attackers out -- it keeps the auth
+              # log readable by banning the scanners that will find the port
+              # within hours of it opening.
+              apt-get install -y fail2ban
+              printf '[sshd]
+enabled = true
+maxretry = 5
+bantime = 1h
+findtime = 10m
+' > /etc/fail2ban/jail.d/sshd.local
+              systemctl enable --now fail2ban
+
               # deploy.yml starts with `cd /home/ubuntu/project_IV && git pull`,
               # so the directory has to exist before the first deploy can run.
               # The clone itself is a manual step: the repository URL is not
