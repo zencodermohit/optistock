@@ -19,6 +19,23 @@ venv/
 # Environment Variables (NEVER commit secrets)
 .env
 
+# Terraform. The state file is the record of what actually exists in AWS, and it
+# stores resource attributes in the clear -- committing it publishes your
+# infrastructure layout and can leak generated credentials. Keep it locally (or
+# move it to a remote backend), never in git. Losing it means Terraform forgets
+# what it built and will try to build a second copy.
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# SSH private keys. The EC2 key pair downloads once and is often saved next to
+# the project by accident; a committed private key is a public server.
+*.pem
+*.key
+
 # IDE
 .vscode/
 .idea/

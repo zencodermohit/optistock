@@ -18,3 +18,16 @@ frontend/dist/
 # Local-only artefacts that have no business in an image.
 data_lake/
 *.parquet
+
+# Media and docs. The repository carries an 18MB screen recording that the
+# Dockerfile's `COPY . .` was pulling into the runtime image on every build.
+*.mp4
+*.mov
+docs/
+
+# Not needed at run time, and each one is a thing an attacker on a shell inside
+# the container would otherwise get for free. terraform/ in particular describes
+# the infrastructure the container is running on.
+tests/
+terraform/
+.github/

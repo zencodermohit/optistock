@@ -141,8 +141,14 @@ jobs:
             # upgraded exactly once per deploy and the relay and consumers do
             # not race it. A failed migration exits the api container, which
             # the check below turns into a failed deploy.
-            docker compose down
+            # Build BEFORE stopping anything. The nginx image compiles the React
+            # app (`npm run build` is `tsc -b && vite build`), so a type error
+            # fails the build -- and when `down` ran first, that left the host
+            # with nothing serving and no way back except a manual checkout.
+            # Building first means a failed build is a no-op: the previous
+            # containers are still up and still serving the old version.
             docker compose build
+            docker compose down
             docker compose up -d
 
             # Fail the deploy if anything is already dead. Without this the step
