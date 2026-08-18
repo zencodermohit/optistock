@@ -1222,3 +1222,76 @@ export function useProductCommand(productId: string | undefined, days: number) {
     staleTime: 60_000,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Procurement                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export interface Procurement {
+  generated_at: string;
+  definitions: Record<string, string>;
+  kpis: {
+    key: string;
+    label: string;
+    value: number;
+    amount: number;
+    /** Only present on cards describing a flow. A level has no trend. */
+    trend: number | null;
+    trend_label?: string;
+    sparkline: number[];
+    tone: "accent" | "warning" | "danger" | "success";
+  }[];
+  recommendations: {
+    id: string;
+    product_id: string;
+    sku: string;
+    name: string;
+    category: string | null;
+    warehouse: string;
+    on_hand: number;
+    days_of_stock: number | null;
+    forecast_demand: number;
+    recommended_quantity: number;
+    order_value: number;
+    revenue_at_risk: number;
+    supplier: string | null;
+    lead_time_days: number | null;
+    lead_time_observations: number;
+    confidence: number;
+    reasoning: string;
+    priority: "high" | "medium";
+  }[];
+  exceptions: {
+    key: string;
+    kind: "supplier_delay" | "stockout_risk" | "approval_pending";
+    severity: "critical" | "high" | "medium";
+    title: string;
+    detail: string;
+    reference: string;
+    amount: number;
+  }[];
+  workspaces: {
+    key: string;
+    label: string;
+    statuses: string[];
+    count: number;
+    value: number;
+    sparkline: number[];
+  }[];
+  suppliers: {
+    id: string;
+    name: string;
+    orders: number;
+    overdue_now: number;
+    stated_reliability: number | null;
+    lead_time_days: number | null;
+  }[];
+}
+
+export function useProcurement() {
+  return useQuery({
+    queryKey: ["purchase-orders", "procurement"] as const,
+    queryFn: () => api<Procurement>("/purchase_orders/procurement"),
+    staleTime: 60_000,
+  });
+}

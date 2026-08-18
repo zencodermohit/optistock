@@ -14,6 +14,7 @@ from app.modules.purchase_orders.schemas import (
     PaginatedPOResponse,
 )
 from app.modules.purchase_orders.service import PurchaseOrderService
+from app.modules.purchase_orders.procurement import procurement
 
 router = APIRouter(prefix="/api/v1/purchase_orders", tags=["Purchase Orders"])
 
@@ -91,6 +92,20 @@ def get_pipeline(
             company_id=UUID(current_user["company_id"]), limit=limit
         )
     }
+
+
+@router.get("/procurement")
+def get_procurement(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """The procurement screen: what to order, what is going wrong, what is open.
+
+    Above /{po_id}. FastAPI matches in declaration order, and below it
+    "procurement" is read as a purchase order id and rejected as a malformed
+    UUID.
+    """
+    return procurement(db, UUID(current_user["company_id"]))
 
 
 @router.get("/{po_id}", response_model=PurchaseOrderResponse)

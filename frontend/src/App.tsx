@@ -24,6 +24,7 @@ import { ProductCommand } from "@/pages/ProductCommand";
 import { ProductsHub } from "@/pages/ProductsHub";
 import { ProductWorkspace } from "@/pages/ProductWorkspace";
 import { Sales } from "@/pages/Sales";
+import { Procurement } from "@/pages/Procurement";
 import { PurchaseOrders } from "@/pages/PurchaseOrders";
 import { StockoutRisk } from "@/pages/StockoutRisk";
 
@@ -77,7 +78,10 @@ export default function App() {
         <Route path="customers" element={<Customers />} />
         <Route path="assistant" element={<Assistant />} />
         <Route path="approvals" element={<Approvals />} />
-        <Route path="purchase-orders" element={<PurchaseOrders />} />
+        <Route path="purchase-orders" element={<Procurement />} />
+        {/* The order list is still here, as a drill-down. It answers "what
+            did we order"; it cannot answer "what needs ordering". */}
+        <Route path="purchase-orders/all" element={<PurchaseOrders />} />
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="transfers" element={<Transfers />} />
         <Route path="stock-counts" element={<Reconciliation />} />
