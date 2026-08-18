@@ -46,6 +46,49 @@ HTTPS at stage 10. Certificates themselves are free.
 
 ---
 
+## Where do I type these commands?
+
+Every `powershell` block in this file goes in a **terminal**. In VS Code:
+
+**Terminal menu at the top → New Terminal**, or press ``Ctrl+` `` (the backtick
+key, above Tab).
+
+A panel opens at the bottom with a prompt like:
+
+```
+PS C:\Users\katre\Desktop\project_IV>
+```
+
+You type there and press Enter. That is your own terminal, separate from the
+panel where you talk to Claude. A plain Windows PowerShell window (Start menu →
+"PowerShell") works exactly the same.
+
+**The gotcha that catches everyone:** after any `winget install`, close the
+terminal and open a new one. Otherwise the next command fails with
+`the term 'aws' is not recognized` — a terminal only learns about newly
+installed programs when it starts.
+
+Some commands are **interactive**: they ask questions one at a time and wait for
+an answer. `aws configure` is one:
+
+```
+PS C:\Users\katre\Desktop\project_IV> aws configure
+AWS Access Key ID [None]:        <- paste the first key, Enter
+AWS Secret Access Key [None]:    <- paste the second, Enter
+Default region name [None]:      <- type  ap-south-1  , Enter
+Default output format [None]:    <- type  json  , Enter
+```
+
+Paste with `Ctrl+V`. When it finishes it prints nothing at all — that is
+success, it is simply quiet.
+
+> **Never paste your AWS keys into a chat, a file in this project, or a
+> screenshot.** They belong in your terminal and nowhere else. If one leaks,
+> delete that access key in IAM and create a new one — which is exactly why
+> there is a separate `terraform` user rather than using your main login.
+
+---
+
 ## Stage 1 — Create an AWS account — DONE
 
 You already have one (account `220438080921`).
