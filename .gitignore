@@ -25,7 +25,6 @@ venv/
 # move it to a remote backend), never in git. Losing it means Terraform forgets
 # what it built and will try to build a second copy.
 terraform/.terraform/
-terraform/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfvars
