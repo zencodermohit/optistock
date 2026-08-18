@@ -10,6 +10,12 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   /** Rendered inside the field on the left — a search or currency glyph. */
   icon?: ReactNode;
+  /**
+   * Rendered inside the field on the right, and unlike `icon` it stays
+   * interactive — this is where a reveal-password toggle or a clear button
+   * goes. The input gets matching right padding so text never runs under it.
+   */
+  trailing?: ReactNode;
 }
 
 export function Input({
@@ -18,6 +24,7 @@ export function Input({
   hint,
   error,
   icon,
+  trailing,
   id,
   ...props
 }: InputProps) {
@@ -55,11 +62,15 @@ export function Input({
               "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " +
               "disabled:cursor-not-allowed disabled:bg-sunken disabled:text-ink-subtle",
             icon && "pl-9",
+            trailing && "pr-10",
             error ? "border-danger" : "border-border-strong",
             className,
           )}
           {...props}
         />
+        {trailing && (
+          <span className="absolute top-1/2 right-2 -translate-y-1/2">{trailing}</span>
+        )}
       </div>
 
       {error ? (

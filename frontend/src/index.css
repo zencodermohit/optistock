@@ -80,6 +80,38 @@
   --color-capacity: #7c5cf5;
   --color-capacity-soft: #efeafe;
 
+  /* --- Night --------------------------------------------------------------
+     The sign-in panel, and nothing else so far.
+
+     Everywhere past the door this product is a lit floor: a cool near-white
+     ground with objects sitting on it. The door itself is the one place that
+     argues rather than works, so it inverts -- a night view of the network,
+     with the warehouses lit up on it.
+
+     These are a SEPARATE ramp rather than a dark-mode remapping of the tokens
+     above. A card on the sign-in panel is not a surface in a dark theme; it is
+     a lit object on a night ground, and it wants its own borders and its own
+     ink. Reusing --color-ink here would have quietly forced every screen in
+     the product to agree with a decision that only one screen needs.
+
+     Semantic hues are restated for this ground, because #0e8f5d reads as
+     almost black on navy. Same meanings, same rule -- amber and red stay
+     reserved for stock trouble -- just legible at 4.5:1 against night. */
+  --color-night: #060c1c;
+  --color-night-deep: #030713;
+  --color-night-raised: #0e1730;
+  --color-night-border: #1d2947;
+  --color-night-border-soft: #16203a;
+  --color-night-ink: #f2f5fd;
+  --color-night-ink-muted: #97a5c4;
+  --color-night-ink-subtle: #66748f;
+  /* Two steps brighter than --color-accent. The periwinkle that carries
+     navigation on a white ground disappears into navy. */
+  --color-night-accent: #6c85ff;
+  --color-night-success: #34d399;
+  --color-night-warning: #f0b45e;
+  --color-night-danger: #fb7185;
+
   /* --- Type ---------------------------------------------------------------
      Two roles. Manrope reads; Plex Mono identifies. */
   --font-display: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
