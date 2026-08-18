@@ -1,7 +1,23 @@
 variable "aws_region" {
-  description = "The AWS region to deploy resources in"
+  description = <<-DESC
+    The AWS region to deploy resources in.
+
+    Mumbai, because that is where this application's users are. The seeded
+    warehouses are Mumbai, Delhi, Pune and Nagpur and every figure on screen
+    is formatted en-IN; serving that from Virginia or Stockholm adds well over
+    a hundred milliseconds to every request for no reason.
+
+    Region is not a setting you change later. It is baked into the VPC, the
+    subnet, the instance, the elastic IP and -- easy to forget -- the SSH key
+    pair, which is region-scoped and simply will not be found from another
+    region. Moving means rebuilding.
+
+    If you do change it, check var.instance_type at the same time: which micro
+    instance the free tier covers varies by region, and eu-north-1 in
+    particular has no t2 instances at all.
+  DESC
   type        = string
-  default     = "us-east-1"
+  default     = "ap-south-1"
 }
 
 variable "instance_type" {
@@ -15,9 +31,9 @@ variable "instance_type" {
     the Python scientific stack compile in the same step and need several GB,
     which is what the swap in main.tf's user_data is for.
 
-    Defaults to t2.micro because that is what the free tier covers in
-    us-east-1, this configuration's default region. Some regions offer
-    t3.micro instead. Check yours before applying -- the wrong one is
+    Defaults to t2.micro, which is what the free tier covers in ap-south-1
+    (Mumbai), this configuration's region. This pairing matters: eu-north-1
+    has no t2 instances at all and needs t3.micro, and the wrong type is
     billable from the first hour. Both are 1 GB, so the sizing above holds
     either way; t2.micro has one vCPU rather than two, which makes the build
     slower still.
