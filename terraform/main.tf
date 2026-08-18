@@ -116,6 +116,23 @@ resource "aws_instance" "app_server" {
   vpc_security_group_ids = [aws_security_group.web_sg.id]
   key_name               = var.key_name
 
+  # Pinned, not left to the AMI's default. The free tier covers 30 GB of
+  # General Purpose SSD across the whole account; an AMI that ships a larger
+  # root volume, or a second instance later, silently crosses that line and
+  # the overage is charged per GB-month. 20 GB leaves room for the Docker
+  # images, the Postgres volume and the Parquet data lake, and still leaves
+  # headroom under the cap.
+  #
+  # gp2 rather than gp3: both are General Purpose SSD and both are covered,
+  # but gp2 is the type the free tier has always named explicitly, and this
+  # deployment has no budget for being wrong about that.
+  root_block_device {
+    volume_size           = 20
+    volume_type           = "gp2"
+    delete_on_termination = true
+    encrypted             = true
+  }
+
   user_data = <<-EOF
               #!/bin/bash
               apt-get update
@@ -190,5 +207,45 @@ resource "aws_eip" "app_eip" {
 
   tags = {
     Name = "optistock-eip"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Spend guard
+#
+# This deployment has no budget at all, so the alarm is infrastructure rather
+# than a step in a checklist somebody might skip. AWS Budgets is itself free
+# for the first two budgets.
+#
+# It does NOT stop charges -- nothing in AWS does that automatically. It tells
+# you within a day of the first cent, which is the difference between noticing
+# now and noticing on a monthly statement.
+#
+# Two notifications on purpose. ACTUAL fires once real money is billed;
+# FORECASTED fires when AWS projects the month will exceed the limit, which
+# usually lands days earlier and is the one that gives you time to act.
+# ---------------------------------------------------------------------------
+resource "aws_budgets_budget" "zero_spend_guard" {
+  name         = "optistock-zero-spend-guard"
+  budget_type  = "COST"
+  limit_amount = "1"
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
+
+  # 1% of one dollar. Effectively: tell me if this account is billed anything.
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 1
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = [var.alert_email]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 1
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "FORECASTED"
+    subscriber_email_addresses = [var.alert_email]
   }
 }

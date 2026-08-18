@@ -15,16 +15,18 @@ variable "instance_type" {
     the Python scientific stack compile in the same step and need several GB,
     which is what the swap in main.tf's user_data is for.
 
-    Check which micro instance your region's free tier covers before applying
-    -- it is t2.micro in some regions and t3.micro in others, and the wrong
-    one is billable from the first hour. Both are 1 GB, so the sizing above
-    holds either way.
+    Defaults to t2.micro because that is what the free tier covers in
+    us-east-1, this configuration's default region. Some regions offer
+    t3.micro instead. Check yours before applying -- the wrong one is
+    billable from the first hour. Both are 1 GB, so the sizing above holds
+    either way; t2.micro has one vCPU rather than two, which makes the build
+    slower still.
 
     Raise this to t3.small or t3.medium if deploys feel too slow; the build is
     the only part that struggles, and it is the part that runs on swap.
   DESC
   type        = string
-  default     = "t3.micro"
+  default     = "t2.micro"
 }
 
 variable "key_name" {
@@ -40,5 +42,22 @@ variable "ssh_allowed_cidr" {
   validation {
     condition     = var.ssh_allowed_cidr != "0.0.0.0/0"
     error_message = "ssh_allowed_cidr must not be 0.0.0.0/0. Restrict SSH to a specific address such as 203.0.113.4/32, or front it with AWS Systems Manager Session Manager."
+  }
+}
+
+variable "alert_email" {
+  description = <<-DESC
+    Where the spend alarm sends its warning.
+
+    No default, because a budget nobody receives is not a budget. This
+    address gets an email the moment the account is billed anything at all
+    -- see aws_budgets_budget in main.tf. Confirm the SNS-style subscription
+    email AWS sends, or the alerts go nowhere.
+  DESC
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@\s]+@[^@\s]+\.[^@\s]+$", var.alert_email))
+    error_message = "alert_email must be a valid email address."
   }
 }
