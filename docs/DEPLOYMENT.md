@@ -191,15 +191,29 @@ icacls "optistock-prod-key.pem" /grant:r "$env:USERNAME:(R)"
 The server refuses SSH from everywhere except the address you name. The config
 rejects an attempt to open it to the whole internet.
 
+Same terminal as everything else.
+
 ```powershell
-curl ifconfig.me
+curl.exe ifconfig.me/ip
 ```
 
-That prints something like `203.0.113.4`. The value you need next is that with
-`/32` on the end: `203.0.113.4/32`.
+Both details matter on Windows, and plain `curl ifconfig.me` fails on both:
 
-> Home IP addresses change. If SSH stops working later, this is almost always
-> why — re-run this and update the rule under EC2 → Security Groups.
+- **`curl.exe`, not `curl`.** In PowerShell, `curl` is an *alias* for
+  `Invoke-WebRequest`, which returns a response object rather than text. The
+  `.exe` forces the real curl that ships with Windows.
+- **`/ip` on the end.** Without it the site returns its whole HTML page, and
+  your address is buried somewhere in the middle of it.
+
+That prints a bare address like `203.0.113.4`. The value you need next is that
+with `/32` on the end: `203.0.113.4/32`.
+
+> No terminal handy? Searching "what is my IP" in a browser gives the same
+> answer. The `/32` still has to be added by hand.
+
+> **This changes.** Home connections get new addresses periodically. If SSH
+> stops working in a month, this is why — re-run the command and update the
+> rule under EC2 → Security Groups.
 
 ---
 
