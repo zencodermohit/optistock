@@ -127,7 +127,9 @@ def network(db: Session, company_id: UUID) -> Dict[str, Any]:
         units = sum(r.quantity for r in lines)
         out = sum(1 for r in lines if r.quantity <= 0)
         low = sum(
-            1 for r in lines if r.reorder_point > 0 and 0 < r.quantity <= r.reorder_point
+            1
+            for r in lines
+            if r.reorder_point > 0 and 0 < r.quantity <= r.reorder_point
         )
         alerts = int(alerts_by_wh.get(wh.id, 0))
         health = _health(len(lines), out, low, alerts)
@@ -140,7 +142,9 @@ def network(db: Session, company_id: UUID) -> Dict[str, Any]:
                 "location_code": wh.location_code,
                 "capacity_units": capacity,
                 "units_held": units,
-                "utilisation": round(min(units / capacity, 1.5), 4) if capacity else None,
+                "utilisation": round(min(units / capacity, 1.5), 4)
+                if capacity
+                else None,
                 "inventory_value": round(
                     sum(float(r.unit_cost or 0) * r.quantity for r in lines), 2
                 ),
@@ -166,7 +170,9 @@ def network(db: Session, company_id: UUID) -> Dict[str, Any]:
         .all()
     )
     units_by_transfer = dict(
-        db.query(TransferItem.transfer_id, func.coalesce(func.sum(TransferItem.quantity), 0))
+        db.query(
+            TransferItem.transfer_id, func.coalesce(func.sum(TransferItem.quantity), 0)
+        )
         .filter(TransferItem.transfer_id.in_([t.id for t in in_flight] or [None]))
         .group_by(TransferItem.transfer_id)
         .all()

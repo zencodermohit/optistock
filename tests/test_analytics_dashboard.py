@@ -339,9 +339,7 @@ def test_filtering_by_site_narrows_the_revenue_trend(
     # filtered reads the sales themselves.
 
 
-def test_the_trend_names_which_query_answered_it(
-    db_session, company, make_warehouse
-):
+def test_the_trend_names_which_query_answered_it(db_session, company, make_warehouse):
     """The two paths can disagree -- the projection is maintained by background
     consumers and can lag -- so the page says which one it used."""
     warehouse = make_warehouse(company)

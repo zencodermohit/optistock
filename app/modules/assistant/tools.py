@@ -268,7 +268,9 @@ def stockout_risk(db: Session, company_id: UUID, days: int = 0, limit: int = 10)
     left for it to assemble. A model given four numbers will write a fifth, and
     a stockout date it derived itself is a stockout date nobody can check.
     """
-    risks = stockout_risks(db, company_id, limit=min(max(int(limit or 10), 1), MAX_ROWS))
+    risks = stockout_risks(
+        db, company_id, limit=min(max(int(limit or 10), 1), MAX_ROWS)
+    )
 
     if days:
         window = max(int(days), 1)
@@ -376,7 +378,9 @@ def create_purchase_order(
         "supplier": payload["supplier_name"],
         "expires_in_hours": 24,
         "_citations": [
-            _cite("proposal", f"Proposed order: {payload['quantity']} x {payload['sku']}")
+            _cite(
+                "proposal", f"Proposed order: {payload['quantity']} x {payload['sku']}"
+            )
         ],
     }
 

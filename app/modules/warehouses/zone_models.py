@@ -62,8 +62,6 @@ class WarehouseZone(Base):
         # One zone per category per warehouse. Two zones claiming the same
         # category would make every stock line count twice, and utilisation
         # would quietly exceed 100% for reasons nobody could find.
-        UniqueConstraint(
-            "warehouse_id", "category", name="uq_warehouse_zone_category"
-        ),
+        UniqueConstraint("warehouse_id", "category", name="uq_warehouse_zone_category"),
         UniqueConstraint("warehouse_id", "code", name="uq_warehouse_zone_code"),
     )

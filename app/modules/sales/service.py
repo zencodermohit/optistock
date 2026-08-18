@@ -60,9 +60,7 @@ class SaleService:
             base = base.filter(Sale.status == status)
 
         total = base.count()
-        sales = (
-            base.order_by(Sale.created_at.desc()).offset(skip).limit(limit).all()
-        )
+        sales = base.order_by(Sale.created_at.desc()).offset(skip).limit(limit).all()
         if not sales:
             return [], total, {"revenue": 0.0, "units": 0, "orders": 0}
 

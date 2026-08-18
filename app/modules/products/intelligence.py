@@ -98,9 +98,7 @@ def product_intelligence(
     window_start = now - timedelta(days=days)
     prior_start = now - timedelta(days=days * 2)
 
-    products = (
-        db.query(Product).filter(Product.company_id == company_id).all()
-    )
+    products = db.query(Product).filter(Product.company_id == company_id).all()
     if not products:
         return {"kpis": {}, "distribution": [], "workspaces": [], "products": []}
 
@@ -163,9 +161,7 @@ def product_intelligence(
 
         # None rather than a fabricated percentage when there is nothing to
         # compare against. "Infinite growth" from a base of zero is not growth.
-        growth = (
-            (units_sold - prior_units) / prior_units if prior_units > 0 else None
-        )
+        growth = (units_sold - prior_units) / prior_units if prior_units > 0 else None
 
         cost = float(product.unit_cost or 0)
         bucket = _classify(on_hand, daily_rate, days_since, growth)
@@ -199,9 +195,7 @@ def product_intelligence(
         by_bucket[row["bucket"]].append(row)
 
     def top(items, key):
-        return (
-            max(items, key=lambda r: r[key] or 0)["name"] if items else None
-        )
+        return max(items, key=lambda r: r[key] or 0)["name"] if items else None
 
     recent_cutoff = now - timedelta(days=30)
     new_products = [r for r in rows if r["created_at"] >= recent_cutoff]
@@ -236,7 +230,7 @@ def product_intelligence(
             by_bucket["critical"] + by_bucket["at_risk"],
             # Emptiest shelf first. Out of stock sorts above nearly out, which
             # is why the None case is forced to the top rather than the bottom.
-            lambda r: (r["days_cover"] if r["days_cover"] is not None else -1),
+            lambda r: r["days_cover"] if r["days_cover"] is not None else -1,
         ),
         "overstocked": (by_bucket["overstocked"], lambda r: -r["inventory_value"]),
         "new": (new_products, lambda r: -r["revenue"]),
@@ -278,9 +272,7 @@ def product_intelligence(
             {
                 "key": bucket,
                 "count": len(by_bucket[bucket]),
-                "value": round(
-                    sum(r["inventory_value"] for r in by_bucket[bucket]), 2
-                ),
+                "value": round(sum(r["inventory_value"] for r in by_bucket[bucket]), 2),
             }
             for bucket in BUCKETS
         ],

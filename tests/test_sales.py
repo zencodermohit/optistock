@@ -238,7 +238,12 @@ def test_the_ledger_joins_names_and_counts_units(
 
 
 def test_the_ledger_is_scoped_to_the_company(
-    db_session, company, other_company, make_customer, make_warehouse, make_product,
+    db_session,
+    company,
+    other_company,
+    make_customer,
+    make_warehouse,
+    make_product,
     make_stock,
 ):
     from app.modules.sales.schemas import SaleCreate, SaleItemCreate
@@ -253,7 +258,9 @@ def test_the_ledger_is_scoped_to_the_company(
             SaleCreate(
                 customer_id=customer.id,
                 source_warehouse_id=warehouse.id,
-                items=[SaleItemCreate(product_id=product.id, quantity=1, unit_price=1.0)],
+                items=[
+                    SaleItemCreate(product_id=product.id, quantity=1, unit_price=1.0)
+                ],
             ),
             owner.id,
         )

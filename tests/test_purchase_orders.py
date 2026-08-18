@@ -119,7 +119,9 @@ def test_the_pipeline_joins_the_names_a_screen_needs(
 
     product = make_product(company, sku="PIPE-1", name="Pipeline widget")
     warehouse = make_warehouse(company, name="Pipeline Depot")
-    supplier = Supplier(company_id=company.id, name="Pipeline Supply Co", is_active=True)
+    supplier = Supplier(
+        company_id=company.id, name="Pipeline Supply Co", is_active=True
+    )
     db_session.add(supplier)
     db_session.flush()
 
@@ -165,7 +167,9 @@ def test_an_approved_proposal_carries_its_provenance_into_the_order(
     product.unit_cost = 10
     warehouse = make_warehouse(company)
     make_stock(product, warehouse, quantity=2)
-    db_session.add(Supplier(company_id=company.id, name="Origin Supply", is_active=True))
+    db_session.add(
+        Supplier(company_id=company.id, name="Origin Supply", is_active=True)
+    )
     db_session.commit()
 
     service = ActionService(db_session)

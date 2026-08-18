@@ -388,9 +388,7 @@ def audit_trail(
         query = query.filter(AuditLog.action == action)
 
     total = query.count()
-    rows = (
-        query.order_by(AuditLog.timestamp.desc()).offset(skip).limit(limit).all()
-    )
+    rows = query.order_by(AuditLog.timestamp.desc()).offset(skip).limit(limit).all()
 
     actors = dict(
         db.query(User.id, User.email).filter(User.company_id == company_id).all()
@@ -429,9 +427,7 @@ def audit_trail(
                 "action": row.action,
                 "timestamp": row.timestamp,
                 "actor": (
-                    actors.get(row.user_id, "deleted user")
-                    if row.user_id
-                    else "system"
+                    actors.get(row.user_id, "deleted user") if row.user_id else "system"
                 ),
                 "old_values": row.old_values,
                 "new_values": row.new_values,

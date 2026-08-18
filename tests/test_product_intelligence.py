@@ -71,7 +71,10 @@ def sell(db_session, company, make_customer):
 
 
 def test_selling_with_nothing_on_the_shelf_is_critical():
-    assert _classify(on_hand=0, daily_rate=2.0, days_since_sale=1, growth=None) == "critical"
+    assert (
+        _classify(on_hand=0, daily_rate=2.0, days_since_sale=1, growth=None)
+        == "critical"
+    )
 
 
 def test_critical_beats_growing():
@@ -90,14 +93,19 @@ def test_critical_beats_growing():
 
 def test_nothing_selling_and_nothing_in_stock_is_not_critical():
     """No demand means no lost sales, whatever the shelf says."""
-    assert _classify(on_hand=0, daily_rate=0.0, days_since_sale=1, growth=None) != "critical"
+    assert (
+        _classify(on_hand=0, daily_rate=0.0, days_since_sale=1, growth=None)
+        != "critical"
+    )
 
 
 def test_thin_cover_is_at_risk():
     # Exactly at the threshold counts. A boundary that only fires below the
     # limit is the same off-by-one that once emptied the Analytics risk bands.
     on_hand = int(AT_RISK_COVER_DAYS * 2)
-    assert _classify(on_hand, daily_rate=2.0, days_since_sale=1, growth=None) == "at_risk"
+    assert (
+        _classify(on_hand, daily_rate=2.0, days_since_sale=1, growth=None) == "at_risk"
+    )
 
 
 def test_silent_with_stock_is_dead():
@@ -118,7 +126,10 @@ def test_silent_with_no_stock_is_not_dead():
 
 
 def test_never_sold_with_stock_is_dead():
-    assert _classify(on_hand=10, daily_rate=0.0, days_since_sale=None, growth=None) == "dead"
+    assert (
+        _classify(on_hand=10, daily_rate=0.0, days_since_sale=None, growth=None)
+        == "dead"
+    )
 
 
 def test_years_of_cover_is_overstocked():
@@ -170,9 +181,7 @@ def test_dead_stock_survives_the_revenue_cap(
     make_stock(silent, warehouse, 80)
     sell(silent, warehouse, quantity=1, days_ago=DEAD_DAYS + 30, unit_price=10)
 
-    data = product_intelligence(
-        db_session, company.id, days=30, workspace_key="dead"
-    )
+    data = product_intelligence(db_session, company.id, days=30, workspace_key="dead")
 
     names = [r["name"] for r in data["products"]]
     assert names == ["Has Not Sold In Months"]

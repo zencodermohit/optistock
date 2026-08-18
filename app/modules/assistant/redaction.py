@@ -104,7 +104,10 @@ class Redactor:
             return text
 
         pattern = re.compile(
-            "|".join(re.escape(token) for token in sorted(self._real_for, key=len, reverse=True))
+            "|".join(
+                re.escape(token)
+                for token in sorted(self._real_for, key=len, reverse=True)
+            )
         )
         return pattern.sub(lambda m: self._real_for[m.group(0)], text)
 

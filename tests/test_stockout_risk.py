@@ -92,7 +92,7 @@ def test_velocity_divides_by_the_window_not_by_the_days_that_had_sales(
 def test_a_line_with_no_sales_is_idle_rather_than_healthy(
     db_session, company, make_product, make_warehouse, make_stock
 ):
-    """"Unmeasured" and "fine" are different claims.
+    """ "Unmeasured" and "fine" are different claims.
 
     Calling a product with no sales history "ok" quietly promotes an unknown
     into a reassurance, which is the failure mode that gets a dead SKU ignored
@@ -148,7 +148,9 @@ def test_a_fast_seller_outranks_a_bigger_pile_that_moves_slowly(
     ranked = [r.sku for r in stockout_risks(db_session, company.id)]
 
     assert ranked.index("FAST-1") < ranked.index("SLOW-1")
-    fast_risk = next(r for r in stockout_risks(db_session, company.id) if r.sku == "FAST-1")
+    fast_risk = next(
+        r for r in stockout_risks(db_session, company.id) if r.sku == "FAST-1"
+    )
     assert fast_risk.days_remaining <= CRITICAL_DAYS
     assert fast_risk.severity == "critical"
 

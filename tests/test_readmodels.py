@@ -57,7 +57,9 @@ def test_delivery_rate_is_counted_from_orders_not_asserted(
     db_session.commit()
 
     row = next(
-        r for r in supplier_scorecard(db_session, company.id) if r["name"] == "Acme Supply"
+        r
+        for r in supplier_scorecard(db_session, company.id)
+        if r["name"] == "Acme Supply"
     )
 
     assert row["orders"] == 4
@@ -91,7 +93,9 @@ def test_a_draft_order_does_not_count_against_a_supplier(
     db_session.commit()
 
     row = next(
-        r for r in supplier_scorecard(db_session, company.id) if r["name"] == "Acme Supply"
+        r
+        for r in supplier_scorecard(db_session, company.id)
+        if r["name"] == "Acme Supply"
     )
 
     assert row["orders"] == 1
@@ -322,7 +326,9 @@ def test_the_site_reports_capacity_fill_and_trouble(
     make_stock(make_product(company, sku="SITE-OUT"), warehouse, quantity=0)
     db_session.commit()
 
-    row = next(r for r in warehouse_site(db_session, company.id) if r["name"] == "Site Depot")
+    row = next(
+        r for r in warehouse_site(db_session, company.id) if r["name"] == "Site Depot"
+    )
 
     assert row["capacity_units"] == 1000
     assert row["units_held"] == 305
@@ -343,22 +349,24 @@ def test_utilisation_is_clamped_so_a_building_cannot_exceed_the_scene(
     make_stock(make_product(company, sku="OVER-1"), warehouse, quantity=450)
     db_session.commit()
 
-    row = next(r for r in warehouse_site(db_session, company.id) if r["name"] == "Overfull")
+    row = next(
+        r for r in warehouse_site(db_session, company.id) if r["name"] == "Overfull"
+    )
 
     assert row["utilisation"] == 1.0
     assert row["units_held"] == 450
 
 
-def test_a_warehouse_with_no_stock_still_appears(
-    db_session, company, make_warehouse
-):
+def test_a_warehouse_with_no_stock_still_appears(db_session, company, make_warehouse):
     """A new site is an empty building, not a missing one."""
     from app.modules.analytics.readmodels import warehouse_site
 
     make_warehouse(company, name="Brand New", capacity_units=500)
     db_session.commit()
 
-    row = next(r for r in warehouse_site(db_session, company.id) if r["name"] == "Brand New")
+    row = next(
+        r for r in warehouse_site(db_session, company.id) if r["name"] == "Brand New"
+    )
 
     assert row["units_held"] == 0
     assert row["stock_lines"] == 0

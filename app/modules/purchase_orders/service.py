@@ -116,7 +116,9 @@ class PurchaseOrderService:
                     "items": [
                         {
                             "sku": products.get(item.product_id, ("?", "?"))[0],
-                            "product_name": products.get(item.product_id, ("?", "?"))[1],
+                            "product_name": products.get(item.product_id, ("?", "?"))[
+                                1
+                            ],
                             "quantity": item.quantity,
                             "unit_price": float(item.unit_price or 0),
                             "line_total": float(item.unit_price or 0) * item.quantity,

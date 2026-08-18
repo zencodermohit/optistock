@@ -207,9 +207,7 @@ class ActionService:
         )
         if status:
             query = query.filter(AssistantAction.status == status)
-        return (
-            query.order_by(AssistantAction.proposed_at.desc()).limit(limit).all()
-        )
+        return query.order_by(AssistantAction.proposed_at.desc()).limit(limit).all()
 
     def get(self, company_id: UUID, action_id: UUID) -> AssistantAction:
         """Fetched with the tenant in the filter, never checked afterwards.
@@ -260,8 +258,7 @@ class ActionService:
                 raise OptiStockException(
                     code="INVALID_QUANTITY",
                     message=(
-                        "Quantity must be between 1 and "
-                        f"{MAX_PROPOSED_QUANTITY:,}."
+                        f"Quantity must be between 1 and {MAX_PROPOSED_QUANTITY:,}."
                     ),
                 )
             final["quantity"] = quantity

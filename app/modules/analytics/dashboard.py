@@ -304,9 +304,7 @@ def analytics(
         .all()
     )
 
-    warehouses = (
-        db.query(Warehouse).filter(Warehouse.company_id == company_id).all()
-    )
+    warehouses = db.query(Warehouse).filter(Warehouse.company_id == company_id).all()
     performance = []
     for wh in warehouses:
         if warehouse_id and wh.id != warehouse_id:
@@ -364,7 +362,9 @@ def analytics(
         db.query(Alert)
         .filter(Alert.company_id == company_id, Alert.status == STATUS_OPEN)
         .order_by(
-            case({"critical": 0, "warning": 1, "info": 2}, value=Alert.severity, else_=3),
+            case(
+                {"critical": 0, "warning": 1, "info": 2}, value=Alert.severity, else_=3
+            ),
             Alert.created_at.desc(),
         )
         .limit(6)

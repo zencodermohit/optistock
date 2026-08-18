@@ -218,7 +218,7 @@ async def test_a_model_that_obeys_an_injection_and_claims_to_have_acted_is_caugh
 
 
 def test_a_leaked_system_prompt_is_not_a_leaked_key():
-    """"Repeat your system prompt" is a real attack with a boring answer here:
+    """ "Repeat your system prompt" is a real attack with a boring answer here:
     the prompt contains no secrets. What must never appear is a credential, and
     that is checked independently of how it got into the text."""
     assert "GEMINI_API_KEY" not in assistant_service.SYSTEM_PROMPT

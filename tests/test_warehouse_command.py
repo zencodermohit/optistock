@@ -80,7 +80,9 @@ def test_recategorising_a_product_moves_it_between_zones(
     make_stock(product, zoned, quantity=50)
     db_session.commit()
 
-    assert _zone(command_center(db_session, company.id, zoned.id), "A")["units_held"] == 50
+    assert (
+        _zone(command_center(db_session, company.id, zoned.id), "A")["units_held"] == 50
+    )
 
     product.category = "Furniture"
     db_session.commit()
@@ -237,7 +239,9 @@ def test_only_transfers_still_in_flight_become_edges(
     assert len(data["transfers"]) == 2
 
 
-def test_accuracy_is_unmeasured_rather_than_perfect(db_session, company, make_warehouse):
+def test_accuracy_is_unmeasured_rather_than_perfect(
+    db_session, company, make_warehouse
+):
     """Nobody has counted anything. Reporting 100% would claim a measurement
     that was never taken."""
     make_warehouse(company)

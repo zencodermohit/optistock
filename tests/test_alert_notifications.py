@@ -7,7 +7,6 @@ notify for a warning, notify twice for a de-duplicated alert, or take an alert
 down with it when the mail server is unreachable.
 """
 
-
 from app.core.notifications import EmailService
 from app.modules.alerts import notifications
 from app.modules.alerts.service import TYPE_LOW_STOCK, TYPE_OUT_OF_STOCK, AlertService
@@ -69,9 +68,7 @@ def test_a_warning_does_not_email_anyone(db_session, company, admin_user):
 def test_the_email_carries_the_evidence(db_session, company, admin_user):
     """Actionable from the notification alone. A warning you cannot check is a
     warning you learn to ignore."""
-    alert = _raise(
-        db_session, company, detail={"quantity": 0, "reorder_point": 20}
-    )
+    alert = _raise(db_session, company, detail={"quantity": 0, "reorder_point": 20})
     recorder = Recorder()
 
     notifications.notify_critical(db_session, alert, service=recorder)

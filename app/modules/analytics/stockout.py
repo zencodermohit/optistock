@@ -330,7 +330,9 @@ def stockout_risks(
             Sale.created_at >= cutoff,
             Sale.created_at < now,
         )
-        .group_by(SaleItem.product_id, Sale.source_warehouse_id, func.date(Sale.created_at))
+        .group_by(
+            SaleItem.product_id, Sale.source_warehouse_id, func.date(Sale.created_at)
+        )
         .subquery()
     )
     peaks = {

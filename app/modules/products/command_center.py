@@ -170,9 +170,7 @@ def product_command_center(
         row = (
             db.query(
                 func.coalesce(func.sum(SaleItem.quantity), 0),
-                func.coalesce(
-                    func.sum(SaleItem.quantity * SaleItem.unit_price), 0
-                ),
+                func.coalesce(func.sum(SaleItem.quantity * SaleItem.unit_price), 0),
                 func.count(func.distinct(Sale.id)),
             )
             .join(Sale, Sale.id == SaleItem.sale_id)
@@ -194,9 +192,7 @@ def product_command_center(
     # of a unit a day, not thirty.
     daily_rate = units_sold / days if days else 0.0
     cover = (on_hand / daily_rate) if daily_rate > 0 else None
-    growth = (
-        (units_sold - prior_units) / prior_units if prior_units > 0 else None
-    )
+    growth = (units_sold - prior_units) / prior_units if prior_units > 0 else None
 
     # Daily series for the window. Days with no sales are filled with zero here
     # rather than left out -- a line chart that skips empty days compresses time
@@ -226,9 +222,7 @@ def product_command_center(
     # years of days lands mid-month and draws a first bar that is short because
     # it is half a month, not because demand was low -- and a reader cannot tell
     # those apart. The current month is genuinely partial and is labelled so.
-    this_month = now.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0
-    )
+    this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month = this_month.month - (SEASONALITY_MONTHS - 1)
     year = this_month.year + (month - 1) // 12
     season_start = this_month.replace(year=year, month=(month - 1) % 12 + 1)
@@ -283,14 +277,10 @@ def product_command_center(
             func.min(Sale.created_at),
             func.max(Sale.created_at),
             func.coalesce(func.sum(SaleItem.quantity), 0),
-            func.coalesce(
-                func.sum(SaleItem.quantity * SaleItem.unit_price), 0
-            ),
+            func.coalesce(func.sum(SaleItem.quantity * SaleItem.unit_price), 0),
         )
         .join(SaleItem, SaleItem.sale_id == Sale.id)
-        .filter(
-            SaleItem.product_id == product_id, Sale.company_id == company_id
-        )
+        .filter(SaleItem.product_id == product_id, Sale.company_id == company_id)
         .one()
     )
     first_sale, last_sale, lifetime_units, lifetime_revenue = lifetime
@@ -316,9 +306,7 @@ def product_command_center(
             "name": row[2],
             "category": row[3],
             "orders": int(row[4]),
-            "attach_rate": round(int(row[4]) / order_count, 3)
-            if order_count
-            else None,
+            "attach_rate": round(int(row[4]) / order_count, 3) if order_count else None,
         }
         for row in db.query(
             Product.id,

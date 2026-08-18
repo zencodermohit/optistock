@@ -332,7 +332,9 @@ async def test_distinct_alerts_survive_de_duplication_through_the_loop(
 # from Anthropic (where the loop was ours, and had MAX_ROUNDS) to Gemini.
 # ---------------------------------------------------------------------------
 @pytest.mark.anyio
-async def test_a_runaway_model_is_capped(db_session, company, make_product, monkeypatch):
+async def test_a_runaway_model_is_capped(
+    db_session, company, make_product, monkeypatch
+):
     monkeypatch.setattr(assistant_service.settings, "MAX_TOOL_CALLS", 3)
     make_product(company, sku="CAP-1")
     db_session.commit()
@@ -667,7 +669,9 @@ def test_gemini_error_advice_lives_with_gemini():
     """Error wording is provider-specific, so it belongs in the provider."""
     gemini = runtime_module.GeminiRuntime()
 
-    assert "GEMINI_API_KEY" in gemini.describe_error(RuntimeError("401 UNAUTHENTICATED"))
+    assert "GEMINI_API_KEY" in gemini.describe_error(
+        RuntimeError("401 UNAUTHENTICATED")
+    )
     assert "rate limit" in gemini.describe_error(RuntimeError("429 quota")).lower()
 
 
@@ -787,4 +791,6 @@ async def test_a_pseudonym_the_model_invented_is_left_alone(
         )
     ]
 
-    assert next(e for e in events if e["type"] == "text")["text"] == "SKU-ZZZZZZ is low."
+    assert (
+        next(e for e in events if e["type"] == "text")["text"] == "SKU-ZZZZZZ is low."
+    )

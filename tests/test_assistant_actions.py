@@ -102,7 +102,10 @@ def test_the_proposal_says_out_loud_that_nothing_happened(
     stops a helpful-sounding "done!" from being the last thing the user sees.
     """
     result, _ = run_tool(
-        db_session, company.id, "create_purchase_order", {"sku": "REORDER-1", "quantity": 5}
+        db_session,
+        company.id,
+        "create_purchase_order",
+        {"sku": "REORDER-1", "quantity": 5},
     )
 
     assert "Nothing has been ordered" in result["message"]
@@ -116,7 +119,10 @@ def test_a_proposal_records_which_warehouse_and_supplier_without_being_told(
     the tenant's own rows, so there is no field through which it could name
     another company's warehouse."""
     result, _ = run_tool(
-        db_session, company.id, "create_purchase_order", {"sku": "REORDER-1", "quantity": 40}
+        db_session,
+        company.id,
+        "create_purchase_order",
+        {"sku": "REORDER-1", "quantity": 40},
     )
 
     assert result["supplier"] == "Acme Supply"
@@ -142,7 +148,9 @@ def test_an_impossible_quantity_is_refused_correctably(
     assert db_session.query(AssistantAction).count() == 0
 
 
-def test_an_unknown_sku_comes_back_as_a_correctable_error(db_session, company, orderable):
+def test_an_unknown_sku_comes_back_as_a_correctable_error(
+    db_session, company, orderable
+):
     result, _ = run_tool(
         db_session, company.id, "create_purchase_order", {"sku": "NOPE", "quantity": 10}
     )
@@ -161,7 +169,10 @@ def test_a_product_with_no_cost_is_refused_at_proposal_time(
     db_session.commit()
 
     result, _ = run_tool(
-        db_session, company.id, "create_purchase_order", {"sku": "FREE-1", "quantity": 10}
+        db_session,
+        company.id,
+        "create_purchase_order",
+        {"sku": "FREE-1", "quantity": 10},
     )
 
     assert "no unit cost" in result["error"]
@@ -175,7 +186,10 @@ def test_a_proposal_cannot_be_made_against_another_tenants_product(
     db_session.commit()
 
     result, _ = run_tool(
-        db_session, company.id, "create_purchase_order", {"sku": "THEIRS-PO", "quantity": 5}
+        db_session,
+        company.id,
+        "create_purchase_order",
+        {"sku": "THEIRS-PO", "quantity": 5},
     )
 
     assert "No product with SKU" in result["error"]
@@ -204,7 +218,9 @@ async def test_a_model_that_wants_an_order_still_only_gets_a_proposal(
 # ---------------------------------------------------------------------------
 # Approval is the only way through
 # ---------------------------------------------------------------------------
-def test_approving_creates_the_real_purchase_order(db_session, company, orderable, admin_user):
+def test_approving_creates_the_real_purchase_order(
+    db_session, company, orderable, admin_user
+):
     service = ActionService(db_session)
     action, error = service.propose_purchase_order(
         company_id=company.id, sku="REORDER-1", quantity=100
@@ -285,7 +301,9 @@ def test_a_proposal_cannot_be_decided_twice(db_session, company, orderable, admi
     service.approve(company_id=company.id, action_id=action.id, user_id=admin_user.id)
 
     with pytest.raises(OptiStockException) as raised:
-        service.approve(company_id=company.id, action_id=action.id, user_id=admin_user.id)
+        service.approve(
+            company_id=company.id, action_id=action.id, user_id=admin_user.id
+        )
 
     assert raised.value.code == "ALREADY_DECIDED"
 
@@ -303,7 +321,9 @@ def test_a_stale_proposal_expires_rather_than_executing(
     db_session.flush()
 
     with pytest.raises(OptiStockException) as raised:
-        service.approve(company_id=company.id, action_id=action.id, user_id=admin_user.id)
+        service.approve(
+            company_id=company.id, action_id=action.id, user_id=admin_user.id
+        )
 
     assert raised.value.code == "PROPOSAL_EXPIRED"
     assert action.status == STATUS_EXPIRED
@@ -325,9 +345,10 @@ def test_another_tenants_proposal_is_not_found_rather_than_forbidden(
             company_id=other_company.id, action_id=action.id, user_id=admin_user.id
         )
 
-    assert "AssistantAction" in str(raised.value) or "not found" in str(
-        raised.value
-    ).lower()
+    assert (
+        "AssistantAction" in str(raised.value)
+        or "not found" in str(raised.value).lower()
+    )
     assert action.status == STATUS_PROPOSED
 
 
@@ -356,7 +377,9 @@ def test_the_audit_log_holds_what_the_model_asked_and_what_ran(
 
     entry = (
         db_session.query(AuditLog)
-        .filter(AuditLog.entity_name == "assistant_actions", AuditLog.action == "APPROVE")
+        .filter(
+            AuditLog.entity_name == "assistant_actions", AuditLog.action == "APPROVE"
+        )
         .one()
     )
 
@@ -380,7 +403,9 @@ def test_a_rejection_is_audited_too(db_session, company, orderable, admin_user):
 
     entry = (
         db_session.query(AuditLog)
-        .filter(AuditLog.entity_name == "assistant_actions", AuditLog.action == "REJECT")
+        .filter(
+            AuditLog.entity_name == "assistant_actions", AuditLog.action == "REJECT"
+        )
         .one()
     )
     assert entry.new_values["status"] == STATUS_REJECTED
@@ -394,7 +419,11 @@ def test_the_proposal_records_who_asked_and_what_they_asked(
         company.id,
         "create_purchase_order",
         {"sku": "REORDER-1", "quantity": 10},
-        {"user_id": admin_user.id, "question": "can you reorder that?", "model": "test-model"},
+        {
+            "user_id": admin_user.id,
+            "question": "can you reorder that?",
+            "model": "test-model",
+        },
     )
 
     action = db_session.query(AssistantAction).one()
@@ -403,7 +432,9 @@ def test_the_proposal_records_who_asked_and_what_they_asked(
     assert action.proposed_by_model == "test-model"
 
 
-def test_the_model_cannot_forge_who_requested_it(db_session, company, orderable, admin_user):
+def test_the_model_cannot_forge_who_requested_it(
+    db_session, company, orderable, admin_user
+):
     """Context comes from the request. A `_context` in the model's arguments is
     stripped, exactly like a company_id would be."""
     run_tool(
@@ -456,7 +487,12 @@ def test_the_approvals_list_is_scoped_to_the_company(
 # now.
 # ---------------------------------------------------------------------------
 def test_another_tenants_proposal_is_a_404_over_http(
-    authenticated_client, db_session, company, other_company, orderable, other_auth_headers
+    authenticated_client,
+    db_session,
+    company,
+    other_company,
+    orderable,
+    other_auth_headers,
 ):
     """404 rather than 403, deliberately: a 403 confirms the id exists."""
     action, _ = ActionService(db_session).propose_purchase_order(

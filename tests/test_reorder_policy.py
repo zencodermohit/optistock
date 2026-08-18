@@ -54,7 +54,9 @@ def test_a_selling_product_gets_an_order_quantity_and_a_reorder_point(
         sell(product, warehouse, 10, days_ago=day)
     db_session.commit()
 
-    risk = next(r for r in stockout_risks(db_session, company.id) if r.sku == "POLICY-1")
+    risk = next(
+        r for r in stockout_risks(db_session, company.id) if r.sku == "POLICY-1"
+    )
 
     assert risk.order_quantity and risk.order_quantity > 0
     assert risk.suggested_reorder_point and risk.suggested_reorder_point > 0
@@ -124,7 +126,9 @@ def test_a_product_with_no_cost_gets_no_policy(
         sell(product, warehouse, 5, days_ago=day)
     db_session.commit()
 
-    risk = next(r for r in stockout_risks(db_session, company.id) if r.sku == "FREE-POL")
+    risk = next(
+        r for r in stockout_risks(db_session, company.id) if r.sku == "FREE-POL"
+    )
 
     assert risk.order_quantity is None
     # But the risk itself is still computed — it sells, so it can still run out.

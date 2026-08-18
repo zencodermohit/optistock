@@ -109,7 +109,7 @@ def validate_answer(text: str) -> Validated:
         # break mid-word.
         cut = result.text[:MAX_ANSWER_CHARS]
         boundary = cut.rfind(". ")
-        result.text = (cut[: boundary + 1] if boundary > MAX_ANSWER_CHARS - 500 else cut)
+        result.text = cut[: boundary + 1] if boundary > MAX_ANSWER_CHARS - 500 else cut
         result.warnings.append(
             "The answer was longer than this view allows and has been cut short."
         )

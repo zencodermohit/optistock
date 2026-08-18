@@ -73,7 +73,9 @@ def test_a_company_id_in_the_arguments_cannot_vary_the_key(
     db_session.commit()
 
     run_tool(db_session, company.id, "search_products", {})
-    run_tool(db_session, company.id, "search_products", {"company_id": str(other_company.id)})
+    run_tool(
+        db_session, company.id, "search_products", {"company_id": str(other_company.id)}
+    )
 
     assert cache.stats()["hits"] == 1
     assert cache.stats()["entries"] == 1

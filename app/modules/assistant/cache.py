@@ -60,9 +60,7 @@ CACHEABLE = frozenset(
 # pool, so two requests genuinely do touch this at the same time. TTLCache is
 # not thread-safe, and its own docs say so.
 _LOCK = threading.Lock()
-_CACHE: TTLCache = TTLCache(
-    maxsize=512, ttl=max(1, settings.TOOL_CACHE_TTL_SECONDS)
-)
+_CACHE: TTLCache = TTLCache(maxsize=512, ttl=max(1, settings.TOOL_CACHE_TTL_SECONDS))
 
 #: Counters for the benchmark utility and for /status. Not metrics-grade;
 #: enough to answer "is the cache doing anything".

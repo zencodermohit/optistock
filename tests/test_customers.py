@@ -208,7 +208,9 @@ def test_the_directory_ranks_customers_by_what_they_are_worth(
                 customer_id=customer.id,
                 source_warehouse_id=warehouse.id,
                 items=[
-                    SaleItemCreate(product_id=product.id, quantity=quantity, unit_price=10.0)
+                    SaleItemCreate(
+                        product_id=product.id, quantity=quantity, unit_price=10.0
+                    )
                 ],
             ),
             company.id,
@@ -224,9 +226,7 @@ def test_the_directory_ranks_customers_by_what_they_are_worth(
     assert rows[0]["last_order_at"] is not None
 
 
-def test_a_customer_who_never_ordered_still_appears(
-    db_session, company, make_customer
-):
+def test_a_customer_who_never_ordered_still_appears(db_session, company, make_customer):
     """A LEFT join, deliberately. Someone who has never ordered is the row worth
     a phone call, and an inner join would hide them."""
     from app.modules.customers.service import CustomerService

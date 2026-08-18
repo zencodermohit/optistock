@@ -82,9 +82,7 @@ def get_scorecard(
     Above /{supplier_id}: FastAPI matches in declaration order, and below it
     "scorecard" would be read as a supplier id and rejected as a bad UUID.
     """
-    return {
-        "data": supplier_scorecard(db, UUID(current_user["company_id"]))
-    }
+    return {"data": supplier_scorecard(db, UUID(current_user["company_id"]))}
 
 
 @router.get("/{supplier_id}", response_model=SupplierResponse)
