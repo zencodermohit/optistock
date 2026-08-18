@@ -277,8 +277,47 @@ exit
 ```
 
 > **If Docker is "not found"** the setup has not finished. Wait two minutes.
-> **If the clone asks for a password** your repo is private — tell me and I
-> will walk you through a deploy key.
+
+### The repo is private, so the clone above will not work as written
+
+`git clone https://...` stops at `Username for 'https://github.com':` and no
+password you type will work — GitHub removed password authentication for git in
+2021. Press `Ctrl+C` to escape it.
+
+The fix is a **deploy key**: an SSH key granting read-only access to this one
+repository. Preferred over a personal access token, which would be account-wide
+and would sit in plaintext in the remote URL on the server.
+
+**On the server**, make a key and print the public half:
+
+```bash
+ssh-keygen -t ed25519 -C "optistock-ec2" -f ~/.ssh/id_ed25519 -N ""
+cat ~/.ssh/id_ed25519.pub
+```
+
+Copy the whole `ssh-ed25519 AAAA...` line. Then **in the browser**: your repo →
+**Settings** → **Deploy keys** → **Add deploy key**.
+
+- Title: `optistock ec2`
+- Key: paste the line
+- **Allow write access: leave unchecked.** The server only ever reads.
+
+**Back on the server**, clone over SSH instead of HTTPS:
+
+```bash
+cd /home/ubuntu/project_IV
+rm -rf .git
+git clone git@github.com:zencodermohit/optistock.git .
+ls
+```
+
+`rm -rf .git` clears any half-finished clone from the failed attempt. Say `yes`
+when it asks whether to trust github.com. You should see `app`, `frontend` and
+`docker-compose.yml` listed.
+
+The `git@github.com:` form is what makes git use the key rather than ask for a
+password. `deploy.yml` runs `git pull origin main` on every deploy and picks up
+the same key automatically.
 
 ---
 
