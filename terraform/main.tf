@@ -128,12 +128,24 @@ resource "aws_instance" "app_server" {
               systemctl start docker
               usermod -aG docker ubuntu
 
-              # Swap. The build compiles the React bundle and installs the
-              # Python scientific stack in one go; on a small instance the
-              # kernel OOM-kills it and Docker reports a generic failure that
-              # looks like broken code. Harmless on a larger instance.
+              # Swap, and 4G of it rather than 2G.
+              #
+              # The default instance is now the 1 GB free-tier size, which runs
+              # the stack comfortably (347 MiB idle) but cannot build it: the
+              # React bundle and the Python scientific stack compile in the
+              # same step, the kernel OOM-kills the compiler, and Docker
+              # reports a generic non-zero exit that reads as broken code and
+              # is not. 2G was sized for a 2 GB instance and only just cleared
+              # the deploy's own preflight on a 1 GB one.
+              #
+              # Building on swap is slow -- expect deploys in the tens of
+              # minutes -- but it is reliable, and it costs nothing beyond
+              # disk. The faster fix is to build in CI and have the server
+              # pull a finished image; that needs a container registry and
+              # credentials on the box, so it is a deliberate later step
+              # rather than something to carry from the start.
               if [ ! -f /swapfile ]; then
-                fallocate -l 2G /swapfile
+                fallocate -l 4G /swapfile
                 chmod 600 /swapfile
                 mkswap /swapfile
                 swapon /swapfile
