@@ -76,7 +76,12 @@ variable "alert_email" {
   type        = string
 
   validation {
-    condition     = can(regex("^[^@\s]+@[^@\s]+\.[^@\s]+$", var.alert_email))
+    # No backslashes on purpose. A \s here has to survive being written through
+    # whatever tooling edits this file, and the first version of it did not --
+    # the escape collapsed and `terraform init` refused the whole configuration
+    # before it could install a single provider. POSIX classes and a bracketed
+    # literal dot say the same thing and cannot be mangled.
+    condition     = can(regex("^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$", var.alert_email))
     error_message = "alert_email must be a valid email address."
   }
 }
