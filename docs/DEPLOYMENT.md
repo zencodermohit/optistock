@@ -13,7 +13,7 @@ Nothing is urgent; stop whenever you like and pick it up later.
 | Setting | Value | Why |
 |---|---|---|
 | Region | `ap-south-1` (Mumbai) | Your users and seed data are in India |
-| Instance | `t2.micro` | What the free tier covers in Mumbai |
+| Instance | `t3.micro` | What the free tier covers in Mumbai (checked, not assumed) |
 | Disk | 20 GB gp2 | Inside the 30 GB free allowance |
 | Swap | 4 GB | So the build survives on 1 GB of RAM |
 | Budget alarm | Built by Terraform | Emails you at the first cent |
@@ -28,7 +28,7 @@ Switch it in the AWS console: top right, where the region name is.
 
 ## What it costs
 
-**$0 per month for twelve months.** One `t2.micro` running all month is 730
+**$0 per month for twelve months.** One `t3.micro` running all month is 730
 hours of the 750-hour allowance. The disk and the public IP are covered too.
 
 Three things end that:
@@ -139,10 +139,19 @@ aws sts get-caller-identity
 The budget alarm used to live here; Terraform builds it now. What is left is
 the one free-tier fact that varies by region.
 
-Open <https://aws.amazon.com/free/>, find the EC2 entry, and check it names
-`t2.micro` for Mumbai. That is what your config is set to.
+**Already done for your account.** The EC2 console reports `t2.micro` as *not*
+free-tier eligible in Mumbai, and `t3.micro` as eligible — so the config is set
+to `t3.micro`. Which of the two a region covers genuinely varies, which is why
+this stage exists at all.
 
-If it says `t3.micro` instead, tell me and I will change one line.
+If you ever change region, check this again before applying.
+
+There is a second trap that comes with `t3`, already closed in the Terraform but
+worth understanding: burstable instances earn CPU credits while idle and spend
+them under load. What happens when they run out is a setting, and `t3` defaults
+to **unlimited**, which does not mean free — it means AWS keeps the CPU fast and
+**bills you** for the surplus. Your config pins it to `standard`, which throttles
+instead. A long build becomes slow rather than expensive.
 
 > **The catch that gets people:** 750 hours is a month of *one* server (a month
 > is about 730 hours). Two servers at once burn it in a fortnight.
@@ -310,7 +319,8 @@ git push origin main
 Then GitHub → **Actions** tab and watch the run.
 
 **Expect 20-40 minutes.** That is the price of the free tier, not a fault. A
-`t2.micro` has one CPU and 1 GB of memory, and the build compiles the React
+`t3.micro` has 1 GB of memory and is throttled to its baseline CPU once its
+credits run out (deliberately — see stage 3), and the build compiles the React
 bundle and installs pandas, numpy and pyarrow, partly in swap. Running the app
 afterwards is unaffected — the whole stack sits at 347 MB. Leave it alone.
 

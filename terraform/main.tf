@@ -116,6 +116,27 @@ resource "aws_instance" "app_server" {
   vpc_security_group_ids = [aws_security_group.web_sg.id]
   key_name               = var.key_name
 
+  # THE ONE THAT BILLS YOU QUIETLY.
+  #
+  # t3 is a burstable instance: it earns CPU credits while idle and spends them
+  # when busy. What happens once the credits run out is a per-instance setting,
+  # and t3 defaults to "unlimited" -- which does not mean free, it means AWS
+  # keeps the CPU fast and CHARGES for the surplus. t2 defaulted to "standard"
+  # and simply throttled, which is why this only became a hazard when the
+  # instance type changed.
+  #
+  # "standard" is therefore mandatory here, not a tuning choice. This deployment
+  # is on the free tier precisely because it has no budget, and the deploy
+  # pegs one vCPU for half an hour compiling a React bundle and a Python
+  # scientific stack -- exactly the workload that exhausts a micro instance's
+  # credits and starts billing surplus.
+  #
+  # The cost of standard is that a long build gets slow rather than expensive.
+  # That is the correct trade for this project.
+  credit_specification {
+    cpu_credits = "standard"
+  }
+
   # Pinned, not left to the AMI's default. The free tier covers 30 GB of
   # General Purpose SSD across the whole account; an AMI that ships a larger
   # root volume, or a second instance later, silently crosses that line and

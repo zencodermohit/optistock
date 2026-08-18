@@ -31,18 +31,21 @@ variable "instance_type" {
     the Python scientific stack compile in the same step and need several GB,
     which is what the swap in main.tf's user_data is for.
 
-    Defaults to t2.micro, which is what the free tier covers in ap-south-1
-    (Mumbai), this configuration's region. This pairing matters: eu-north-1
-    has no t2 instances at all and needs t3.micro, and the wrong type is
-    billable from the first hour. Both are 1 GB, so the sizing above holds
-    either way; t2.micro has one vCPU rather than two, which makes the build
-    slower still.
+    t3.micro, confirmed against this account: the EC2 console reports t2.micro
+    as NOT free-tier eligible in ap-south-1 and t3.micro as eligible. Which of
+    the two a region covers genuinely varies, and the wrong one bills from the
+    first hour, so this was checked rather than assumed.
+
+    Changing this type also means checking credit_specification on the
+    instance in main.tf. t3 defaults to "unlimited" CPU credits, which bills
+    for surplus CPU instead of throttling -- the opposite of what a no-budget
+    deployment wants. It is pinned to "standard" there.
 
     Raise this to t3.small or t3.medium if deploys feel too slow; the build is
     the only part that struggles, and it is the part that runs on swap.
   DESC
   type        = string
-  default     = "t2.micro"
+  default     = "t3.micro"
 }
 
 variable "key_name" {
