@@ -34,6 +34,8 @@ terraform/.terraform/
 # the project by accident; a committed private key is a public server.
 *.pem
 *.key
+# ...but keep the marker that makes the certificate mount point exist.
+!nginx/certs/.gitkeep
 
 # Local database dumps kept beside the project on the server for a fast
 # restore. Untracked files here are not harmless: anything git does not know

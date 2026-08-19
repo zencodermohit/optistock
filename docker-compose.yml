@@ -152,6 +152,19 @@ services:
     container_name: optistock_nginx
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # The Cloudflare origin certificate, read-only, from the host.
+      #
+      # Bind-mounted rather than baked into the image for the obvious reason --
+      # a private key in an image layer is a private key in every copy of that
+      # image, forever, including ones pushed somewhere by accident.
+      #
+      # The directory is created empty by the deploy, so this mount always
+      # succeeds. nginx's entrypoint checks whether anything is actually in it
+      # and enables HTTPS only if so, which is what lets a server with no
+      # certificate keep serving instead of failing to start.
+      - ./nginx/certs:/etc/nginx/certs:ro
     # No config bind mount. The config is baked in beside the build it belongs
     # to, so a host file can't silently override it with a version that predates
     # the frontend and returns 404 for the whole site.

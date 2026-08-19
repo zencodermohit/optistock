@@ -25,6 +25,12 @@ RUN npm run build
 FROM nginx:alpine
 
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
+COPY nginx/app.conf /etc/nginx/app.conf
+# Staged, not installed. The entrypoint moves this into /etc/nginx/tls/ only
+# when an origin certificate is present -- see nginx/docker-entrypoint.sh.
+COPY nginx/tls.conf /etc/nginx/tls-available/tls.conf
+COPY nginx/docker-entrypoint.sh /docker-entrypoint-tls.sh
+RUN chmod +x /docker-entrypoint-tls.sh && mkdir -p /etc/nginx/tls
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # No `nginx -t` here, deliberately. It resolves every upstream as part of the
@@ -34,4 +40,10 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # instead by the container healthcheck and by the deploy step, which fails when
 # any container exits on startup.
 
-EXPOSE 80
+EXPOSE 80 443
+
+# Wraps the stock nginx entrypoint rather than replacing it: the base image's
+# own /docker-entrypoint.sh does the envsubst and IPv6 setup that the official
+# image is expected to do, and skipping it would be a silent behaviour change.
+ENTRYPOINT ["/docker-entrypoint-tls.sh", "/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,0 +1,6 @@
+The Cloudflare origin certificate goes here on the server, as origin.pem and
+origin.key. Both are gitignored; a private key must never reach a repository.
+
+This directory is tracked (empty) so the compose bind mount always has
+something to mount. Without it Docker creates the path as root-owned and the
+nginx entrypoint cannot read it.
