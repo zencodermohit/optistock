@@ -51,3 +51,7 @@ backups/
 # OS
 Thumbs.db
 .DS_Store
+
+# ACME challenge files are transient; only the mount point is tracked.
+nginx/certbot-webroot/*
+!nginx/certbot-webroot/.gitkeep

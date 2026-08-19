@@ -1,0 +1,3 @@
+certbot writes its HTTP-01 challenge files here and nginx serves them from
+/var/www/certbot. Tracked empty so the compose bind mount always resolves;
+the challenge files themselves are transient and gitignored.

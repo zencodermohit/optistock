@@ -165,6 +165,12 @@ services:
       # and enables HTTPS only if so, which is what lets a server with no
       # certificate keep serving instead of failing to start.
       - ./nginx/certs:/etc/nginx/certs:ro
+      # Where certbot writes its HTTP-01 challenge files and nginx reads them
+      # from. Sharing a directory is what lets the certificate renew every
+      # ninety days without stopping the web server; the alternative,
+      # `certbot --standalone`, wants port 80 to itself and buys you a small
+      # outage four times a year until you forget why.
+      - ./nginx/certbot-webroot:/var/www/certbot:ro
     # No config bind mount. The config is baked in beside the build it belongs
     # to, so a host file can't silently override it with a version that predates
     # the frontend and returns 404 for the whole site.
