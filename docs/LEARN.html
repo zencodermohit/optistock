@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learn OptiStock — from zero</title>
+<style>
+  /* System fonts only, so this file works with no internet. */
+  :root {
+    --canvas:  #f6f8fc;
+    --surface: #ffffff;
+    --sunken:  #eef1f7;
+    --border:  #e2e7f0;
+    --strong:  #c8d1e0;
+
+    --ink:     #131824;
+    --muted:   #4e5970;
+    --subtle:  #7d879a;
+
+    --accent:   #4460f0;
+    --acc-bg:   #e9edfe;
+    --acc-line: #c2ccfb;
+
+    --good:    #0e8f5d;
+    --good-bg: #ddf4ea;
+    --warn:    #a9660a;
+    --warn-bg: #fdf0da;
+    --bad:     #bd3a30;
+    --bad-bg:  #fce9e7;
+
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, Menlo, monospace;
+    --lift: 0 1px 2px rgb(19 24 36 / .05), 0 8px 24px -8px rgb(19 24 36 / .12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --canvas:  #0b0e15;
+      --surface: #151a26;
+      --sunken:  #11151e;
+      --border:  #262d3d;
+      --strong:  #3b4456;
+
+      --ink:     #e9edf6;
+      --muted:   #a6b0c4;
+      --subtle:  #7a8497;
+
+      --accent:   #8ea0fa;
+      --acc-bg:   #1c2342;
+      --acc-line: #354372;
+
+      --good:    #45cf93;
+      --good-bg: #10291f;
+      --warn:    #e0a44a;
+      --warn-bg: #2a2013;
+      --bad:     #f3897d;
+      --bad-bg:  #2d1715;
+
+      --lift: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px -8px rgb(0 0 0 / .5);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.68;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 54rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+
+  /* ---------- cover ---------- */
+
+  .cover {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    padding: 2.5rem 2rem;
+    box-shadow: var(--lift);
+    margin-bottom: 2rem;
+  }
+
+  .cover .tag {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 .8rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 5.5vw, 2.9rem);
+    line-height: 1.08;
+    letter-spacing: -.03em;
+    font-weight: 800;
+    margin: 0 0 .9rem;
+  }
+
+  .cover p { color: var(--muted); margin: 0 0 .8rem; max-width: 36rem; }
+  .cover p:last-child { margin-bottom: 0; }
+
+  /* ---------- contents ---------- */
+
+  .toc {
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 3rem;
+  }
+
+  .toc h2 { font-size: .78rem; letter-spacing: .1em; text-transform: uppercase;
+            color: var(--subtle); margin: 0 0 1rem; font-weight: 700; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: l;
+            display: grid; gap: .5rem; }
+  .toc li { counter-increment: l; display: grid; grid-template-columns: 2rem 1fr; gap: .5rem; }
+  .toc li::before {
+    content: counter(l, decimal-leading-zero);
+    font-family: var(--mono); font-size: .8rem; color: var(--accent); padding-top: .18rem;
+  }
+  .toc a { color: var(--ink); text-decoration: none; font-weight: 600; }
+  .toc a:hover { color: var(--accent); text-decoration: underline; }
+  .toc span { display: block; font-size: .875rem; color: var(--subtle); font-weight: 400; }
+
+  /* ---------- lessons ---------- */
+
+  .lesson { margin: 0 0 4rem; scroll-margin-top: 1.5rem; }
+
+  .lesson > h2 {
+    font-size: 1.55rem;
+    font-weight: 780;
+    letter-spacing: -.025em;
+    margin: 0 0 .4rem;
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    align-items: baseline;
+  }
+
+  .lesson > h2 .n {
+    font-family: var(--mono);
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .lesson > p, .lesson > ul, .lesson > ol { margin-left: 2.6rem; }
+  .lesson p { margin: 0 0 1rem; }
+  .lesson ul, .lesson ol { margin-top: 0; margin-bottom: 1rem; padding-left: 1.2rem; }
+  .lesson li { margin-bottom: .45rem; }
+
+  h3 {
+    font-size: 1.06rem;
+    font-weight: 700;
+    margin: 1.8rem 0 .5rem 2.6rem;
+    letter-spacing: -.01em;
+  }
+
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+
+  /* ---------- boxes ---------- */
+
+  .box {
+    margin: 1.25rem 0 1.25rem 2.6rem;
+    border-radius: .8rem;
+    padding: 1.1rem 1.3rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .box .lab {
+    display: block;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: .5rem;
+  }
+
+  .box p:last-child { margin-bottom: 0; }
+
+  .idea  { background: var(--acc-bg);  border-color: var(--acc-line); }
+  .idea .lab  { color: var(--accent); }
+
+  .real  { background: var(--good-bg); border-color: color-mix(in srgb, var(--good) 35%, transparent); }
+  .real .lab  { color: var(--good); }
+
+  .care  { background: var(--warn-bg); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+  .care .lab  { color: var(--warn); }
+
+  .stop  { background: var(--bad-bg);  border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+  .stop .lab  { color: var(--bad); }
+
+  /* ---------- picture ---------- */
+
+  .pic {
+    margin: 1.5rem 0 1.5rem 2.6rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: .9rem;
+    padding: 1.4rem 1.2rem;
+    box-shadow: var(--lift);
+    overflow-x: auto;
+  }
+  .pic svg { display: block; width: 100%; height: auto; }
+
+  svg text { font-family: var(--sans); fill: var(--ink); }
+  svg .s-lab { font-size: 13px; font-weight: 650; }
+  svg .s-sm  { font-size: 11px; font-weight: 500; fill: var(--muted); }
+  svg .s-tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; font-weight: 600; }
+
+  /* ---------- code ---------- */
+
+  code {
+    font-family: var(--mono);
+    font-size: .86em;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    border-radius: .25rem;
+    padding: .06em .35em;
+    color: var(--ink);
+    word-break: break-word;
+  }
+
+  pre {
+    margin: 1.1rem 0 1.1rem 2.6rem;
+    background: #121722;
+    color: #dfe5f2;
+    border-radius: .6rem;
+    padding: .95rem 1.1rem;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: .8rem;
+    line-height: 1.7;
+    border: 1px solid var(--border);
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+  pre .c { color: #7d879a; }
+
+  /* ---------- file pointer ---------- */
+
+  .file {
+    margin: 1rem 0 1rem 2.6rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .55rem;
+    font-size: .9rem;
+    color: var(--muted);
+    background: var(--sunken);
+    border: 1px dashed var(--strong);
+    border-radius: .55rem;
+    padding: .6rem .85rem;
+  }
+  .file b { font-family: var(--mono); font-size: .82rem; color: var(--ink); font-weight: 600; }
+
+  /* ---------- glossary ---------- */
+
+  .gloss { display: grid; gap: .55rem; margin-left: 2.6rem; }
+  .gword {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: .55rem;
+    padding: .7rem .95rem;
+    font-size: .95rem;
+    color: var(--muted);
+  }
+  .gword b { color: var(--ink); font-weight: 700; }
+
+  hr { border: 0; border-top: 1px solid var(--border); margin: 3.5rem 0; }
+
+  .foot { color: var(--subtle); font-size: .9rem; margin-left: 0; }
+
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  @media (max-width: 40rem) {
+    .lesson > h2 { grid-template-columns: 2rem 1fr; }
+    .lesson > p, .lesson > ul, .lesson > ol, h3, .box, .pic, pre, .file, .gloss { margin-left: 0; }
+  }
+
+  @media print {
+    body { background: #fff; }
+    .pic, .box, .cover { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="cover">
+    <p class="tag">A guide for beginners</p>
+    <h1>How OptiStock was built</h1>
+    <p>
+      This file teaches you the ideas behind your own project, one at a time,
+      starting from zero. No knowledge is assumed.
+    </p>
+    <p>
+      Read it in order. Each lesson gives you <strong>one idea</strong>, a
+      picture, and then points at the real file in your project where that idea
+      lives. Open that file while you read. That is where the learning happens.
+    </p>
+  </div>
+
+  <div class="toc">
+    <h2>What you will learn</h2>
+    <ol>
+      <li><a href="#l1">Who really built this</a><span>An honest note before you start</span></li>
+      <li><a href="#l2">What the app is for</a><span>The business problem</span></li>
+      <li><a href="#l3">The pieces of any web app</a><span>Browser, server, database</span></li>
+      <li><a href="#l4">Containers and Docker</a><span>Why there are six of them</span></li>
+      <li><a href="#l5">What an API really is</a><span>And what happens on one request</span></li>
+      <li><a href="#l6">Transactions</a><span>All or nothing</span></li>
+      <li><a href="#l7">Keeping companies apart</a><span>The most dangerous bug</span></li>
+      <li><a href="#l8">Events and the outbox</a><span>The hardest idea here</span></li>
+      <li><a href="#l9">Background workers</a><span>Doing things after the reply</span></li>
+      <li><a href="#l10">The analytics side</a><span>ETL, Parquet, ABC, forecasting</span></li>
+      <li><a href="#l11">Getting it on the internet</a><span>Deploy, CI/CD, HTTPS</span></li>
+      <li><a href="#l12">Not losing everything</a><span>Backups, rollback, tests</span></li>
+      <li><a href="#gloss">Word list</a><span>Every term, in one place</span></li>
+    </ol>
+  </div>
+
+  <!-- ================================================ 1 ==== -->
+  <section class="lesson" id="l1">
+    <h2><span class="n">01</span> Who really built this</h2>
+
+    <p>
+      Start here, because you said something that is not true, and it matters.
+    </p>
+
+    <p>
+      You said I did most of the work. I checked the project history. Here is
+      what it says.
+    </p>
+
+    <div class="pic">
+      <svg viewBox="0 0 640 130" role="img" aria-label="Of 75 commits, 61 were made by you before this session and 14 during it.">
+        <rect x="4" y="26" width="512" height="44" rx="8" fill="var(--acc-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <rect x="516" y="26" width="120" height="44" rx="8" fill="var(--sunken)" stroke="var(--strong)" stroke-width="2"/>
+        <text class="s-lab" x="260" y="54" text-anchor="middle" fill="var(--accent)">61 commits &#183; you, before this week</text>
+        <text class="s-sm"  x="576" y="52" text-anchor="middle">14 &#183; this week</text>
+        <text class="s-tag" x="4" y="18" fill="var(--subtle)">75 COMMITS IN TOTAL</text>
+        <text class="s-sm"  x="4" y="96">You started on 8 August with a working backend and 136 tests already passing.</text>
+        <text class="s-sm"  x="4" y="116">The event system, the analytics and the AI assistant were all yours before I arrived.</text>
+      </svg>
+    </div>
+
+    <p>
+      <strong>You wrote about 81% of this project.</strong> The hard architecture
+      &mdash; the event system, the forecasting, the assistant, all 21 modules
+      &mdash; existed before I saw a single line.
+    </p>
+
+    <p>What I did was help you <em>ship</em> it:</p>
+    <ul>
+      <li>Fixed the deploy so it could not lie about succeeding</li>
+      <li>Put it on a server, with HTTPS, for free</li>
+      <li>Added backups and a way to undo a bad deploy</li>
+      <li>Wrote tests for the procurement screen</li>
+      <li>Rebuilt the login page and filled the empty screens with data</li>
+    </ul>
+
+    <div class="box idea">
+      <span class="lab">Why this matters for learning</span>
+      <p>
+        You are not studying a stranger's code. You are studying <em>your own</em>
+        code, and you already understand more of it than you think. This guide
+        just gives names to things you have already built.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================================================ 2 ==== -->
+  <section class="lesson" id="l2">
+    <h2><span class="n">02</span> What the app is for</h2>
+
+    <p>
+      A shop or a factory keeps stock. Stock is money sitting on a shelf. There
+      are two ways to lose that money.
+    </p>
+
+    <ul>
+      <li><strong>Too little stock.</strong> A customer wants to buy, you have none, you lose the sale.</li>
+      <li><strong>Too much stock.</strong> Your money is stuck in boxes. It may go out of date and become worthless.</li>
+    </ul>
+
+    <p>
+      OptiStock helps find the middle. It watches what sells, predicts what will
+      sell next, and tells you what to order.
+    </p>
+
+    <div class="box real">
+      <span class="lab">See it working</span>
+      <p>
+        Open <b>https://optistock.duckdns.org</b> and sign in. The
+        <em>Purchase orders</em> screen is this idea made real: it says what to
+        buy next, and why.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================================================ 3 ==== -->
+  <section class="lesson" id="l3">
+    <h2><span class="n">03</span> The pieces of any web app</h2>
+
+    <p>
+      Every website in the world is built from the same three parts. Learn these
+      names and most of the confusion disappears.
+    </p>
+
+    <div class="pic">
+      <svg viewBox="0 0 640 200" role="img" aria-label="Browser sends a request to the server, which asks the database and sends a page back.">
+        <rect x="8" y="40" width="170" height="72" rx="10" fill="var(--surface)" stroke="var(--strong)" stroke-width="2"/>
+        <text class="s-lab" x="93" y="70" text-anchor="middle">1. Browser</text>
+        <text class="s-sm"  x="93" y="90" text-anchor="middle">what you see</text>
+
+        <rect x="235" y="40" width="170" height="72" rx="10" fill="var(--acc-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="s-lab" x="320" y="70" text-anchor="middle" fill="var(--accent)">2. Server</text>
+        <text class="s-sm"  x="320" y="90" text-anchor="middle">does the thinking</text>
+
+        <rect x="462" y="40" width="170" height="72" rx="10" fill="var(--surface)" stroke="var(--strong)" stroke-width="2"/>
+        <text class="s-lab" x="547" y="70" text-anchor="middle">3. Database</text>
+        <text class="s-sm"  x="547" y="90" text-anchor="middle">remembers things</text>
+
+        <path d="M178 62 L231 62" stroke="var(--muted)" stroke-width="2" marker-end="url(#p3)"/>
+        <path d="M405 62 L458 62" stroke="var(--muted)" stroke-width="2" marker-end="url(#p3)"/>
+        <path d="M458 92 L405 92" stroke="var(--muted)" stroke-width="2" marker-end="url(#p3)"/>
+        <path d="M231 92 L178 92" stroke="var(--muted)" stroke-width="2" marker-end="url(#p3)"/>
+
+        <text class="s-sm" x="204" y="54" text-anchor="middle">ask</text>
+        <text class="s-sm" x="431" y="54" text-anchor="middle">ask</text>
+        <text class="s-sm" x="431" y="110" text-anchor="middle">answer</text>
+        <text class="s-sm" x="204" y="110" text-anchor="middle">answer</text>
+
+        <text class="s-sm" x="8" y="160">The browser never talks to the database. It cannot, and it must not:</text>
+        <text class="s-sm" x="8" y="180">anyone could then read anyone else's data. Everything goes through the server.</text>
+
+        <defs><marker id="p3" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker></defs>
+      </svg>
+    </div>
+
+    <p>In your project:</p>
+    <div class="file"><b>frontend/</b> the browser part &mdash; React, written in TypeScript</div>
+    <div class="file"><b>app/</b> the server part &mdash; Python, using FastAPI</div>
+    <div class="file"><b>PostgreSQL</b> the database &mdash; runs inside a container</div>
+  </section>
+
+  <!-- ================================================ 4 ==== -->
+  <section class="lesson" id="l4">
+    <h2><span class="n">04</span> Containers and Docker</h2>
+
+    <div class="box idea">
+      <span class="lab">The idea, in one sentence</span>
+      <p>
+        A container is a small box that holds a program <em>and everything it
+        needs to run</em>. Move the box to any computer and the program still
+        works.
+      </p>
+    </div>
+
+    <p>
+      Before containers, developers said "but it works on my machine". The other
+      machine had a different Python, or a missing library. A container ends that
+      argument, because the box carries its own copy of everything.
+    </p>
+
+    <p>
+      Your project has <strong>six boxes</strong> running at the same time. The
+      file that lists them is <code>docker-compose.yml</code>.
+    </p>
+
+    <div class="pic">
+      <svg viewBox="0 0 640 210" role="img" aria-label="Six containers: nginx, api, relay, consumers, postgres, redis.">
+        <rect x="230" y="6" width="180" height="48" rx="9" fill="var(--sunken)" stroke="var(--strong)" stroke-width="2"/>
+        <text class="s-lab" x="320" y="27" text-anchor="middle">nginx</text>
+        <text class="s-sm"  x="320" y="44" text-anchor="middle">the front door</text>
+
+        <rect x="8" y="82" width="196" height="48" rx="9" fill="var(--acc-bg)" stroke="var(--acc-line)"/>
+        <text class="s-lab" x="106" y="103" text-anchor="middle">api</text>
+        <text class="s-sm"  x="106" y="120" text-anchor="middle">answers people</text>
+
+        <rect x="222" y="82" width="196" height="48" rx="9" fill="var(--acc-bg)" stroke="var(--acc-line)"/>
+        <text class="s-lab" x="320" y="103" text-anchor="middle">relay</text>
+        <text class="s-sm"  x="320" y="120" text-anchor="middle">passes messages</text>
+
+        <rect x="436" y="82" width="196" height="48" rx="9" fill="var(--acc-bg)" stroke="var(--acc-line)"/>
+        <text class="s-lab" x="534" y="103" text-anchor="middle">consumers</text>
+        <text class="s-sm"  x="534" y="120" text-anchor="middle">reacts to messages</text>
+
+        <rect x="115" y="152" width="196" height="48" rx="9" fill="var(--surface)" stroke="var(--strong)" stroke-width="2"/>
+        <text class="s-lab" x="213" y="173" text-anchor="middle">PostgreSQL</text>
+        <text class="s-sm"  x="213" y="190" text-anchor="middle">stores everything</text>
+
+        <rect x="329" y="152" width="196" height="48" rx="9" fill="var(--surface)" stroke="var(--strong)" stroke-width="2"/>
+        <text class="s-lab" x="427" y="173" text-anchor="middle">Redis</text>
+        <text class="s-sm"  x="427" y="190" text-anchor="middle">carries messages</text>
+      </svg>
+    </div>
+
+    <div class="box care">
+      <span class="lab">A detail worth knowing</span>
+      <p>
+        <b>api</b>, <b>relay</b> and <b>consumers</b> are the <em>same program</em>,
+        started three different ways. They are kept separate because they fail
+        differently. If you restart the alert rules, message delivery should not
+        stop.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================================================ 5 ==== -->
+  <section class="lesson" id="l5">
+    <h2><span class="n">05</span> What an API really is</h2>
+
+    <p>
+      An API is just a list of addresses the server understands. Nothing more
+      mysterious than that.
+    </p>
+
+    <pre><code>GET  /api/v1/products/        <span class="c">give me the products</span>
+POST /api/v1/sales/           <span class="c">record a sale</span>
+GET  /api/v1/alerts/          <span class="c">what needs attention</span></code></pre>
+
+    <p>
+      <code>GET</code> means "give me something". <code>POST</code> means "here
+      is something new". The browser sends one of these, the server replies with
+      data, and the screen draws it.
+    </p>
+
+    <p>
+      In your project, each area of the business has its own folder inside
+      <code>app/modules/</code>, and each folder has the same four files:
+    </p>
+
+    <div class="file"><b>models.py</b> what the data looks like in the database</div>
+    <div class="file"><b>schemas.py</b> what the data looks like coming in and going out</div>
+    <div class="file"><b>service.py</b> the actual rules and thinking</div>
+    <div class="file"><b>router.py</b> the addresses, like <code>/api/v1/sales/</code></div>
+
+    <div class="box idea">
+      <span class="lab">Why split into four files</span>
+      <p>
+        So each file has one job. When a sale is wrong, you look in
+        <code>service.py</code>. When an address is wrong, you look in
+        <code>router.py</code>. You never have to read all of it.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================================================ 6 ==== -->
+  <section class="lesson" id="l6">
+    <h2><span class="n">06</span> Transactions: all or nothing</h2>
+
+    <div class="box idea">
+      <span class="lab">The idea</span>
+      <p>
+        A transaction is a group of database changes that must <em>all</em>
+        succeed, or <em>none</em> of them must.
+      </p>
+    </div>
+
+    <p>
+      Think of moving money between two bank accounts. Take &#8377;100 out of one,
+      put &#8377;100 into the other. If the computer dies in the middle, you must
+      not end up with the money taken out but never arriving.
+    </p>
+
+    <p>
+      A sale in your app is the same. It writes a sale row, and it reduces the
+      stock. Those two must happen together, or the numbers lie.
+    </p>
+
+    <div class="pic">
+      <svg viewBox="0 0 640 150" role="img" aria-label="Without a transaction the stock can be wrong. With one, either both changes happen or neither.">
+        <rect x="4" y="8" width="306" height="134" rx="10" fill="var(--bad-bg)" stroke="var(--bad)" stroke-opacity=".45"/>
+        <text class="s-tag" x="22" y="32" fill="var(--bad)">WITHOUT A TRANSACTION</text>
+        <text class="s-sm" x="22" y="58">save the sale &#10003;</text>
+        <text class="s-sm" x="22" y="80">reduce the stock &#10007; crash</text>
+        <text class="s-lab" x="22" y="110" fill="var(--bad)">You sold it, but the</text>
+        <text class="s-lab" x="22" y="128" fill="var(--bad)">shelf still says 10.</text>
+
+        <rect x="330" y="8" width="306" height="134" rx="10" fill="var(--good-bg)" stroke="var(--good)" stroke-opacity=".5"/>
+        <text class="s-tag" x="348" y="32" fill="var(--good)">WITH A TRANSACTION</text>
+        <text class="s-sm" x="348" y="58">save the sale</text>
+        <text class="s-sm" x="348" y="80">reduce the stock &#10007; crash</text>
+        <text class="s-lab" x="348" y="110" fill="var(--good)">Both are undone. The</text>
+        <text class="s-lab" x="348" y="128" fill="var(--good)">sale simply never happened.</text>
+      </svg>
+    </div>
+
+    <div class="box care">
+      <span class="lab">A rule your project follows everywhere</span>
+      <p>
+        The <code>service.py</code> files never decide when to save. The
+        <code>router.py</code> owns that. One place decides, so a transaction can
+        never be half-finished by accident.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================================================ 7 ==== -->
+  <section class="lesson" id="l7">
+    <h2><span class="n">07</span> Keeping companies apart</h2>
+
+    <p>
+      Your app serves more than one company from <em>one</em> database. TechNova
+      and GreenLeaf both have products, both have sales, all in the same tables.
+    </p>
+
+    <p>
+      What keeps them apart is a single column on every table:
+      <code>company_id</code>.
+    </p>
+
+    <pre><code><span class="c">-- correct: only this company's products</span>
+SELECT * FROM products WHERE company_id = 'technova';
+
+<span class="c">-- forget one line, and TechNova sees GreenLeaf's business</span>
+SELECT * FROM products;</code></pre>
+
+    <div class="box stop">
+      <span class="lab">The most dangerous bug in this whole project</span>
+      <p>
+        Forgetting that filter does not crash. Nothing turns red. The page just
+        quietly shows another company their competitor's data. This is why the
+        tests check it, and why every query in the code filters on it.
+      </p>
+    </div>
+
+    <p>
+      There is a second layer of safety. When you log in you get a
+      <em>token</em> &mdash; a signed note saying who you are. The server does not
+      simply trust it:
+    </p>
+
+    <pre><code><span class="c"># app/core/dependencies.py</span>
+user = db.query(User).filter(User.id == user_id).first()
+if str(user.company_id) != company_id:
+    raise HTTPException(401, "Invalid token payload")</code></pre>
+
+    <p>
+      The token says "I belong to TechNova". The server checks the database and
+      asks: <em>is that still true?</em> If someone edits their token, it fails
+      here.
+    </p>
+  </section>
+
+  <!-- ================================================ 8 ==== -->
+  <section class="lesson" id="l8">
+    <h2><span class="n">08</span> Events and the outbox</h2>
+
+    <p>
+      This is the hardest idea in your project. Take it slowly. It is worth it,
+      because this is real senior-level engineering and you built it.
+    </p>
+
+    <h3>First: what is an event?</h3>
+
+    <p>
+      An event is a note saying <em>something happened</em>. "Stock fell below
+      the reorder point." Other parts of the system read these notes and react,
+      without the sale having to know about them.
+    </p>
+
+    <div class="box idea">
+      <span class="lab">Why bother</span>
+      <p>
+        Without events, the sale code would have to raise the alert, update the
+        dashboard, and send the email itself. Every new feature would mean
+        editing the sale code again. With events, the sale just says what
+        happened, and new features listen.
+      </p>
+    </div>
+
+    <h3>Now: the problem</h3>
+
+    <p>
+      Saving the sale and sending the note are <em>two different systems</em> —
+      the database and the message queue. You must do one first. Both orders are
+      broken.
+    </p>
+
+    <div class="pic">
+      <svg viewBox="0 0 640 250" role="img" aria-label="Sending first can announce a sale that failed. Saving first can lose the note in a crash. Writing both in one transaction works.">
+        <rect x="4" y="8" width="200" height="234" rx="10" fill="var(--bad-bg)" stroke="var(--bad)" stroke-opacity=".45"/>
+        <text class="s-tag" x="20" y="30" fill="var(--bad)">ORDER 1</text>
+        <text class="s-lab" x="20" y="52">Send, then save</text>
+        <text class="s-sm" x="20" y="82">1. send the note</text>
+        <text class="s-sm" x="20" y="104">2. saving fails</text>
+        <text class="s-sm" x="20" y="140">Everyone was told</text>
+        <text class="s-sm" x="20" y="158">about a sale that</text>
+        <text class="s-sm" x="20" y="176">never happened.</text>
+        <text class="s-lab" x="20" y="212" fill="var(--bad)">Broken</text>
+
+        <rect x="220" y="8" width="200" height="234" rx="10" fill="var(--bad-bg)" stroke="var(--bad)" stroke-opacity=".45"/>
+        <text class="s-tag" x="236" y="30" fill="var(--bad)">ORDER 2</text>
+        <text class="s-lab" x="236" y="52">Save, then send</text>
+        <text class="s-sm" x="236" y="82">1. save the sale</text>
+        <text class="s-sm" x="236" y="104">2. crash before sending</text>
+        <text class="s-sm" x="236" y="140">The sale is real,</text>
+        <text class="s-sm" x="236" y="158">but nobody is ever</text>
+        <text class="s-sm" x="236" y="176">told. Forever.</text>
+        <text class="s-lab" x="236" y="212" fill="var(--bad)">Broken</text>
+
+        <rect x="436" y="8" width="200" height="234" rx="10" fill="var(--good-bg)" stroke="var(--good)" stroke-opacity=".5"/>
+        <text class="s-tag" x="452" y="30" fill="var(--good)">THE OUTBOX</text>
+        <text class="s-lab" x="452" y="52">Save both together</text>
+        <text class="s-sm" x="452" y="82">Write the sale AND</text>
+        <text class="s-sm" x="452" y="100">the note into the</text>
+        <text class="s-sm" x="452" y="118">same database, in</text>
+        <text class="s-sm" x="452" y="136">one transaction.</text>
+        <text class="s-sm" x="452" y="166">A worker sends the</text>
+        <text class="s-sm" x="452" y="184">note afterwards.</text>
+        <text class="s-lab" x="452" y="212" fill="var(--good)">Works</text>
+      </svg>
+    </div>
+
+    <p>
+      Because the note is <em>a row in the same database</em>, the transaction
+      from Lesson 6 covers both. They cannot disagree.
+    </p>
+
+    <div class="file"><b>app/modules/events/publisher.py</b> writes the note</div>
+    <div class="file"><b>app/workers/relay.py</b> sends the notes out later</div>
+
+    <div class="box care">
+      <span class="lab">One more thing to understand</span>
+      <p>
+        The relay sends the note, then marks it as sent. If it crashes in
+        between, the note gets sent <em>twice</em>. That is on purpose. Every
+        note carries an ID so a repeat can be ignored &mdash; and a repeated
+        message can be spotted, while a <em>lost</em> message cannot.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================================================ 9 ==== -->
+  <section class="lesson" id="l9">
+    <h2><span class="n">09</span> Background workers</h2>
+
+    <p>
+      A worker is a program with no web address. Nobody visits it. It just runs
+      in a loop, doing a job.
+    </p>
+
+    <p>Your project has two, plus a nightly job:</p>
+
+    <div class="file"><b>relay.py</b> reads unsent notes, pushes them to Redis</div>
+    <div class="file"><b>consumers.py</b> reads notes from Redis, raises alerts</div>
+    <div class="file"><b>app/core/scheduler.py</b> runs the analytics every night at 01:00</div>
+
+    <div class="box idea">
+      <span class="lab">Why not do this during the request?</span>
+      <p>
+        Because the customer would wait. The sale replies in about 50
+        milliseconds. Raising alerts and recalculating dashboards happens after
+        they have already got their answer.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================================================ 10 ==== -->
+  <section class="lesson" id="l10">
+    <h2><span class="n">10</span> The analytics side</h2>
+
+    <p>
+      Reading a year of sales is slow. If a report did that on the live
+      database, every user would feel it. So the history is copied out each
+      night into separate files.
+    </p>
+
+    <div class="pic">
+      <svg viewBox="0 0 640 130" role="img" aria-label="Every night: read sales from the database, reshape them, write Parquet files, then calculate classes and forecasts.">
+        <rect x="4" y="30" width="140" height="52" rx="9" fill="var(--surface)" stroke="var(--strong)" stroke-width="2"/>
+        <text class="s-lab" x="74" y="52" text-anchor="middle">1. Extract</text>
+        <text class="s-sm"  x="74" y="70" text-anchor="middle">read the sales</text>
+
+        <rect x="168" y="30" width="140" height="52" rx="9" fill="var(--surface)" stroke="var(--strong)" stroke-width="2"/>
+        <text class="s-lab" x="238" y="52" text-anchor="middle">2. Transform</text>
+        <text class="s-sm"  x="238" y="70" text-anchor="middle">tidy them up</text>
+
+        <rect x="332" y="30" width="140" height="52" rx="9" fill="var(--surface)" stroke="var(--strong)" stroke-width="2"/>
+        <text class="s-lab" x="402" y="52" text-anchor="middle">3. Load</text>
+        <text class="s-sm"  x="402" y="70" text-anchor="middle">write Parquet</text>
+
+        <rect x="496" y="30" width="140" height="52" rx="9" fill="var(--acc-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="s-lab" x="566" y="52" text-anchor="middle" fill="var(--accent)">4. Analyse</text>
+        <text class="s-sm"  x="566" y="70" text-anchor="middle">classes, forecast</text>
+
+        <path d="M144 56 L164 56" stroke="var(--muted)" stroke-width="2" marker-end="url(#p10)"/>
+        <path d="M308 56 L328 56" stroke="var(--muted)" stroke-width="2" marker-end="url(#p10)"/>
+        <path d="M472 56 L492 56" stroke="var(--muted)" stroke-width="2" marker-end="url(#p10)"/>
+        <text class="s-tag" x="4" y="18" fill="var(--subtle)">EVERY NIGHT AT 01:00 &#183; THIS IS CALLED AN ETL PIPELINE</text>
+        <text class="s-sm"  x="4" y="112">Parquet is a file type that stores data in columns. Reading "all the prices" is very fast.</text>
+
+        <defs><marker id="p10" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker></defs>
+      </svg>
+    </div>
+
+    <h3>ABC classes</h3>
+    <p>
+      Sort products by money earned, biggest first. The products making the first
+      80% of the money are <strong>class A</strong> &mdash; watch these closely.
+      Up to 95% is <strong>B</strong>. The long tail is <strong>C</strong>.
+    </p>
+
+    <h3>The forecast</h3>
+    <p>
+      This is <em>not</em> artificial intelligence, and your code is honest about
+      that. It is an average:
+    </p>
+
+    <pre><code>average daily sales = units sold in the last 30 days / 30</code></pre>
+
+    <div class="box care">
+      <span class="lab">A small detail that matters a lot</span>
+      <p>
+        Divide by <b>30</b>, not by "days that had a sale". If a product sold 5
+        units on one day only, dividing by 1 says it sells 5 a day. Dividing by
+        30 says it sells 0.17 a day. The second one is the truth.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================================================ 11 ==== -->
+  <section class="lesson" id="l11">
+    <h2><span class="n">11</span> Getting it on the internet</h2>
+
+    <p>
+      When you type <code>git push</code>, a robot on GitHub wakes up and does
+      four things in order. If any step fails, it stops.
+    </p>
+
+    <div class="pic">
+      <svg viewBox="0 0 640 110" role="img" aria-label="Push triggers style check, tests, image build and deploy, then the site is live.">
+        <rect x="4" y="26" width="112" height="50" rx="8" fill="var(--sunken)" stroke="var(--strong)"/>
+        <text class="s-lab" x="60" y="47" text-anchor="middle">style</text>
+        <text class="s-sm"  x="60" y="65" text-anchor="middle">is it tidy?</text>
+
+        <rect x="136" y="26" width="112" height="50" rx="8" fill="var(--sunken)" stroke="var(--strong)"/>
+        <text class="s-lab" x="192" y="47" text-anchor="middle">tests</text>
+        <text class="s-sm"  x="192" y="65" text-anchor="middle">446 of them</text>
+
+        <rect x="268" y="26" width="112" height="50" rx="8" fill="var(--sunken)" stroke="var(--strong)"/>
+        <text class="s-lab" x="324" y="47" text-anchor="middle">build</text>
+        <text class="s-sm"  x="324" y="65" text-anchor="middle">make the box</text>
+
+        <rect x="400" y="26" width="112" height="50" rx="8" fill="var(--acc-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="s-lab" x="456" y="47" text-anchor="middle" fill="var(--accent)">deploy</text>
+        <text class="s-sm"  x="456" y="65" text-anchor="middle">copy to server</text>
+
+        <rect x="532" y="26" width="104" height="50" rx="8" fill="var(--good-bg)" stroke="var(--good)"/>
+        <text class="s-lab" x="584" y="47" text-anchor="middle" fill="var(--good)">live</text>
+        <text class="s-sm"  x="584" y="65" text-anchor="middle">~4 minutes</text>
+
+        <path d="M116 51 L132 51" stroke="var(--muted)" stroke-width="2" marker-end="url(#p11)"/>
+        <path d="M248 51 L264 51" stroke="var(--muted)" stroke-width="2" marker-end="url(#p11)"/>
+        <path d="M380 51 L396 51" stroke="var(--muted)" stroke-width="2" marker-end="url(#p11)"/>
+        <path d="M512 51 L528 51" stroke="var(--good)" stroke-width="2" marker-end="url(#p11g)"/>
+
+        <text class="s-tag" x="4" y="16" fill="var(--subtle)">THIS IS CALLED CI/CD</text>
+
+        <defs>
+          <marker id="p11" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker>
+          <marker id="p11g" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="var(--good)"/></marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="box stop">
+      <span class="lab">A real failure that happened to you</span>
+      <p>
+        One deploy showed a green tick but had shipped nothing. The
+        <code>git pull</code> step failed, the script ignored it, and it rebuilt
+        the <em>old</em> code. Everything after that looked healthy &mdash;
+        because it was healthy. It was just the wrong version.
+      </p>
+      <p>
+        The fix is one line: <code>set -euo pipefail</code>. It means "stop at
+        the first thing that fails". <b>A deploy that cannot fail is not a
+        deploy.</b>
+      </p>
+    </div>
+
+    <h3>HTTPS, and why it matters</h3>
+    <p>
+      Without it, a password travels across the internet as readable text. HTTPS
+      locks it. Your site has it, free, from a service called Let's Encrypt, and
+      it renews itself every 90 days.
+    </p>
+  </section>
+
+  <!-- ================================================ 12 ==== -->
+  <section class="lesson" id="l12">
+    <h2><span class="n">12</span> Not losing everything</h2>
+
+    <p>Three safety nets, and all three were tested for real.</p>
+
+    <div class="box real">
+      <span class="lab">Backups</span>
+      <p>
+        Every night the database is copied to Amazon S3, away from the server. If
+        the server is destroyed, the data survives. One backup was actually
+        restored into a spare database and every table matched.
+      </p>
+      <p>
+        <b>A backup you have never restored is only a hope.</b> That is why it was
+        tested.
+      </p>
+    </div>
+
+    <div class="box real">
+      <span class="lab">Rollback</span>
+      <p>
+        One command puts the previous version back, in about four minutes. This
+        was also tested on the live site &mdash; back, then forward again, with no
+        downtime.
+      </p>
+    </div>
+
+    <div class="box real">
+      <span class="lab">Tests</span>
+      <p>
+        446 automatic checks. They run before every deploy. If one fails, nothing
+        reaches the server.
+      </p>
+      <p>
+        The important trick: a test is only useful if it can <em>fail</em>. To
+        prove the new tests worked, the code was deliberately broken three times
+        to check each break was caught.
+      </p>
+    </div>
+
+    <div class="box care">
+      <span class="lab">What is still missing</span>
+      <p>
+        There is one server. If it dies, the site is down until it is rebuilt
+        (the data is safe). Fixing that costs money, so it is a fair trade for a
+        demo &mdash; but you should know it, rather than discover it.
+      </p>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ================================================ glossary ==== -->
+  <section class="lesson" id="gloss">
+    <h2><span class="n">&#128218;</span> Word list</h2>
+
+    <div class="gloss">
+      <div class="gword"><b>API</b> &mdash; the list of addresses a server understands.</div>
+      <div class="gword"><b>Backend</b> &mdash; the part running on the server. Your <code>app/</code> folder.</div>
+      <div class="gword"><b>CI/CD</b> &mdash; the robot that tests and deploys your code when you push.</div>
+      <div class="gword"><b>Container</b> &mdash; a box holding a program plus everything it needs.</div>
+      <div class="gword"><b>Deploy</b> &mdash; putting new code onto the real server.</div>
+      <div class="gword"><b>ETL</b> &mdash; Extract, Transform, Load. Copy data out, tidy it, save it elsewhere.</div>
+      <div class="gword"><b>Event</b> &mdash; a note saying something happened.</div>
+      <div class="gword"><b>Frontend</b> &mdash; the part running in the browser. Your <code>frontend/</code> folder.</div>
+      <div class="gword"><b>Migration</b> &mdash; a recorded change to the shape of the database.</div>
+      <div class="gword"><b>Multi-tenant</b> &mdash; one system serving several companies, kept apart by data.</div>
+      <div class="gword"><b>Outbox</b> &mdash; saving an event in the database so it cannot be lost.</div>
+      <div class="gword"><b>Parquet</b> &mdash; a file type that stores data in columns. Fast to scan.</div>
+      <div class="gword"><b>Rollback</b> &mdash; going back to the previous working version.</div>
+      <div class="gword"><b>Token</b> &mdash; a signed note proving who you are, sent with every request.</div>
+      <div class="gword"><b>Transaction</b> &mdash; a group of changes that all happen, or none do.</div>
+      <div class="gword"><b>Worker</b> &mdash; a program with no web address that just runs in a loop.</div>
+    </div>
+  </section>
+
+  <hr>
+
+  <p class="foot">
+    Everything here was read from your own code. If one lesson is still unclear,
+    say which number and I will explain that one differently.
+  </p>
+
+</div>
+</body>
+</html>
