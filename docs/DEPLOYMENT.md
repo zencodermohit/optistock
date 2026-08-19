@@ -17,6 +17,7 @@ Nothing is urgent; stop whenever you like and pick it up later.
 | Disk | 20 GB gp2 | Inside the 30 GB free allowance |
 | Swap | 4 GB | So the build survives on 1 GB of RAM |
 | Budget alarm | Built by Terraform | Emails you at the first cent |
+| Address | `optistock.duckdns.org` | Free subdomain, HTTPS via Let's Encrypt |
 
 **Everything must happen in the Mumbai region.** Key pairs, instances and
 security groups are region-scoped. A key pair made in Stockholm is invisible
@@ -41,8 +42,9 @@ Three things end that:
 3. **AWS moved to a credit-based free plan for new accounts in 2025.** Read the
    current terms on the AWS free tier page rather than trusting these numbers.
 
-The only real cost anywhere is a domain (~$12/year), and only if you want
-HTTPS at stage 10. Certificates themselves are free.
+**Nothing here costs anything at all.** The domain that stage 10 used to
+require was avoided entirely: DuckDNS gives the subdomain away and Let's
+Encrypt issues the certificate free, so the running total is $0.
 
 ---
 
@@ -392,23 +394,77 @@ and sign in.
 
 ---
 
-## Stage 10 — A domain, so logins stop travelling in the clear
+## Stage 10 — HTTPS — DONE
 
-Until this is done, every password typed into your login page crosses the
-internet as readable text. This is the main reason not to let real people use
-it yet.
+**https://optistock.duckdns.org** — Let's Encrypt certificate, browser-trusted,
+and it cost nothing.
 
-Certificates cannot be issued for a bare IP. You need a name — **the only thing
-in this document that is not free**, about $12/year.
+No domain was bought. DuckDNS gives the subdomain away, and Let's Encrypt issues
+the certificate for free, so the one item this document used to call "the only
+thing that is not free" turned out not to be.
 
-1. Buy a domain from any registrar (Namecheap, Cloudflare, GoDaddy)
-2. In its DNS settings add an **A record** pointing at your server IP
-3. Wait — ten minutes to a few hours
-4. Check with `ping yourdomain.com`; when it answers with your IP, it is ready
+Plain HTTP on the hostname now returns `301` to HTTPS. The bare IP deliberately
+does **not** redirect: no public CA issues certificates for IP addresses, so
+sending `http://43.205.36.210` to `https://43.205.36.210` would show every
+visitor a certificate naming something else.
 
-**Then tell me.** I will write the HTTPS config and certificate renewal and
-walk you through the one command that runs on the server. You will also update
-`PUBLIC_ORIGIN` to `https://yourdomain.com` and deploy once more.
+### Renewal happens by itself
+
+certbot's timer runs twice daily and a deploy hook copies the new certificate
+where nginx reads it and restarts. Without that hook renewal would succeed,
+certbot would report success, and nginx would keep serving the copy it loaded
+ninety days earlier — the failure being invisible until the certificate expired.
+
+Check it any time:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+Two things must never change or renewal breaks in ninety days:
+
+- `/.well-known/acme-challenge/` must stay reachable over **plain HTTP**. Let's
+  Encrypt does not follow redirects to find it.
+- The nginx `certbot-webroot` mount must stay in place.
+
+### If the server's IP ever changes
+
+It has an Elastic IP, so it should not. If it does:
+
+```bash
+sudo ./scripts/duckdns_update.sh          # repoint the subdomain
+sudo ./scripts/setup_https.sh optistock.duckdns.org you@example.com
+```
+
+---
+
+## Rolling back a bad deploy
+
+```bash
+ssh -i "$env:USERPROFILE\keys\optistock-prod-key.pem" ubuntu@43.205.36.210
+cd /home/ubuntu/project_IV
+
+./scripts/rollback.sh --list     # what has been deployed here
+./scripts/rollback.sh            # back to the previous deploy
+./scripts/rollback.sh <sha>      # back to a specific one
+```
+
+Takes about four minutes; it rebuilds rather than reusing an old image, so it
+cannot be defeated by image pruning. It asks you to type `rollback` first.
+
+**Tested on 19 Aug 2026, not merely written:** production was rolled back a
+commit, confirmed to be running the older code, and rolled forward again. The
+site answered 200 throughout.
+
+> **It rolls back code, not the database.** Migrations run automatically on
+> deploy. If the deploy you are undoing only ADDED columns, the old code ignores
+> them and you are fine — the common case. If it removed or transformed data, no
+> code rollback brings it back and you want `./scripts/restore_db.sh` instead.
+> The script names the migrations involved and warns you before doing anything.
+
+After a rollback the host sits on a detached HEAD, so the next push deploys
+`main` straight over it. If the rollback is meant to stick, revert the bad
+commit on `main` and push that.
 
 ---
 
@@ -462,13 +518,18 @@ products 225, sales 19,331, purchase orders 1,902.
 
 ## After stage 9
 
-You will have a working, publicly reachable application costing nothing —
-enough to demonstrate, to put on a CV, to show someone.
+You have a working, publicly reachable application costing nothing — enough to
+demonstrate, to put on a CV, to show someone.
 
-What you will **not** have is somewhere safe for real inventory data: no
-backups yet, no encryption in transit until stage 10, and one server with no
-spare. Backups and the undo-a-bad-deploy path are being built separately, so
-those close without work from you.
+Since that was written, three of the gaps have closed: **HTTPS** is live and
+renewing itself, **backups** run nightly to S3 with a restore that has actually
+been tested, and a **rollback** path exists and has been exercised against
+production.
+
+What remains is redundancy. One server, one region: a deploy is a brief outage,
+and an instance failure is an outage until you rebuild. For a demo that is a
+reasonable trade; for real customer data it is not, and the honest fix is more
+money than this deployment spends.
 
 And set that eleven-month calendar reminder today, while you are thinking
 about it.
