@@ -1,4 +1,4 @@
-name: OptiStock CI
+name: OptiStock
 
 on:
   push:
@@ -7,6 +7,11 @@ on:
   pull_request:
     branches:
       - main
+  # Lets a deploy be re-run from the Actions tab without inventing a commit.
+  # A pipeline you can only trigger by pushing is one you cannot retry after
+  # fixing something that lives outside the repository -- a secret, a stuck
+  # host, a runner that never picked the job up.
+  workflow_dispatch:
 
 jobs:
   lint:
@@ -91,3 +96,148 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build Docker Image
         run: docker build -t optistock-api .
+
+  # Runs only after lint, the FULL test suite and the image build have passed.
+  #
+  # It used to live in a second workflow carrying its own copy of the test job,
+  # and the copies had already drifted: different install lines, and only one
+  # of them had a Redis service. Neither difference was breaking anything the
+  # day it was found -- the async assistant suites run under anyio's plugin,
+  # which comes in via requirements.txt, so the missing pytest-asyncio was
+  # never load-bearing -- but a duplicated job that nobody diffs is a fault
+  # waiting for a reason, and the deploy gate is the worst place to keep one.
+  # One pipeline cannot drift from itself, and it also halves the Actions
+  # minutes a private repository is billed for.
+  deploy:
+    needs: docker
+    runs-on: ubuntu-latest
+    # Never from a pull request, which would deploy unreviewed code, and never
+    # from a branch.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      # Skip rather than fail when there is nowhere to deploy yet. Without this
+      # the job dies inside the SSH action with "missing server host", which is
+      # a red build on every push that says nothing about the cause. It starts
+      # deploying on its own the moment EC2_HOST exists.
+      - name: Check a deploy target is configured
+        id: preflight
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          if [ -z "$EC2_HOST" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EC2_HOST is not set, so there is no server to deploy to. Provision the instance (terraform/) and add the EC2_HOST, EC2_SSH_KEY and PUBLIC_ORIGIN secrets to enable deployment."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to EC2
+        if: steps.preflight.outputs.configured == 'true'
+        # Pinned to a release, not @master. This action is handed the SSH
+        # private key for the production host, so a floating ref means any
+        # future commit on that branch runs with that key in scope.
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Abort on the first failing command.
+            #
+            # Without this the script runs on regardless, and the failure that
+            # exposed it was the worst possible shape: `git pull` refused to
+            # overwrite two untracked files, the script carried on, rebuilt the
+            # images from the OLD checkout, restarted the stack and exited zero.
+            # The run went green. The server was serving code from four commits
+            # earlier and nothing anywhere said so.
+            #
+            # A deploy that cannot fail is not a deploy, it is a restart.
+            set -euo pipefail
+
+            cd /home/ubuntu/project_IV
+
+            # Refuse to build from a checkout that is not what was just pushed.
+            # `git pull` alone can fail for reasons that leave the tree usable
+            # -- untracked collisions, local edits -- and every one of them ends
+            # with the wrong code deployed under a green tick.
+            git pull origin main
+            echo "Deploying $(git rev-parse --short HEAD)"
+            
+            # Inject production secrets. POSTGRES_PASSWORD provisions the database
+            # container and MUST match the password embedded in DATABASE_URL, so
+            # both are derived from the same secret.
+            echo "POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}" > .env
+            echo "DATABASE_URL=postgresql://optistock:${{ secrets.DB_PASSWORD }}@db:5432/optistock_db" >> .env
+            echo "REDIS_URL=redis://redis:6379/0" >> .env
+            echo "SECRET_KEY=${{ secrets.PROD_SECRET_KEY }}" >> .env
+            echo "ALGORITHM=HS256" >> .env
+            echo "ACCESS_TOKEN_EXPIRE_MINUTES=60" >> .env
+            # Same-origin in production: nginx serves the built frontend and
+            # proxies /api on one host, so the browser never makes a
+            # cross-origin request and CORS is not what lets the app work. This
+            # stays narrow anyway, so a third-party page cannot call the API
+            # with a user's credentials. PUBLIC_ORIGIN is the deployed URL
+            # (e.g. http://<elastic-ip> before a domain exists).
+            echo "ALLOWED_ORIGINS=[\"${{ secrets.PUBLIC_ORIGIN }}\"]" >> .env
+            # Optional. Absent or empty, the Assistant screen says it is not
+            # configured and the rest of the application is unaffected.
+            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+            # pgAdmin is gated behind the "dev" Compose profile and will not start
+            # here, but Compose interpolates the whole file, so these must exist.
+            echo "PGADMIN_EMAIL=disabled@example.com" >> .env
+            echo "PGADMIN_PASSWORD=${{ secrets.PROD_SECRET_KEY }}" >> .env
+
+            # Validate interpolation BEFORE touching running containers. Compose
+            # now aborts on a missing secret, and we would rather fail here with
+            # the old version still serving than fail after `down`.
+            docker compose config -q
+
+            # Fail fast on a box too small to build, rather than 20 minutes
+            # later with an OOM-killed compiler and no obvious cause.
+            #
+            # The build compiles the React app (node + vite) and installs the
+            # Python scientific stack (pandas, numpy, pyarrow) in the same run.
+            # A 1 GB free-tier t2.micro with no swap cannot do it: the kernel
+            # kills the process and Docker reports a generic non-zero exit,
+            # which looks like a code failure and is not one.
+            TOTAL_MB=$(free -m | awk '/^Mem:/{print $2}')
+            SWAP_MB=$(free -m | awk '/^Swap:/{print $2}')
+            echo "Host memory: ${TOTAL_MB}MB RAM, ${SWAP_MB}MB swap"
+            if [ "$((TOTAL_MB + SWAP_MB))" -lt 2000 ]; then
+              echo "::error::Need ~2GB of RAM+swap to build; this host has $((TOTAL_MB + SWAP_MB))MB."
+              echo "Either use a larger instance, or add swap once:"
+              echo "  sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile"
+              echo "  sudo mkswap /swapfile && sudo swapon /swapfile"
+              echo "  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab"
+              exit 1
+            fi
+
+            # Migrations run inside the api container's entrypoint, gated on
+            # RUN_MIGRATIONS, which only that service sets -- so the schema is
+            # upgraded exactly once per deploy and the relay and consumers do
+            # not race it. A failed migration exits the api container, which
+            # the check below turns into a failed deploy.
+            # Build BEFORE stopping anything. The nginx image compiles the React
+            # app (`npm run build` is `tsc -b && vite build`), so a type error
+            # fails the build -- and when `down` ran first, that left the host
+            # with nothing serving and no way back except a manual checkout.
+            # Building first means a failed build is a no-op: the previous
+            # containers are still up and still serving the old version.
+            docker compose build
+            docker compose down
+            docker compose up -d
+
+            # Fail the deploy if anything is already dead. Without this the step
+            # is green whenever `up -d` returned, even when the API or the event
+            # consumers crashlooped on their first tick.
+            sleep 15
+            docker compose ps
+            if [ -n "$(docker compose ps --status exited --quiet)" ]; then
+              echo "::error::A container exited immediately after deploy"
+              docker compose ps --status exited
+              docker compose logs --tail 50
+              exit 1
+            fi
