@@ -1,0 +1,18 @@
+# Development and CI only. NOT installed into the production image.
+#
+# These were in requirements.txt, which the Dockerfile installs, so every
+# production container carried a linter, a formatter and a test runner it
+# could never use. That is not only weight: a shell on the box came with
+# tooling, and `black` in particular had already been retired from CI by the
+# commit that made ruff own both linting and formatting -- so the image was
+# shipping a tool the project had deliberately stopped using.
+#
+#     pip install -r requirements.txt -r requirements-dev.txt
+#
+# CI installs pytest and pytest-asyncio explicitly in the test job, so it does
+# not depend on this file; this is for a developer setting the project up.
+
+black==26.5.1
+pytest==8.0.2
+pytest-asyncio
+ruff==0.15.22
