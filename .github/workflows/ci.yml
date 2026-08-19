@@ -165,6 +165,14 @@ jobs:
             # with the wrong code deployed under a green tick.
             git pull origin main
             echo "Deploying $(git rev-parse --short HEAD)"
+
+            # Record what shipped, so rollback.sh knows what "previous" means.
+            # The previous DEPLOYED commit is not the previous commit in the
+            # log: several commits ship in one deploy, and the one before HEAD
+            # may never have run anywhere. Written before the build, so a
+            # deploy that fails halfway still leaves a trace of what it tried.
+            echo "$(date -u +%FT%TZ) $(git rev-parse --short HEAD)" >> .deploy-history
+            tail -50 .deploy-history > .deploy-history.tmp && mv .deploy-history.tmp .deploy-history
             
             # Inject production secrets. POSTGRES_PASSWORD provisions the database
             # container and MUST match the password embedded in DATABASE_URL, so

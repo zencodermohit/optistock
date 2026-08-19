@@ -55,3 +55,7 @@ Thumbs.db
 # ACME challenge files are transient; only the mount point is tracked.
 nginx/certbot-webroot/*
 !nginx/certbot-webroot/.gitkeep
+
+# Written on the deploy host by the pipeline; it is a record of that host,
+# not of the repository, and every host has its own.
+.deploy-history
