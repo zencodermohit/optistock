@@ -35,6 +35,13 @@ terraform/.terraform/
 *.pem
 *.key
 
+# Local database dumps kept beside the project on the server for a fast
+# restore. Untracked files here are not harmless: anything git does not know
+# about but a future commit might add is a file `git pull` refuses to
+# overwrite, and on the deploy host that turns into a deploy which quietly
+# builds the previous checkout.
+backups/
+
 # IDE
 .vscode/
 .idea/

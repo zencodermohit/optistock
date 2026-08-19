@@ -101,8 +101,26 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Abort on the first failing command.
+            #
+            # Without this the script runs on regardless, and the failure that
+            # exposed it was the worst possible shape: `git pull` refused to
+            # overwrite two untracked files, the script carried on, rebuilt the
+            # images from the OLD checkout, restarted the stack and exited zero.
+            # The run went green. The server was serving code from four commits
+            # earlier and nothing anywhere said so.
+            #
+            # A deploy that cannot fail is not a deploy, it is a restart.
+            set -euo pipefail
+
             cd /home/ubuntu/project_IV
+
+            # Refuse to build from a checkout that is not what was just pushed.
+            # `git pull` alone can fail for reasons that leave the tree usable
+            # -- untracked collisions, local edits -- and every one of them ends
+            # with the wrong code deployed under a green tick.
             git pull origin main
+            echo "Deploying $(git rev-parse --short HEAD)"
             
             # Inject production secrets. POSTGRES_PASSWORD provisions the database
             # container and MUST match the password embedded in DATABASE_URL, so
