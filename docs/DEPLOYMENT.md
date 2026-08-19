@@ -412,6 +412,40 @@ walk you through the one command that runs on the server. You will also update
 
 ---
 
+## Backups
+
+Nightly at 02:30 UTC (08:00 IST), to S3. Nothing for you to run.
+
+- **Bucket:** `optistock-backups-220438080921`, private, encrypted, 30-day expiry
+- **Credentials:** none on the server. The instance carries an IAM role, and
+  that role can write and read backups but **cannot delete** them.
+- **Log:** `/var/log/optistock-backup.log` on the server
+
+The backup script verifies each dump before reporting success: valid gzip, the
+completion marker `pg_dump` writes only at the end of a whole dump, and a
+plausible size. A backup nobody has restored is a hypothesis.
+
+To see what exists, or to restore:
+
+```bash
+ssh -i "$env:USERPROFILE\keys\optistock-prod-key.pem" ubuntu@43.205.36.210
+cd /home/ubuntu/project_IV
+
+./scripts/restore_db.sh --list      # what backups exist
+./scripts/restore_db.sh --latest    # restore the most recent
+```
+
+Restoring is **destructive** — it drops the current tables and replaces them.
+The script verifies the dump before touching anything, stops the writers so the
+reload is not racing live transactions, and requires you to type `restore` to
+confirm. It will never run unattended.
+
+This was tested on 19 Aug 2026, not merely written: a real dump was restored
+into a throwaway database and every table matched production exactly — users 9,
+products 225, sales 19,331, purchase orders 1,902.
+
+---
+
 ## Five things to never do
 
 1. Never commit `.env`, a `.pem` file, or your AWS keys. Git is set to refuse
