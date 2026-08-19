@@ -65,8 +65,21 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
   }
 
   if (response.status === 401) {
-    // The token is missing, expired, or belongs to a user who has since been
+    // "Your session has expired" is only true if there WAS a session, and this
+    // branch used to say it unconditionally. A sign-in request carries no
+    // token, so a 401 there means the credentials were rejected -- and the
+    // server already says so precisely ("Incorrect email or password",
+    // "Inactive user"), uniformly enough not to reveal whether the address
+    // exists. Overwriting that told a user whose account simply did not exist
+    // that their session had expired, which is both false and the wrong thing
+    // to act on: it sends you looking for an auth bug instead of a missing row.
+    if (!token) {
+      throw new ApiError(401, await readErrorMessage(response));
+    }
+
+    // A token was sent and refused: expired, or the user has since been
     // deactivated (the backend re-checks the live user on every request).
+    // Now the message is accurate and clearing the token is the right move.
     tokenStore.clear();
     onUnauthenticated?.();
     throw new ApiError(401, "Your session has expired. Please sign in again.");

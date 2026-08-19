@@ -391,12 +391,29 @@ ssh -i optistock-prod-key.pem ubuntu@<public-ip>
 cd /home/ubuntu/project_IV
 docker compose exec api python seed_db.py
 docker compose exec api python -m app.workers.rebuild_projections
+
+# The ETL. Not optional, and it has to come before the backfill below.
+# It writes the Parquet file in data_lake/ that the ABC classification and the
+# demand forecast both read. Without it backfill_forecasts runs to completion
+# and reports "Recorded 0 forecast runs, scored 0", having logged
+# "No usable data lake file found" once per week it tried to score -- a warning
+# that is easy to scroll past on the way to a summary line that looks like an
+# answer. This chains ETL -> ABC -> forecast -> recommendations in one call.
+docker compose exec api python -c \
+  "from app.core.scheduler import run_nightly_analytics; print(run_nightly_analytics())"
+
 docker compose exec api python -m app.workers.backfill_forecasts --weeks 8 --replace
+
+# Purchase order history, so the procurement screen has something to report.
+# Without it every figure on it is zero or three.
+docker compose exec api python scripts/seed_procurement.py
 ```
 
-The last two populate the dashboard and the forecast-accuracy figures, which
-are otherwise empty: both are derived from a history that predates the event
-system, so nothing replays it for you.
+These populate the dashboard, the recommendations and the forecast-accuracy
+figures, which are otherwise empty: all are derived from a history that predates
+the event system, so nothing replays it for you.
+
+On a free-tier `t3.micro` the whole sequence takes about a minute.
 
 ### Verifying a deploy
 
