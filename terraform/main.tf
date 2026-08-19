@@ -116,6 +116,10 @@ resource "aws_instance" "app_server" {
   vpc_security_group_ids = [aws_security_group.web_sg.id]
   key_name               = var.key_name
 
+  # Lets the box write database dumps to S3 without an access key on disk.
+  # See backups.tf.
+  iam_instance_profile = aws_iam_instance_profile.app_server.name
+
   # THE ONE THAT BILLS YOU QUIETLY.
   #
   # t3 is a burstable instance: it earns CPU credits while idle and spends them
