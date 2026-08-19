@@ -182,6 +182,22 @@ jobs:
             # with a user's credentials. PUBLIC_ORIGIN is the deployed URL
             # (e.g. http://<elastic-ip> before a domain exists).
             echo "ALLOWED_ORIGINS=[\"${{ secrets.PUBLIC_ORIGIN }}\"]" >> .env
+            # Just the hostname, scheme and any trailing slash stripped. nginx
+            # matches a Host header, which never contains either.
+            #
+            # Left EMPTY when that turns out to be a bare IP address, which
+            # disables the HTTP->HTTPS redirect. A public certificate cannot be
+            # issued for an IP, so redirecting http://<ip> to https://<ip>
+            # sends every visitor to a certificate that names something else
+            # and warns them off the site. No redirect is the correct
+            # behaviour until a hostname exists; nginx treats empty as "do not
+            # redirect" by design.
+            PUBLIC_HOST=$(echo "${{ secrets.PUBLIC_ORIGIN }}" | sed -E 's#^[a-z]+://##; s#/.*$##')
+            if echo "${PUBLIC_HOST}" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; then
+              echo "PUBLIC_ORIGIN is a bare IP; HTTP->HTTPS redirect stays off until it names a host"
+              PUBLIC_HOST=""
+            fi
+            echo "PUBLIC_HOST=${PUBLIC_HOST}" >> .env
             # Optional. Absent or empty, the Assistant screen says it is not
             # configured and the rest of the application is unaffected.
             echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env

@@ -40,6 +40,20 @@ if [ -f "$CERT" ] && [ -f "$KEY" ]; then
 
   cp /etc/nginx/tls-available/tls.conf /etc/nginx/tls/tls.conf
   echo "nginx-entrypoint: origin certificate found, HTTPS enabled on 443"
+
+  # The HTTP->HTTPS redirect, and only now. Both conditions matter: without a
+  # certificate it would redirect to a port that is not listening, and without
+  # a hostname it would have to match every request on port 80 -- including the
+  # healthcheck's loopback request, which would then fail certificate
+  # validation and mark the container permanently unhealthy.
+  if [ -n "${PUBLIC_HOST:-}" ]; then
+    sed "s|\${PUBLIC_HOST}|${PUBLIC_HOST}|g" \
+      /etc/nginx/tls-available/redirect.conf.template >/etc/nginx/tls/redirect.conf
+    echo "nginx-entrypoint: redirecting http://${PUBLIC_HOST} to https"
+  else
+    rm -f /etc/nginx/tls/redirect.conf
+    echo "nginx-entrypoint: PUBLIC_HOST unset, serving HTTP without redirect"
+  fi
 else
   # Leave the directory empty. Said out loud rather than silently, because
   # "why is my site still HTTP" is otherwise a long afternoon.

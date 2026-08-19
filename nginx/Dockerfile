@@ -29,6 +29,7 @@ COPY nginx/app.conf /etc/nginx/app.conf
 # Staged, not installed. The entrypoint moves this into /etc/nginx/tls/ only
 # when an origin certificate is present -- see nginx/docker-entrypoint.sh.
 COPY nginx/tls.conf /etc/nginx/tls-available/tls.conf
+COPY nginx/redirect.conf.template /etc/nginx/tls-available/redirect.conf.template
 COPY nginx/docker-entrypoint.sh /docker-entrypoint-tls.sh
 RUN chmod +x /docker-entrypoint-tls.sh && mkdir -p /etc/nginx/tls
 COPY --from=build /app/dist /usr/share/nginx/html

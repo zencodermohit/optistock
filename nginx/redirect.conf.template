@@ -1,0 +1,43 @@
+# Send public HTTP traffic to HTTPS.
+#
+# Installed by the entrypoint only when BOTH a certificate exists and
+# PUBLIC_HOST is set, because a redirect to a scheme that is not listening is
+# just an outage with extra steps.
+#
+# MATCHED BY NAME, not by "everything on port 80". Two things still need plain
+# HTTP on this server and both would break under a blanket redirect:
+#
+#   - the container healthcheck, which fetches http://127.0.0.1/index.html.
+#     It follows redirects, so it would arrive at https://127.0.0.1/ and fail
+#     certificate validation -- the name on the certificate is the public
+#     hostname, not a loopback address. A permanently unhealthy container is
+#     worse than none: everything gating on it waits forever.
+#   - the deploy's own smoke test, for the same reason.
+#
+# So this server block claims the public name and redirects it, while the
+# default server in nginx.conf keeps answering localhost in plain HTTP. Traffic
+# from the internet arrives with the public Host header and is upgraded;
+# traffic from inside the box is left alone.
+#
+# The ACME challenge is exempt, and that exemption is load-bearing rather than
+# tidy. Let's Encrypt fetches the challenge over HTTP and does NOT follow a
+# redirect to find it, so redirecting it would work perfectly for ninety days
+# and then fail renewal -- the certificate expiring being the first anyone
+# hears about it.
+
+server {
+    listen 80;
+    server_name ${PUBLIC_HOST};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        access_log off;
+    }
+
+    location / {
+        # 301, not 302: this is permanent, and browsers cache it, which means
+        # the insecure request stops being made at all rather than being made
+        # and corrected every time.
+        return 301 https://$host$request_uri;
+    }
+}
