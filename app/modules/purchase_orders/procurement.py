@@ -233,8 +233,37 @@ def procurement(db: Session, company_id: UUID) -> Dict[str, Any]:
         .all()
     )
 
+    # A recommendation is not urgent once an open order already covers the same
+    # product at the same warehouse -- it is done, just not delivered yet.
+    # Without this, the comment above promised something the query never did.
+    already_ordered = {
+        (row.product_id, row.warehouse_id)
+        for row in (
+            db.query(
+                POItem.product_id,
+                PurchaseOrder.destination_warehouse_id.label("warehouse_id"),
+            )
+            .join(PurchaseOrder, PurchaseOrder.id == POItem.po_id)
+            .filter(
+                PurchaseOrder.company_id == company_id,
+                PurchaseOrder.status.in_(OPEN_STATUSES),
+            )
+            .all()
+        )
+    }
+    recommendations = [
+        row
+        for row in recommendations
+        if (row.product_id, row.warehouse_id) not in already_ordered
+    ]
+
     open_count = sum(by_status.get(s, 0) for s in OPEN_STATUSES)
     open_value = sum(float(value_by_status.get(s, 0)) for s in OPEN_STATUSES)
+    # Computed once and reused below in workspaces: the KPI card and the
+    # workspace tile for the same statuses would otherwise run the identical
+    # query twice.
+    open_sparkline = _sparkline(db, company_id, OPEN_STATUSES)
+    draft_sparkline = _sparkline(db, company_id, ("draft",))
 
     kpis = [
         {
@@ -246,7 +275,7 @@ def procurement(db: Session, company_id: UUID) -> Dict[str, Any]:
             # raised. The other three are levels and carry no trend.
             "trend": _orders_raised_trend(db, company_id),
             "trend_label": "orders raised vs previous 30 days",
-            "sparkline": _sparkline(db, company_id, OPEN_STATUSES),
+            "sparkline": open_sparkline,
             "tone": "accent",
         },
         {
@@ -255,7 +284,7 @@ def procurement(db: Session, company_id: UUID) -> Dict[str, Any]:
             "value": by_status.get("draft", 0),
             "amount": round(float(value_by_status.get("draft", 0)), 2),
             "trend": None,
-            "sparkline": _sparkline(db, company_id, ("draft",)),
+            "sparkline": draft_sparkline,
             "tone": "warning",
         },
         {
@@ -310,13 +339,21 @@ def procurement(db: Session, company_id: UUID) -> Dict[str, Any]:
             row.product_id, {"id": row.supplier_id, "name": row.name}
         )
 
-    on_hand = dict(
-        db.query(Inventory.product_id, func.coalesce(func.sum(Inventory.quantity), 0))
+    # Keyed by (product, warehouse): a recommendation is for stock at one
+    # warehouse, and summing across every warehouse the company owns would
+    # mask a stockout at the warehouse that actually triggered the reorder.
+    on_hand = {
+        (row.product_id, row.warehouse_id): row.quantity
+        for row in db.query(
+            Inventory.product_id,
+            Inventory.warehouse_id,
+            func.coalesce(func.sum(Inventory.quantity), 0).label("quantity"),
+        )
         .join(Warehouse, Warehouse.id == Inventory.warehouse_id)
         .filter(Warehouse.company_id == company_id)
-        .group_by(Inventory.product_id)
+        .group_by(Inventory.product_id, Inventory.warehouse_id)
         .all()
-    )
+    }
 
     recommended = []
     for row in recommendations:
@@ -326,7 +363,7 @@ def procurement(db: Session, company_id: UUID) -> Dict[str, Any]:
         supplier = last_supplier.get(row.product_id)
         lead = lead_times.get(supplier["id"]) if supplier else None
 
-        stock = int(on_hand.get(row.product_id, 0))
+        stock = int(on_hand.get((row.product_id, row.warehouse_id), 0))
         daily = float(evidence.get("avg_daily_sales") or 0)
 
         recommended.append(
@@ -445,7 +482,7 @@ def procurement(db: Session, company_id: UUID) -> Dict[str, Any]:
             "statuses": list(OPEN_STATUSES),
             "count": open_count,
             "value": round(open_value, 2),
-            "sparkline": _sparkline(db, company_id, OPEN_STATUSES),
+            "sparkline": open_sparkline,
         },
         {
             "key": "draft",
@@ -453,7 +490,7 @@ def procurement(db: Session, company_id: UUID) -> Dict[str, Any]:
             "statuses": ["draft"],
             "count": by_status.get("draft", 0),
             "value": round(float(value_by_status.get("draft", 0)), 2),
-            "sparkline": _sparkline(db, company_id, ("draft",)),
+            "sparkline": draft_sparkline,
         },
         {
             "key": "submitted",
@@ -514,11 +551,16 @@ def procurement(db: Session, company_id: UUID) -> Dict[str, Any]:
                 )
             ).label("overdue_now"),
         )
-        .join(PurchaseOrder, PurchaseOrder.supplier_id == Supplier.id)
-        .filter(
-            Supplier.company_id == company_id,
-            PurchaseOrder.status.in_(("submitted", "delivered")),
+        # Outer join with the status check moved into the ON clause: a supplier
+        # with no submitted/delivered order (a new one, or one whose orders are
+        # all still drafts) must still appear, with orders=0, rather than
+        # vanishing from the page entirely.
+        .outerjoin(
+            PurchaseOrder,
+            (PurchaseOrder.supplier_id == Supplier.id)
+            & (PurchaseOrder.status.in_(("submitted", "delivered"))),
         )
+        .filter(Supplier.company_id == company_id)
         .group_by(Supplier.id, Supplier.name, Supplier.reliability_score)
         .all()
     )
