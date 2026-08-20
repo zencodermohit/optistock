@@ -8,7 +8,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { SiteScene } from "@/components/site/SiteScene";
 import { Badge } from "@/components/ui/Badge";
@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
  * scene rather than inside it.
  */
 export function Site() {
+  const navigate = useNavigate();
   const site = useSite();
   const overview = useOverview(30);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -148,6 +149,7 @@ export function Site() {
                 warehouse={selected}
                 largest={largest}
                 direction={direction}
+                onOpen={() => navigate(`/inventory/${selected.id}`)}
               />
             </Suspense>
           ) : (
@@ -205,7 +207,7 @@ export function Site() {
 
         <p className="pointer-events-none absolute right-3 bottom-3 flex items-center gap-1.5 text-2xs text-ink-subtle">
           <Maximize2 className="h-3 w-3" />
-          Drag to orbit · scroll to zoom
+          Drag to orbit · scroll to zoom · double-click the building to open it
         </p>
       </div>
 

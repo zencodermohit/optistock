@@ -5,7 +5,7 @@ import {
   Lightformer,
   OrbitControls,
 } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   EffectComposer,
   N8AO,
@@ -338,8 +338,36 @@ function Marker({ height }: { height: number }) {
 /* The building                                                        */
 /* ------------------------------------------------------------------ */
 
-function Warehouse({ warehouse, largest }: { warehouse: SiteWarehouse; largest: number }) {
+function Warehouse({
+  warehouse,
+  largest,
+  onOpen,
+}: {
+  warehouse: SiteWarehouse;
+  largest: number;
+  onOpen?: () => void;
+}) {
   const size = dimensions(warehouse.capacity_units, largest);
+
+  /* Double click opens this site's command centre.
+   *
+   * DOUBLE and not single, because a single click is already spent: the whole
+   * canvas is an OrbitControls surface, and every drag to turn the building
+   * begins with a mousedown that ends as a click. Navigating on that would
+   * mean the page leaves whenever somebody looks around it.
+   *
+   * The hover hint goes through `data-cursor`, which is the convention the
+   * app's own CursorLayer reads. Setting `style.cursor` would do nothing --
+   * CursorLayer puts `cursor: none !important` on the whole document while the
+   * custom cursor is on, so the native cursor is not available to change.
+   */
+  const { gl } = useThree();
+
+  const hint = (on: boolean) => {
+    if (!onOpen) return;
+    if (on) gl.domElement.dataset.cursor = "interactive";
+    else delete gl.domElement.dataset.cursor;
+  };
   const fill = warehouse.utilisation ?? 0;
   const ringRadius = Math.max(size.width, size.depth) * 0.62;
 
@@ -379,7 +407,21 @@ function Warehouse({ warehouse, largest }: { warehouse: SiteWarehouse; largest: 
   }, [size.width, size.depth]);
 
   return (
-    <group>
+    <group
+      onDoubleClick={(e) => {
+        if (!onOpen) return;
+        // Without this the event bubbles from every mesh under the pointer --
+        // wall, roof, banding -- and fires the handler several times.
+        e.stopPropagation();
+        hint(false);
+        onOpen();
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        hint(true);
+      }}
+      onPointerOut={() => hint(false)}
+    >
       {/* The yard the building stands on.
           A circle, not a rectangle. The rectangular version drew a hard
           straight edge diagonally across the whole frame and read as a slab
@@ -473,10 +515,14 @@ function Stage({
   warehouse,
   largest,
   direction,
+  onOpen,
 }: {
   warehouse: SiteWarehouse;
   largest: number;
   direction: number;
+  /** Double clicking the building calls this. Optional: without it the scene
+      is exactly as it was, and nothing becomes clickable. */
+  onOpen?: () => void;
 }) {
   const group = useRef<Group>(null);
   const [shown, setShown] = useState(warehouse);
@@ -520,7 +566,7 @@ function Stage({
 
   return (
     <group ref={group}>
-      <Warehouse warehouse={shown} largest={largest} />
+      <Warehouse warehouse={shown} largest={largest} onOpen={onOpen} />
     </group>
   );
 }
@@ -533,10 +579,14 @@ function Scene({
   warehouse,
   largest,
   direction,
+  onOpen,
 }: {
   warehouse: SiteWarehouse;
   largest: number;
   direction: number;
+  /** Double clicking the building calls this. Optional: without it the scene
+      is exactly as it was, and nothing becomes clickable. */
+  onOpen?: () => void;
 }) {
   const key = useRef<DirectionalLight>(null);
 
@@ -573,7 +623,12 @@ function Scene({
         <meshStandardMaterial color={PALETTE.ground} roughness={1} />
       </mesh>
 
-      <Stage warehouse={warehouse} largest={largest} direction={direction} />
+      <Stage
+        warehouse={warehouse}
+        largest={largest}
+        direction={direction}
+        onOpen={onOpen}
+      />
 
       <ContactShadows
         position={[0, 0.018, 0]}
@@ -591,10 +646,14 @@ export function SiteScene({
   warehouse,
   largest,
   direction,
+  onOpen,
 }: {
   warehouse: SiteWarehouse;
   largest: number;
   direction: number;
+  /** Double clicking the building calls this. Optional: without it the scene
+      is exactly as it was, and nothing becomes clickable. */
+  onOpen?: () => void;
 }) {
   // Honoured rather than assumed: an orbiting camera is exactly the ambient
   // motion that makes some people ill.
@@ -638,7 +697,12 @@ export function SiteScene({
           <SMAA />
         </EffectComposer>
 
-        <Scene warehouse={warehouse} largest={largest} direction={direction} />
+        <Scene
+          warehouse={warehouse}
+          largest={largest}
+          direction={direction}
+          onOpen={onOpen}
+        />
       </Selection>
 
       <OrbitControls
