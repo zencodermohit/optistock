@@ -136,7 +136,12 @@ export function Site() {
 
       {/* ---------------- The scene ---------------- */}
       <div className="relative overflow-hidden rounded-2xl border border-border bg-canvas shadow-md">
-        <div className="h-[clamp(20rem,60vh,38rem)] w-full">
+        {/* 46vh, not 60vh. On a 1366x768 laptop -- the most common size there
+            is -- 60vh gave the scene 460px, which together with the header and
+            the site chips filled the entire fold and pushed the numbers below
+            it. The floor is lower too, so a short window still shows some of
+            the summary beneath and the page reads as scrollable. */}
+        <div className="h-[clamp(15rem,46vh,34rem)] w-full">
           {selected ? (
             <Suspense
               fallback={
@@ -161,7 +166,11 @@ export function Site() {
 
         {/* Legend. The scene encodes three things and says so, because a
             visualisation whose rules you have to guess is decoration. */}
-        <div className="pointer-events-none absolute top-3 left-3 flex flex-col gap-1.5 rounded-xl border border-border bg-surface/85 px-3 py-2.5 backdrop-blur-sm">
+        {/* Hidden below sm: at 390px this box is half the width of the canvas
+            and sat on top of the site-name badge, so the one label naming what
+            you are looking at was unreadable. The scene still carries its own
+            labels; the key is an aid, not the content. */}
+        <div className="pointer-events-none absolute top-3 left-3 hidden flex-col gap-1.5 rounded-xl border border-border bg-surface/85 px-3 py-2.5 backdrop-blur-sm sm:flex">
           <p className="eyebrow">Reading the site</p>
           <Key swatch="bg-ink-subtle" label="Building size = capacity" />
           <Key swatch="bg-capacity" label="Glowing ring = how full" />
@@ -205,9 +214,17 @@ export function Site() {
           </div>
         )}
 
+        {/* Two versions rather than one that wraps. The full sentence is
+            wider than a phone, and wrapping put a second line straight through
+            the position dots. Touch has no scroll wheel or hover anyway, so the
+            short form drops what does not apply. */}
         <p className="pointer-events-none absolute right-3 bottom-3 flex items-center gap-1.5 text-2xs text-ink-subtle">
           <Maximize2 className="h-3 w-3" />
-          Drag to orbit · scroll to zoom · double-click the building to open it
+          <span className="hidden lg:inline">
+            Drag to orbit · scroll to zoom · double-click the building to open it
+          </span>
+          <span className="hidden sm:inline lg:hidden">Drag to orbit · double-click to open</span>
+          <span className="sm:hidden">Drag to turn</span>
         </p>
       </div>
 
@@ -215,7 +232,10 @@ export function Site() {
       {selected && <SelectedSite warehouse={selected} />}
 
       {/* ---------------- The persistent KPI strip ---------------- */}
-      <div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-sm sm:grid-cols-2 lg:grid-cols-5">
+      {/* Three across at lg, five only from xl. Five columns at 1024 left each
+          cell about 124px of usable width, which no rupee figure fits in --
+          the count of columns, not the font size, was the real constraint. */}
+      <div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-sm sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Kpi
           icon={<Boxes className="h-4 w-4" />}
           label="Units on hand"
@@ -442,14 +462,25 @@ function Kpi({
   bar?: number;
 }) {
   return (
-    <div className="flex flex-col gap-1.5 bg-surface px-4 py-3.5">
+    /* min-w-0 so a long figure shrinks the cell instead of bursting out of
+       it: grid items default to min-width:auto, which refuses to go narrower
+       than their content. */
+    <div className="flex min-w-0 flex-col gap-1.5 bg-surface px-4 py-3.5">
       <span className="flex items-center gap-1.5 text-ink-subtle">
         {icon}
         <span className="eyebrow">{label}</span>
       </span>
+      {/* The figure scales with the column, not with the page. This strip is
+          five across from lg up, and lg is where the columns are TIGHTEST --
+          about 157px on a 1024 screen. At a flat 30px a rupee value like
+          ₹4,82,42,193 was wider than its cell and ran into the next one. */}
       <span
         className={cn(
-          "tnum text-3xl leading-none font-extrabold tracking-tight",
+          "tnum truncate text-3xl leading-none font-extrabold tracking-tight",
+          // Sized against the COLUMN COUNT at each step, measured rather than
+          // guessed: 3-up at lg leaves 212px, 5-up at xl leaves 176px, and
+          // 5-up at 2xl leaves 227px.
+          "lg:text-2xl xl:text-xl 2xl:text-2xl",
           tone === "danger" && "text-danger",
         )}
       >

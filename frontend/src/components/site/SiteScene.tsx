@@ -16,6 +16,7 @@ import {
   SelectiveBloom,
 } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Vector3 } from "three";
 import type { DirectionalLight, Group } from "three";
 
 import type { SiteWarehouse } from "@/lib/queries";
@@ -676,6 +677,32 @@ function Scene({
   );
 }
 
+/** Pulls the camera back when the canvas is narrow.
+ *
+ * `fov` is the VERTICAL field of view, so the horizontal one is whatever the
+ * aspect ratio makes it. On a phone the canvas is roughly square, the
+ * horizontal field collapses, and the building runs off both sides -- which is
+ * what "cropped on mobile" was. Backing off restores the framing rather than
+ * shrinking the model.
+ *
+ * Applied on resize as well as on mount, so rotating a phone re-frames it. */
+function FitToViewport() {
+  const camera = useThree((s) => s.camera);
+  const width = useThree((s) => s.size.width);
+  const height = useThree((s) => s.size.height);
+
+  useEffect(() => {
+    const aspect = width / Math.max(height, 1);
+    // 4:3 and wider needs nothing; below that, pull back in proportion, and
+    // stop at 1.9x so a very tall window does not send the camera to orbit.
+    const pull = aspect >= 1.34 ? 1 : Math.min(1.9, 1.34 / Math.max(aspect, 0.5));
+    camera.position.copy(new Vector3(7.6, 4.6, 8.2).multiplyScalar(pull));
+    camera.updateProjectionMatrix();
+  }, [camera, width, height]);
+
+  return null;
+}
+
 export function SiteScene({
   warehouse,
   largest,
@@ -703,6 +730,8 @@ export function SiteScene({
       gl={{ antialias: false }}
       style={{ touchAction: "none" }}
     >
+      <FitToViewport />
+
       <color attach="background" args={["#eaeef8"]} />
       <fog attach="fog" args={["#eaeef8", 17, 34]} />
 

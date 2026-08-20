@@ -125,7 +125,13 @@ function AlertRow({
         </Badge>
       </div>
 
-      <div className="min-w-0 flex-1">
+      {/* basis-48, not the default basis-0 of flex-1.
+          With a zero basis this column contributes no intrinsic width, so the
+          row happily kept the badge and the Dismiss button on one line and
+          squeezed the alert text down to about 13px -- a column of single
+          letters. A real minimum basis means the button wraps to the next line
+          on a phone instead, and the alert stays readable. */}
+      <div className="min-w-0 flex-1 basis-48">
         <p className="font-medium">{alert.title}</p>
 
         {/* The evidence, laid out as the numbers it actually was. An alert that

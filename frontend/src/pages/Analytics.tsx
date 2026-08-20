@@ -122,7 +122,7 @@ export function Analytics() {
       </div>
 
       {/* ---------------- KPI row ---------------- */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Kpi
           icon={<TrendingUp className="h-4 w-4" />}
           label="Revenue"

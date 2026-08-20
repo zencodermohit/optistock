@@ -300,14 +300,18 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-end justify-between gap-4">
-      <div>
-        <h1 className="text-2xl leading-tight font-semibold">{title}</h1>
+    /* Stacked on a phone, side by side from sm up.
+       Side by side at every width meant the action -- a filter group, a button
+       -- held its full size while the description was squeezed into whatever
+       was left, which on a 390px screen was a column about two words wide. */
+    <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+      <div className="min-w-0">
+        <h1 className="text-xl leading-tight font-semibold sm:text-2xl">{title}</h1>
         {description && (
-          <p className="mt-1.5 text-base text-ink-muted">{description}</p>
+          <p className="mt-1.5 text-sm text-ink-muted sm:text-base">{description}</p>
         )}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="w-full shrink-0 sm:w-auto">{action}</div>}
     </div>
   );
 }

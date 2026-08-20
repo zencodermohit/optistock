@@ -178,7 +178,7 @@ function Figure({
   return (
     <Band className="p-3">
       <p className="eyebrow">{label}</p>
-      <p className="tnum mt-1 text-2xl leading-none font-semibold">{value}</p>
+      <p className="tnum mt-1 truncate text-xl leading-none font-semibold lg:text-2xl">{value}</p>
       {hint && <p className="mt-1 text-2xs text-ink-subtle">{hint}</p>}
     </Band>
   );

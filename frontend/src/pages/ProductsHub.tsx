@@ -89,7 +89,7 @@ export function ProductsHub() {
       />
 
       {/* ---------------- Portfolio KPIs ---------------- */}
-      <div className="mt-5 mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="mt-5 mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Metric
           icon={<Layers className="h-4 w-4" />}
           label="Catalogue"
@@ -431,7 +431,7 @@ function Workspaces({
 
   if (!data) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 2xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-36 rounded-2xl" />
         ))}
@@ -440,7 +440,7 @@ function Workspaces({
   }
 
   return (
-    <div className="grid content-start gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+    <div className="grid content-start grid-cols-2 gap-3 2xl:grid-cols-3">
       {workspaces.map((workspace) => {
         const active = selected === workspace.key;
         const empty = workspace.count === 0;
