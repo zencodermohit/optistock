@@ -6,6 +6,7 @@ import {
   OrbitControls,
 } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import type { ThreeEvent } from "@react-three/fiber";
 import {
   EffectComposer,
   N8AO,
@@ -345,7 +346,7 @@ function Warehouse({
 }: {
   warehouse: SiteWarehouse;
   largest: number;
-  onOpen?: () => void;
+  onOpen?: (warehouseId: string) => void;
 }) {
   const size = dimensions(warehouse.capacity_units, largest);
 
@@ -368,6 +369,18 @@ function Warehouse({
     if (on) gl.domElement.dataset.cursor = "interactive";
     else delete gl.domElement.dataset.cursor;
   };
+
+  /* Clear the hint if this building is unmounted while the pointer is on it,
+     which is what a site swap does. No pointerout is delivered for a mesh that
+     stops existing, so without this the canvas could keep advertising itself as
+     clickable over empty ground. Cheap insurance; the swap is hard to drive
+     from a test, so this one is reasoned rather than observed. */
+  useEffect(
+    () => () => {
+      delete gl.domElement.dataset.cursor;
+    },
+    [gl],
+  );
   const fill = warehouse.utilisation ?? 0;
   const ringRadius = Math.max(size.width, size.depth) * 0.62;
 
@@ -406,22 +419,39 @@ function Warehouse({
     return spots;
   }, [size.width, size.depth]);
 
+  /* Attached to the building, not to the whole site.
+   *
+   * These were on the outer <group>, which also holds the ground disc, the
+   * trees, the silos and the vans -- and R3F bubbles pointer events from any
+   * child up to the nearest ancestor handler. So double clicking the grass
+   * navigated, and the hint text ("double-click the building to open it") was
+   * describing something narrower than what the code did. The apron mesh alone
+   * is a disc 1.55x the building's longest side, so most of the frame was a
+   * navigation target. */
+  const opens = {
+    onDoubleClick: (e: ThreeEvent<MouseEvent>) => {
+      if (!onOpen) return;
+      // The building is several meshes -- wall, roof, banding, docks -- and the
+      // event bubbles from each one the ray hits. Without this it fires
+      // several times per click.
+      e.stopPropagation();
+      hint(false);
+      // warehouse.id, not the selected id from the page. During a site swap
+      // Stage keeps rendering the OUTGOING building for ~300ms while it slides
+      // away, and the page's selection has already moved on. Reading the id off
+      // the thing that is actually drawn is the only way the click opens what
+      // the user clicked.
+      onOpen(warehouse.id);
+    },
+    onPointerOver: (e: ThreeEvent<PointerEvent>) => {
+      e.stopPropagation();
+      hint(true);
+    },
+    onPointerOut: () => hint(false),
+  };
+
   return (
-    <group
-      onDoubleClick={(e) => {
-        if (!onOpen) return;
-        // Without this the event bubbles from every mesh under the pointer --
-        // wall, roof, banding -- and fires the handler several times.
-        e.stopPropagation();
-        hint(false);
-        onOpen();
-      }}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        hint(true);
-      }}
-      onPointerOut={() => hint(false)}
-    >
+    <group>
       {/* The yard the building stands on.
           A circle, not a rectangle. The rectangular version drew a hard
           straight edge diagonally across the whole frame and read as a slab
@@ -433,6 +463,9 @@ function Warehouse({
         <meshStandardMaterial color={PALETTE.apron} roughness={0.95} />
       </mesh>
 
+      {/* Everything from here to the annex IS the building, and only these
+          carry the click handlers. */}
+      <group {...opens}>
       {/* Main shed */}
       <mesh position={[0, size.height / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[size.width, size.height, size.depth]} />
@@ -462,6 +495,7 @@ function Warehouse({
         position={[-size.width / 2 - 0.95, 0, size.depth * 0.16]}
         height={size.height}
       />
+      </group>
       <Silos position={[size.width / 2 + 1.15, 0, -size.depth * 0.1]} />
 
       {vans.map((van, i) => (
@@ -520,9 +554,9 @@ function Stage({
   warehouse: SiteWarehouse;
   largest: number;
   direction: number;
-  /** Double clicking the building calls this. Optional: without it the scene
-      is exactly as it was, and nothing becomes clickable. */
-  onOpen?: () => void;
+  /** Double clicking the building calls this with the id of the warehouse
+      that is ON SCREEN. Optional: without it nothing becomes clickable. */
+  onOpen?: (warehouseId: string) => void;
 }) {
   const group = useRef<Group>(null);
   const [shown, setShown] = useState(warehouse);
@@ -584,9 +618,9 @@ function Scene({
   warehouse: SiteWarehouse;
   largest: number;
   direction: number;
-  /** Double clicking the building calls this. Optional: without it the scene
-      is exactly as it was, and nothing becomes clickable. */
-  onOpen?: () => void;
+  /** Double clicking the building calls this with the id of the warehouse
+      that is ON SCREEN. Optional: without it nothing becomes clickable. */
+  onOpen?: (warehouseId: string) => void;
 }) {
   const key = useRef<DirectionalLight>(null);
 
@@ -651,9 +685,9 @@ export function SiteScene({
   warehouse: SiteWarehouse;
   largest: number;
   direction: number;
-  /** Double clicking the building calls this. Optional: without it the scene
-      is exactly as it was, and nothing becomes clickable. */
-  onOpen?: () => void;
+  /** Double clicking the building calls this with the id of the warehouse
+      that is ON SCREEN. Optional: without it nothing becomes clickable. */
+  onOpen?: (warehouseId: string) => void;
 }) {
   // Honoured rather than assumed: an orbiting camera is exactly the ambient
   // motion that makes some people ill.

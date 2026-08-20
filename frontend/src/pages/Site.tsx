@@ -149,7 +149,7 @@ export function Site() {
                 warehouse={selected}
                 largest={largest}
                 direction={direction}
-                onOpen={() => navigate(`/inventory/${selected.id}`)}
+                onOpen={(warehouseId) => navigate(`/inventory/${warehouseId}`)}
               />
             </Suspense>
           ) : (
