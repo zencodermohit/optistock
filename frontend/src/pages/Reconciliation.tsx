@@ -104,7 +104,12 @@ function CountCard({ row, decidable }: { row: ReconRow; decidable?: boolean }) {
   return (
     <div className="px-4 py-3.5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1">
+        {/* basis-64 rather than the basis-0 that flex-1 implies. With a zero
+            basis this column contributes no intrinsic width, so on a phone the
+            approve/reject controls kept their size and the summary line was
+            squeezed to 35px -- about three characters. A real minimum makes the
+            controls wrap underneath instead. */}
+        <div className="min-w-0 flex-1 basis-64">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-display text-base font-semibold">
               {row.warehouse_name}

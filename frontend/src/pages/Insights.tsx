@@ -173,7 +173,9 @@ function SuggestionRow({
         <span className="w-8 shrink-0">
           <AbcBadge value={suggestion.abc_class} />
         </span>
-        <span className="min-w-0 flex-1">
+        {/* basis-40: flex-1 alone implies basis-0, which lets the fixed
+            columns beside it squeeze this one to a few characters on a phone. */}
+        <span className="min-w-0 flex-1 basis-40">
           <span className="font-medium">{suggestion.product_name}</span>
           <span className="ml-2 text-xs text-ink-muted">
             {suggestion.warehouse_name}
@@ -193,7 +195,11 @@ function SuggestionRow({
             {currency(suggestion.estimated_cost)}
           </span>
         </span>
-        <span className="w-16 shrink-0 text-right">
+        {/* w-24, not w-16. The column is fixed so the values line up down the
+            list, but 64px was narrower than the longest label it has to hold
+            ("patchy" needs 80), so that word was clipped at every screen size,
+            desktop included. */}
+        <span className="w-24 shrink-0 text-right">
           <Confidence score={suggestion.confidence_score} />
         </span>
         <ChevronDown
