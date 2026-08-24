@@ -115,6 +115,17 @@ class Redactor:
     def substitutions(self) -> int:
         return len(self._real_for)
 
+    @property
+    def issued(self) -> List[str]:
+        """The pseudonyms handed out so far.
+
+        Exposed for the streaming path, which has to know where a token starts
+        and ends so it never releases half of one -- an unmasker only recognises
+        a whole token, so a token split across two fragments would reach the
+        screen as the hash it was meant to hide.
+        """
+        return list(self._real_for)
+
     def _walk(self, value: Any) -> Any:
         if isinstance(value, dict):
             return {key: self._mask_field(key, item) for key, item in value.items()}
