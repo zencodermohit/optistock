@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.modules.assistant.redaction import Redactor
 from app.modules.assistant.runtime import LLMRuntime, get_runtime
+from app.modules.assistant.streaming import AnswerGuard
 from app.modules.assistant.tools import run_tool
 from app.modules.assistant.validation import validate_answer
 
@@ -48,6 +49,13 @@ plainly instead of guessing. Never invent a SKU, a quantity, or a figure.
 Lead with the answer. A question whose answer is a number gets the number \
 first, then the supporting detail. Keep responses to the length the question \
 needs; a lookup deserves a sentence, not a report.
+
+When a question needs two lookups that do not depend on each other, ask for \
+both in the same turn instead of one after the other -- each turn is a round \
+trip, and two lookups in one turn cost one wait rather than two. "What is low, \
+and how accurate are the forecasts?" is two independent lookups. Only wait for \
+a result when you need it to decide what to look up next: finding a product \
+before looking up its supplier has to happen in that order.
 
 You can read, and you can propose one thing: a purchase order, via \
 create_purchase_order. Proposing is not doing. Nothing is ordered and no stock \
@@ -93,12 +101,13 @@ def build_toolset(
     context = context or {}
 
     def call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        # The cap is enforced HERE, inside the tools, because the SDK owns the
-        # loop -- there is no iteration for the caller to count. A model that
-        # keeps calling tools would otherwise keep billing and keep the request
-        # open indefinitely. Returning a refusal rather than raising lets the
-        # model read the message and write an answer from what it already has;
-        # raising would abort the turn and waste the work already done.
+        # The cap is enforced HERE, inside the tools, and stays here even now
+        # that the runtime owns the loop again. The two limits count different
+        # things: ASSISTANT_MAX_ROUNDS bounds trips to the model, this bounds
+        # lookups, and one round can carry several. Returning a refusal rather
+        # than raising lets the model read the message and write an answer from
+        # what it already has; raising would abort the turn and waste the work
+        # already done.
         budget["used"] += 1
         if budget["used"] > budget["limit"]:
             logger.warning(
@@ -287,11 +296,22 @@ async def converse(
     """Answer one question, yielding progress the router forwards to the browser.
 
     {"type": "tool",     "name": ..., "input": ...}  -- a tool that ran
-    {"type": "text",     "text": ...}                -- the answer
+    {"type": "text",     "text": ...}                -- a piece of the answer
     {"type": "citation", "citation": {...}}          -- a record it used
     {"type": "notice",   "message": ...}             -- a caveat about the answer
     {"type": "done"}
     {"type": "error",    "message": ...}
+
+    Events arrive as they happen rather than in one batch at the end. Tool
+    events land while the model is still working, and the answer arrives in
+    fragments, so the reader sees the first sentence instead of a blank bubble.
+    `text` is therefore a delta to append, not a whole answer -- which is what
+    the client always did with it; the server simply never sent more than one.
+
+    Nothing skips the output filter to achieve that. AnswerGuard applies every
+    check that REWRITES text incrementally, holding back anything not yet
+    decidable, and validate_answer still runs at the end for the checks that
+    only annotate.
 
     `client` is accepted for callers holding a provider client already; passing
     `runtime` directly is the newer path.
@@ -319,56 +339,113 @@ async def converse(
     # Assembled from the request, not from anything the model said.
     context = {"user_id": user_id, "question": question, "model": runtime.model}
 
-    result = await runtime.generate(
+    guard = AnswerGuard(redactor)
+    sent_tools = 0
+    sent_citations = 0
+    latency_ms = 0.0
+    rounds = 0
+    failure: Optional[str] = None
+
+    def drain():
+        """Emit any lookups that have happened since the last drain.
+
+        The point of doing this mid-stream is that the reader sees "checked
+        stock levels" while the model is still deciding what to say about it.
+        Before, these were emitted after the answer was complete, which is the
+        one moment they are of no use to anybody.
+        """
+        nonlocal sent_tools, sent_citations
+        while sent_tools < len(used):
+            yield {"type": "tool", **used[sent_tools]}
+            sent_tools += 1
+        while sent_citations < len(citations):
+            yield {"type": "citation", "citation": citations[sent_citations]}
+            sent_citations += 1
+
+    async for event in runtime.stream(
         system_prompt=SYSTEM_PROMPT,
         history=history or [],
         question=question,
         tools=build_toolset(db, company_id, record, budget, redactor, context),
-    )
+    ):
+        kind = event.get("type")
 
-    if not result.ok:
+        if kind == "text":
+            # Never straight through: the guard holds anything that could still
+            # turn out to need rewriting, so a key split across two fragments
+            # cannot reach the screen ahead of the check that removes it.
+            safe = guard.feed(event["text"])
+            if safe:
+                yield {"type": "text", "text": safe}
+
+        elif kind == "tool_round":
+            for pending in drain():
+                yield pending
+
+        elif kind == "error":
+            failure = event["message"]
+
+        elif kind == "meta":
+            latency_ms = event.get("latency_ms", 0.0)
+            rounds = event.get("rounds", 0)
+
+    tail = guard.finish()
+    if tail:
+        yield {"type": "text", "text": tail}
+    # Late lookups: a runtime that cannot report mid-stream (the default
+    # non-streaming path) records everything before it yields anything.
+    for pending in drain():
+        yield pending
+
+    answer = guard.released
+    truncated = budget["used"] > budget["limit"]
+
+    if failure and not answer:
         logger.warning(
             "assistant.failed",
             extra={
                 "provider": runtime.name,
-                "latency_ms": result.latency_ms,
+                "latency_ms": latency_ms,
                 "tool_calls": budget["used"],
             },
         )
-        yield {"type": "error", "message": result.error}
+        yield {"type": "error", "message": failure}
         return
 
-    truncated = budget["used"] > budget["limit"]
+    # The streamed guard has already applied every check that REWRITES text.
+    # This pass is for the checks that only annotate -- a claim of having
+    # placed an order gets a warning under it rather than a deletion, which
+    # validation.py argues for and streaming does not change.
+    checked = validate_answer(answer)
+    flags = sorted(set(guard.flags) | set(checked.flags))
 
-    for call in used:
-        yield {"type": "tool", **call}
-    for citation in citations:
-        # Nested rather than spread: a citation carries its own `type`
-        # ("product", "alert"), which would otherwise overwrite the envelope's
-        # and leave the client with an event kind it cannot handle.
-        yield {"type": "citation", "citation": citation}
-
-    # Pseudonyms back to real identifiers, then the safety checks. In that
-    # order: validation should read the text the user will read, not the
-    # intermediate form.
-    checked = validate_answer(redactor.unmask_text(result.text))
+    if checked.text != answer:
+        # The batch validator would have rewritten text the reader has already
+        # been shown, which means the two paths disagree and the streaming one
+        # let something through. Loud, because it is a hole in the filter and
+        # not a cosmetic difference.
+        logger.error(
+            "assistant.stream_filter_divergence",
+            extra={"flags": checked.flags, "answer_chars": len(answer)},
+        )
 
     logger.info(
         "assistant.answered",
         extra={
             "provider": runtime.name,
             "model": runtime.model,
-            "latency_ms": result.latency_ms,
+            "latency_ms": latency_ms,
+            "rounds": rounds,
             "tool_calls": budget["used"],
-            "answer_chars": len(checked.text),
+            "answer_chars": len(answer),
             "citations": len(citations),
             "truncated": truncated,
-            "flags": checked.flags,
+            "flags": flags,
             "unmasked": redactor.substitutions,
         },
     )
 
-    if not checked.text:
+    if not answer:
         # An empty answer with tools run is a real outcome worth naming rather
         # than rendering as a blank bubble. If the budget ran out, say THAT --
         # "try rephrasing" is misleading advice when the question was fine and
@@ -384,21 +461,28 @@ async def converse(
         }
         return
 
-    yield {"type": "text", "text": checked.text}
-
+    warnings = list(checked.warnings)
+    if failure:
+        # Half an answer plus the reason it stopped, rather than throwing away
+        # what the reader is already looking at.
+        warnings.append(failure)
+    if guard.truncated:
+        warnings.append(
+            "The answer was longer than this view allows and has been cut short."
+        )
     if truncated:
         # Shown, not swallowed: an answer built from a capped search is still a
         # good answer, but the reader deserves to know it was capped.
-        checked.warnings.append(
+        warnings.append(
             f"Answered after {budget['limit']} lookups, the limit for one "
             "question. Some detail may be missing."
         )
-    for warning in checked.warnings:
+    for warning in warnings:
         yield {"type": "notice", "message": warning}
 
     yield {
         "type": "done",
         "rounds": len(used),
         "truncated": truncated,
-        "flags": checked.flags,
+        "flags": flags,
     }

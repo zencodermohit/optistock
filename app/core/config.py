@@ -46,6 +46,21 @@ class Settings(BaseSettings):
     # Gemini 3.x. The 2.5 Flash models are no longer served to new API keys,
     # so an older default would 404 for anyone setting this up today.
     ASSISTANT_MODEL: str = "gemini-3.6-flash"
+    # How much silent reasoning the model may do before answering. Measured
+    # rather than assumed: on this workload the tools have already done the
+    # arithmetic and handed the model finished numbers, so a turn spends about
+    # 150 thinking tokens to produce a 45-token answer. "low" cuts that to
+    # near zero without changing what the answer says. Set to "high" if you
+    # ever give the assistant a job that needs it to reason rather than report.
+    ASSISTANT_THINKING_LEVEL: str = "low"
+    # A ceiling on trips to the model for one question. Distinct from
+    # MAX_TOOL_CALLS: one round can carry several tool calls, and this bounds
+    # the round trips rather than the lookups.
+    ASSISTANT_MAX_ROUNDS: int = 4
+    # Free-tier keys are rate limited hard enough that a burst of two questions
+    # can trip them. A 429 is a wait, not a failure, so it is retried -- but
+    # only a couple of times, because a person is watching a spinner.
+    ASSISTANT_RETRY_ATTEMPTS: int = 2
 
     # Where the nightly ETL writes Parquet. Must be backed by a Docker volume in
     # any deployed environment or the analytical history is destroyed on restart.

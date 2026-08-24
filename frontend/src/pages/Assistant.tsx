@@ -322,13 +322,16 @@ function TurnBlock({ turn }: { turn: Turn }) {
         <p className="text-sm text-ink-subtle">Looking it up…</p>
       )}
 
-      {turn.notice && (
-        // Below the answer, not above it: the answer is the point, this is the
-        // footnote. Styled as a caveat rather than a failure.
-        <p className="mt-2 rounded-sm border border-warning/25 bg-warning-soft px-2.5 py-1.5 text-2xs text-ink-muted">
-          {turn.notice}
+      {turn.notices.map((notice) => (
+        // Below the answer, not above it: the answer is the point, these are
+        // the footnotes. Styled as caveats rather than failures.
+        <p
+          key={notice}
+          className="mt-2 rounded-sm border border-warning/25 bg-warning-soft px-2.5 py-1.5 text-2xs text-ink-muted"
+        >
+          {notice}
         </p>
-      )}
+      ))}
 
       {turn.error && (
         <p

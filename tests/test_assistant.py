@@ -18,33 +18,93 @@ from app.modules.assistant import validation
 from app.modules.assistant.runtime import LLMResult, LLMRuntime
 from app.modules.assistant.tools import TOOLS, run_tool
 
-
 # ---------------------------------------------------------------------------
-# A fake Gemini client
+# A fake Gemini transport
 #
-# Mirrors the shape the service uses: client.aio.models.generate_content, with
-# automatic function calling. The fake runs the tools it is told to, exactly as
-# the SDK would, so the loop, the tenant binding and the citation collection are
-# all exercised without a network call or an API key.
+# Only the transport is fake. The parts it yields are real google.genai types,
+# because the runtime feeds a model turn straight back into types.Content --
+# a SimpleNamespace stand-in would be rejected there, and a fake that cannot
+# survive the real code path is not testing the real code path.
+#
+# The fake no longer calls the tools itself. It says which tools the "model"
+# asked for, and the runtime's own dispatch runs them, so the loop under test
+# is the one that runs in production.
 # ---------------------------------------------------------------------------
+from google.genai import types as genai_types  # noqa: E402
+
+
+def _chunk(parts):
+    """One streamed chunk carrying `parts`."""
+    return SimpleNamespace(
+        candidates=[
+            SimpleNamespace(content=SimpleNamespace(parts=parts), finish_reason=None)
+        ]
+    )
+
+
+async def _astream(chunks):
+    for chunk in chunks:
+        yield chunk
+
+
 class FakeModels:
+    """Scripted turns: the planned tool calls first, then the answer."""
+
     def __init__(self, plan, answer):
-        self.plan = list(plan)  # [(tool_name, kwargs), ...] the "model" decides to call
+        self.plan = list(plan)  # [(tool_name, kwargs), ...] the "model" asks for
         self.answer = answer
         self.requests = []
+        self.rounds = 0
+        #: Tool results as the model received them -- masked, and carrying any
+        #: refusal the budget produced. The fake no longer runs the tools, so
+        #: this is how a test sees what a lookup actually returned.
+        self.tool_results = []
 
-    async def generate_content(self, model, contents, config):
+    async def generate_content_stream(self, model, contents, config):
         self.requests.append({"model": model, "contents": contents, "config": config})
-        by_name = {t.__name__: t for t in config.tools}
-        for name, kwargs in self.plan:
-            by_name[name](**kwargs)
-        return SimpleNamespace(text=self.answer)
+        self._harvest(contents)
+        self.rounds += 1
+        return _astream(self.turn())
+
+    def _harvest(self, contents):
+        for content in contents:
+            for part in getattr(content, "parts", None) or []:
+                answer = getattr(part, "function_response", None)
+                if answer is not None:
+                    self.tool_results.append(
+                        {"name": answer.name, "response": answer.response}
+                    )
+
+    def turn(self):
+        """The chunks for this round."""
+        if self.rounds == 1 and self.plan:
+            return [
+                _chunk(
+                    [
+                        genai_types.Part(
+                            function_call=genai_types.FunctionCall(
+                                name=name, args=dict(kwargs)
+                            )
+                        )
+                        for name, kwargs in self.plan
+                    ]
+                )
+            ]
+        # Answers arrive in pieces, as a real stream does, so tests exercise
+        # reassembly rather than a single-fragment special case.
+        return [_chunk([genai_types.Part(text=piece)]) for piece in _split(self.answer)]
+
+
+def _split(text, size=7):
+    return [text[i : i + size] for i in range(0, len(text), size)] or []
 
 
 class FakeClient:
     def __init__(self, plan=(), answer="Here is the answer."):
         self.models = FakeModels(plan, answer)
         self.aio = SimpleNamespace(models=self.models)
+        # from_callable() asks the client which API variant it is talking to.
+        self.vertexai = False
 
 
 class ExplodingClient:
@@ -52,7 +112,18 @@ class ExplodingClient:
         async def boom(**_):
             raise error
 
-        self.aio = SimpleNamespace(models=SimpleNamespace(generate_content=boom))
+        self.vertexai = False
+        self.aio = SimpleNamespace(models=SimpleNamespace(generate_content_stream=boom))
+
+
+def answer_of(events):
+    """The whole answer, reassembled.
+
+    `text` events are fragments now. The browser concatenates them, so a test
+    that reads only the first one is testing the transport rather than the
+    answer.
+    """
+    return "".join(e["text"] for e in events if e["type"] == "text")
 
 
 async def _collect(client, db, company_id, question="hello"):
@@ -232,9 +303,16 @@ async def test_the_tenant_is_bound_and_never_exposed_to_the_model(
     client = FakeClient(plan=[("search_products", {})], answer="Done.")
     await _collect(client, db_session, company.id)
 
+    # Read the declarations the model was actually sent, rather than the
+    # Python closures behind them -- the schema is what the model can see and
+    # therefore what it could try to supply.
     config = client.models.requests[0]["config"]
-    for tool in config.tools:
-        assert "company_id" not in tool.__code__.co_varnames
+    declarations = [d for tool in config.tools for d in tool.function_declarations]
+    assert declarations, "the model was sent no tools at all"
+    for declaration in declarations:
+        properties = getattr(declaration.parameters, "properties", None) or {}
+        assert "company_id" not in properties
+        assert "db" not in properties
 
     # And the call it made only saw this tenant's catalogue.
     result, _ = run_tool(db_session, company.id, "search_products", {})
@@ -366,23 +444,21 @@ async def test_the_refusal_is_readable_by_the_model(db_session, company, monkeyp
 
     captured = []
 
-    class Recording(FakeModels):
-        async def generate_content(self, model, contents, config):
-            by_name = {t.__name__: t for t in config.tools}
-            captured.append(by_name["warehouse_overview"]())
-            captured.append(by_name["warehouse_overview"]())
-            return SimpleNamespace(text="Answered anyway.")
-
-    client = FakeClient()
-    client.models = Recording([], "")
-    client.aio = SimpleNamespace(models=client.models)
+    # Two lookups in one turn, against a budget of one. The runtime dispatches
+    # both, so the second must come back as a refusal the model can read.
+    client = FakeClient(
+        plan=[("warehouse_overview", {}), ("warehouse_overview", {})],
+        answer="Answered anyway.",
+    )
 
     events = await _collect(client, db_session, company.id)
+    captured = [result["response"] for result in client.models.tool_results]
 
+    assert len(captured) == 2
     assert "error" not in captured[0]
     assert captured[1]["error"] == "tool_budget_exceeded"
     assert "answer from the results you have" in captured[1]["message"].lower()
-    assert any(e["type"] == "text" for e in events)
+    assert answer_of(events) == "Answered anyway."
 
 
 @pytest.mark.anyio
@@ -470,18 +546,13 @@ async def test_citations_keep_the_real_sku_while_the_model_sees_a_pseudonym(
 
     seen = {}
 
-    class Peeking(FakeModels):
-        async def generate_content(self, model, contents, config):
-            by_name = {t.__name__: t for t in config.tools}
-            seen["payload"] = by_name["search_products"](query="Real")
-            return SimpleNamespace(text="Found it.")
-
-    client = FakeClient()
-    client.models = Peeking([], "")
-    client.aio = SimpleNamespace(models=client.models)
+    client = FakeClient(
+        plan=[("search_products", {"query": "Real"})], answer="Found it."
+    )
 
     events = await _collect(client, db_session, company.id)
 
+    seen["payload"] = client.models.tool_results[0]["response"]
     model_saw = [p["sku"] for p in seen["payload"]["products"]]
     assert "REAL-SKU-1" not in model_saw
 
@@ -769,8 +840,7 @@ async def test_the_answer_speaks_in_real_skus_even_though_the_model_did_not(
         )
     ]
 
-    text = next(e for e in events if e["type"] == "text")["text"]
-    assert text == "ROUNDTRIP-1 is the one to watch."
+    assert answer_of(events) == "ROUNDTRIP-1 is the one to watch."
 
 
 @pytest.mark.anyio
@@ -791,6 +861,209 @@ async def test_a_pseudonym_the_model_invented_is_left_alone(
         )
     ]
 
-    assert (
-        next(e for e in events if e["type"] == "text")["text"] == "SKU-ZZZZZZ is low."
+    assert answer_of(events) == "SKU-ZZZZZZ is low."
+
+
+# ---------------------------------------------------------------------------
+# The streamed loop
+#
+# These cover what changed when the runtime took the tool loop back from the
+# SDK: progress that arrives while the model is still working, an answer that
+# arrives in pieces, and the one detail that makes a hand-written loop work at
+# all on a Gemini 3 model.
+# ---------------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_lookups_are_reported_before_the_answer_not_after(db_session, company):
+    """The whole point of owning the loop.
+
+    Tool events used to be emitted after the answer was complete, which is the
+    one moment they are of no use: the reader had already finished reading. A
+    lookup has to be announced while it is the reason for the wait.
+    """
+    client = FakeClient(plan=[("warehouse_overview", {})], answer="Two sites.")
+
+    events = await _collect(client, db_session, company.id)
+    kinds = [e["type"] for e in events]
+
+    assert "tool" in kinds and "text" in kinds
+    assert kinds.index("tool") < kinds.index("text")
+
+
+@pytest.mark.anyio
+async def test_the_answer_arrives_in_pieces(db_session, company):
+    """Streaming is only streaming if more than one fragment reaches the client."""
+    client = FakeClient(plan=[], answer="A reasonably long answer to split up.")
+
+    events = await _collect(client, db_session, company.id)
+
+    fragments = [e for e in events if e["type"] == "text"]
+    assert len(fragments) > 1
+    assert answer_of(events) == "A reasonably long answer to split up."
+
+
+@pytest.mark.anyio
+async def test_private_reasoning_never_reaches_the_reader(db_session, company):
+    """A thought part is the model talking to itself.
+
+    It is echoed back to the provider, because dropping it breaks the turn, but
+    it is not the answer and it can quote tool results verbatim -- including
+    rows the redactor masked on the way out.
+    """
+
+    class Thinking(FakeModels):
+        def turn(self):
+            return [
+                _chunk(
+                    [
+                        genai_types.Part(
+                            text="The user wants stock. I should check.",
+                            thought=True,
+                        ),
+                        genai_types.Part(text="Two sites."),
+                    ]
+                )
+            ]
+
+    client = FakeClient()
+    client.models = Thinking([], "")
+    client.aio = SimpleNamespace(models=client.models)
+
+    events = await _collect(client, db_session, company.id)
+
+    assert answer_of(events) == "Two sites."
+    assert "I should check" not in answer_of(events)
+
+
+@pytest.mark.anyio
+async def test_the_model_turn_is_echoed_back_verbatim(db_session, company):
+    """The line that makes a hand-written loop work.
+
+    Gemini 3 carries a thought_signature through a turn. Rebuilding the model's
+    turn from the function calls we read out of it -- which is the obvious way
+    to write this -- drops the signature, and a model that loses it re-issues
+    the same tool call instead of answering. So the parts go back exactly as
+    they arrived.
+    """
+    signed = genai_types.Part(
+        function_call=genai_types.FunctionCall(name="warehouse_overview", args={}),
+        thought_signature=b"opaque-signature",
     )
+
+    class Signed(FakeModels):
+        def turn(self):
+            if self.rounds == 1:
+                return [_chunk([signed])]
+            return [_chunk([genai_types.Part(text="Two sites.")])]
+
+    client = FakeClient()
+    client.models = Signed([], "")
+    client.aio = SimpleNamespace(models=client.models)
+
+    await _collect(client, db_session, company.id)
+
+    # The second request must carry the signature the first one produced.
+    replayed = [
+        part
+        for content in client.models.requests[1]["contents"]
+        for part in (getattr(content, "parts", None) or [])
+        if getattr(part, "thought_signature", None)
+    ]
+    assert replayed, "the model turn was rebuilt instead of echoed"
+    assert replayed[0].thought_signature == b"opaque-signature"
+
+
+@pytest.mark.anyio
+async def test_a_rate_limit_is_waited_out_rather_than_shown(
+    db_session, company, monkeypatch
+):
+    """A 429 on a free-tier key is a wait, not a failure.
+
+    Retried only before any text has been shown -- restarting a turn the reader
+    is already watching would print the answer twice.
+    """
+    monkeypatch.setattr(runtime_module.asyncio, "sleep", _no_wait)
+    attempts = {"n": 0}
+
+    class Limited(FakeModels):
+        async def generate_content_stream(self, model, contents, config):
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                raise RuntimeError("429 RESOURCE_EXHAUSTED: quota exceeded")
+            return _astream([_chunk([genai_types.Part(text="Two sites.")])])
+
+    client = FakeClient()
+    client.models = Limited([], "")
+    client.aio = SimpleNamespace(models=client.models)
+
+    events = await _collect(client, db_session, company.id)
+
+    assert attempts["n"] == 2
+    assert answer_of(events) == "Two sites."
+    assert not [e for e in events if e["type"] == "error"]
+
+
+@pytest.mark.anyio
+async def test_a_model_that_never_answers_is_stopped(db_session, company, monkeypatch):
+    """Bounded in round trips, not only in lookups.
+
+    MAX_TOOL_CALLS caps lookups, but a model looping on a tool it is refused
+    would still keep the request open. ASSISTANT_MAX_ROUNDS ends it.
+    """
+    monkeypatch.setattr(runtime_module.settings, "ASSISTANT_MAX_ROUNDS", 3)
+
+    class Looping(FakeModels):
+        def turn(self):
+            return [
+                _chunk(
+                    [
+                        genai_types.Part(
+                            function_call=genai_types.FunctionCall(
+                                name="warehouse_overview", args={}
+                            )
+                        )
+                    ]
+                )
+            ]
+
+    client = FakeClient()
+    client.models = Looping([], "")
+    client.aio = SimpleNamespace(models=client.models)
+
+    events = await _collect(client, db_session, company.id)
+
+    assert client.models.rounds == 3
+    assert events[-1]["type"] == "error"
+
+
+@pytest.mark.anyio
+async def test_a_tool_the_model_invented_is_answered_not_crashed(db_session, company):
+    """An unknown tool name is a correctable mistake, not a 500."""
+
+    class Inventing(FakeModels):
+        def turn(self):
+            if self.rounds == 1:
+                return [
+                    _chunk(
+                        [
+                            genai_types.Part(
+                                function_call=genai_types.FunctionCall(
+                                    name="delete_everything", args={}
+                                )
+                            )
+                        ]
+                    )
+                ]
+            return [_chunk([genai_types.Part(text="I cannot do that.")])]
+
+    client = FakeClient()
+    client.models = Inventing([], "")
+    client.aio = SimpleNamespace(models=client.models)
+
+    events = await _collect(client, db_session, company.id)
+
+    assert client.models.tool_results[0]["response"]["error"] == "unknown_tool"
+    assert answer_of(events) == "I cannot do that."
+
+
+async def _no_wait(_seconds):
+    return None

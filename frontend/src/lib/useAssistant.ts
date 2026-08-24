@@ -24,7 +24,7 @@ export interface Turn {
    * the tool-call budget ran out before the model finished looking. Separate
    * from `error` because the answer above it is still worth reading.
    */
-  notice?: string;
+  notices: string[];
   /** True while this turn is still being written. */
   streaming?: boolean;
 }
@@ -61,8 +61,15 @@ export function useAssistant() {
 
       setTurns((current) => [
         ...current,
-        { role: "user", text: question, tools: [], citations: [] },
-        { role: "assistant", text: "", tools: [], citations: [], streaming: true },
+        { role: "user", text: question, tools: [], citations: [], notices: [] },
+        {
+          role: "assistant",
+          text: "",
+          tools: [],
+          citations: [],
+          notices: [],
+          streaming: true,
+        },
       ]);
 
       // Mutates only the last turn, so a long answer doesn't rebuild the
@@ -137,7 +144,13 @@ export function useAssistant() {
                 }));
                 break;
               case "notice":
-                patch((t) => ({ ...t, notice: event.message as string }));
+                // Appended, not replaced. One answer can carry several
+                // caveats -- it was cut short AND it ran out of lookups --
+                // and overwriting means the reader only ever sees the last.
+                patch((t) => ({
+                  ...t,
+                  notices: [...t.notices, event.message as string],
+                }));
                 break;
               case "error":
                 patch((t) => ({ ...t, error: event.message as string }));
