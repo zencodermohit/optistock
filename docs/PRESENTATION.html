@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OptiStock — Flowchart and Working Principle</title>
+<style>
+  /* ------------------------------------------------------------------
+     Built to be PROJECTED, then printed as a handout.
+
+     Type is larger than a normal document because a projector loses about
+     one size step and the back row loses another. Diagrams are inline SVG
+     with a viewBox and width:100%, so they scale to whatever the projector
+     gives them instead of pixellating. No external file is loaded, so it
+     works with the campus Wi-Fi down.
+     ------------------------------------------------------------------ */
+  :root {
+    --bg:      #f7f8fc;
+    --panel:   #ffffff;
+    --ink:     #151a26;
+    --muted:   #4f5a70;
+    --faint:   #8891a4;
+    --line:    #dde3ee;
+    --accent:  #3a55e6;
+    --accent-w:#eaeeff;
+    --hw:      #0f8f6b;   /* hardware edge   */
+    --hw-w:    #e2f6ef;
+    --store:   #b3620a;   /* anything stored */
+    --store-w: #fdf0dc;
+    --brain:   #7a4fd8;   /* anything computed */
+    --brain-w: #f0eaff;
+    --sans: "Segoe UI", Roboto, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono: "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0d111c; --panel:#141a29; --ink:#e9edf6; --muted:#a7b2c8; --faint:#78839a;
+      --line:#26304a; --accent:#8ea0fa; --accent-w:#1c2445;
+      --hw:#4bd3a7; --hw-w:#0d2b23; --store:#e8a55c; --store-w:#33260e;
+      --brain:#b79cff; --brain-w:#251a45;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 1.25rem 5rem;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1140px; margin: 0 auto; }
+
+  header.title { padding: 3rem 0 1.5rem; border-bottom: 3px solid var(--ink); margin-bottom: 2.5rem; }
+  header.title h1 { font-size: 2.6rem; line-height: 1.1; margin: 0 0 .5rem; letter-spacing: -.02em; }
+  header.title .sub { font-size: 1.15rem; color: var(--muted); margin: 0; }
+  header.title .meta { margin-top: 1rem; font-family: var(--mono); font-size: .82rem; color: var(--faint); }
+
+  h2 {
+    font-size: 1.7rem; margin: 3.5rem 0 .4rem; letter-spacing: -.01em;
+    padding-top: 1.5rem; border-top: 1px solid var(--line);
+  }
+  h2 .n {
+    font-family: var(--mono); font-size: .95rem; color: var(--accent);
+    display: block; letter-spacing: .1em; margin-bottom: .2rem;
+  }
+  h3 { font-size: 1.12rem; margin: 2rem 0 .3rem; }
+  p  { margin: .7rem 0; max-width: 68ch; }
+  .lead { font-size: 1.06rem; color: var(--muted); max-width: 68ch; }
+
+  figure { margin: 1.8rem 0 1.2rem; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption {
+    margin-top: .6rem; font-size: .88rem; color: var(--faint);
+    font-style: italic; max-width: 70ch;
+  }
+
+  svg text { font-family: var(--sans); fill: var(--ink); }
+  svg .lbl  { font-size: 14px; font-weight: 600; }
+  svg .sub  { font-size: 11.5px; fill: var(--muted); font-weight: 400; }
+  svg .tag  { font-family: var(--mono); font-size: 10.5px; fill: var(--faint); letter-spacing: .06em; }
+  svg .flow { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+  svg .box  { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+  svg .arr  { stroke: var(--faint); stroke-width: 1.8; fill: none; }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 1.2rem 1.4rem; margin: 1.5rem 0;
+  }
+  .panel h4 { margin: 0 0 .4rem; font-size: 1rem; }
+  .panel.why { border-left: 5px solid var(--accent); }
+  .panel.why h4 { color: var(--accent); }
+
+  table { border-collapse: collapse; width: 100%; margin: 1.4rem 0; font-size: .95rem; }
+  th, td { text-align: left; padding: .7rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); font-weight: 700; }
+  td.k { font-weight: 600; white-space: nowrap; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--accent-w); color: var(--accent);
+         padding: .1em .38em; border-radius: 4px; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1.1rem; }
+  .stat .v { font-family: var(--mono); font-size: 1.5rem; font-weight: 700; display: block; }
+  .stat .l { font-size: .82rem; color: var(--faint); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 1.2rem; margin: 1rem 0 0; font-size: .85rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: .45rem; }
+  .legend i { width: 15px; height: 15px; border-radius: 4px; display: inline-block; border: 1.5px solid; }
+
+  @media print {
+    body { background: #fff; font-size: 11.5pt; }
+    h2 { page-break-after: avoid; break-after: avoid; }
+    figure, .panel, table { page-break-inside: avoid; break-inside: avoid; }
+    header.title { padding-top: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="title">
+  <h1>OptiStock</h1>
+  <p class="sub">A multi-tenant inventory intelligence platform — flowchart and working principle.</p>
+  <p class="meta">Live system · https://optistock.duckdns.org · FastAPI + PostgreSQL + Redis + React · deployed on AWS</p>
+</header>
+
+<p class="lead">
+  A warehouse has stock. Stock moves. The problem is not storing the number — it is
+  <strong>noticing</strong>, in time, that something is about to run out, and knowing
+  how much to order. OptiStock records every movement as an event, reacts to those
+  events automatically, and each night turns the history into predictions.
+</p>
+
+<div class="legend">
+  <span><i style="background:var(--hw-w);border-color:var(--hw)"></i> Hardware / edge</span>
+  <span><i style="background:var(--panel);border-color:var(--line)"></i> Service</span>
+  <span><i style="background:var(--store-w);border-color:var(--store)"></i> Storage</span>
+  <span><i style="background:var(--brain-w);border-color:var(--brain)"></i> Computation</span>
+</div>
+
+<!-- ================================================================ -->
+<h2><span class="n">THE WHOLE SYSTEM</span>Master flowchart</h2>
+
+<p>
+  Everything below is one of these five paths. Read it left to right: something happens
+  at the edge, it is written down once, and three independent consumers act on it.
+</p>
+
+<figure>
+<svg viewBox="0 0 1120 720" role="img" aria-label="Master system flowchart">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g color="var(--faint)">
+
+  <!-- ---------- EDGE ---------- -->
+  <text x="10" y="26" class="tag">1 · INPUT</text>
+  <rect x="10" y="38" width="200" height="72" rx="10" fill="var(--hw-w)" stroke="var(--hw)" stroke-width="1.8"/>
+  <text x="26" y="64" class="lbl">Scanner / RFID / ESP32</text>
+  <text x="26" y="82" class="sub">POST /api/v1/ingest/scan</text>
+  <text x="26" y="98" class="sub">sku · warehouse · in|out · qty</text>
+
+  <rect x="10" y="126" width="200" height="62" rx="10" class="box"/>
+  <text x="26" y="152" class="lbl">Browser (React)</text>
+  <text x="26" y="170" class="sub">Staff entering movements</text>
+
+  <path d="M212 74 H 268" class="arr" marker-end="url(#a)"/>
+  <path d="M212 157 H 250 Q 268 157 268 120 V 92" class="arr" marker-end="url(#a)"/>
+
+  <!-- ---------- API ---------- -->
+  <text x="272" y="26" class="tag">2 · REQUEST PATH</text>
+  <rect x="272" y="38" width="180" height="72" rx="10" class="box"/>
+  <text x="288" y="64" class="lbl">Nginx</text>
+  <text x="288" y="82" class="sub">HTTPS · rate limit</text>
+  <text x="288" y="98" class="sub">serves the React build</text>
+
+  <path d="M362 112 V 148" class="arr" marker-end="url(#a)"/>
+  <rect x="272" y="150" width="180" height="86" rx="10" class="box"/>
+  <text x="288" y="176" class="lbl">FastAPI</text>
+  <text x="288" y="194" class="sub">JWT → company_id</text>
+  <text x="288" y="210" class="sub">every query scoped</text>
+  <text x="288" y="226" class="sub">to that one tenant</text>
+
+  <!-- ---------- ONE TRANSACTION ---------- -->
+  <rect x="500" y="150" width="240" height="120" rx="12" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="512" y="142" class="tag" style="fill:var(--accent)">ONE DATABASE TRANSACTION</text>
+
+  <rect x="516" y="166" width="208" height="42" rx="8" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.6"/>
+  <text x="530" y="192" class="lbl">PostgreSQL — the ledger</text>
+
+  <rect x="516" y="216" width="208" height="42" rx="8" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.6"/>
+  <text x="530" y="242" class="lbl">event_outbox — the notice</text>
+
+  <path d="M454 193 H 510" class="arr" marker-end="url(#a)"/>
+  <text x="452" y="182" class="flow">write</text>
+
+  <!-- ---------- RELAY ---------- -->
+  <path d="M628 272 V 306" class="arr" marker-end="url(#a)"/>
+  <text x="638" y="294" class="flow">FOR UPDATE SKIP LOCKED</text>
+  <rect x="516" y="308" width="208" height="58" rx="10" class="box"/>
+  <text x="530" y="332" class="lbl">Relay worker</text>
+  <text x="530" y="350" class="sub">publish, THEN mark published</text>
+
+  <path d="M628 368 V 400" class="arr" marker-end="url(#a)"/>
+  <rect x="516" y="402" width="208" height="52" rx="10" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.6"/>
+  <text x="530" y="426" class="lbl">Redis Stream</text>
+  <text x="530" y="444" class="sub">durable queue · consumer group</text>
+
+  <path d="M628 456 V 488" class="arr" marker-end="url(#a)"/>
+  <text x="638" y="476" class="flow">XREADGROUP</text>
+  <rect x="516" y="490" width="208" height="58" rx="10" class="box"/>
+  <text x="530" y="514" class="lbl">Consumer workers</text>
+  <text x="530" y="532" class="sub">de-duplicate on event_id</text>
+
+  <!-- consumer outputs -->
+  <path d="M724 519 H 786" class="arr" marker-end="url(#a)"/>
+  <rect x="788" y="490" width="180" height="58" rx="10" fill="var(--accent-w)" stroke="var(--accent)" stroke-width="1.6"/>
+  <text x="802" y="514" class="lbl">Alerts raised</text>
+  <text x="802" y="532" class="sub">below reorder · out of stock</text>
+
+  <path d="M620 548 V 580 H 786" class="arr" marker-end="url(#a)"/>
+  <rect x="788" y="556" width="180" height="52" rx="10" class="box"/>
+  <text x="802" y="580" class="lbl">Read models updated</text>
+  <text x="802" y="597" class="sub">dashboards stay fast</text>
+
+  <!-- ---------- NIGHTLY ---------- -->
+  <text x="10" y="392" class="tag">3 · NIGHTLY, 01:00</text>
+  <rect x="10" y="404" width="200" height="52" rx="10" class="box"/>
+  <text x="26" y="428" class="lbl">Scheduler</text>
+  <text x="26" y="445" class="sub">one chained job</text>
+
+  <path d="M212 430 H 258" class="arr" marker-end="url(#a)"/>
+  <rect x="260" y="404" width="180" height="52" rx="10" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="274" y="428" class="lbl">ETL → Parquet</text>
+  <text x="274" y="445" class="sub">history, column-wise</text>
+
+  <path d="M350 458 V 490" class="arr" marker-end="url(#a)"/>
+  <rect x="260" y="492" width="180" height="72" rx="10" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="274" y="516" class="lbl">ABC + Forecast</text>
+  <text x="274" y="534" class="sub">which items matter</text>
+  <text x="274" y="550" class="sub">how fast they sell</text>
+
+  <path d="M350 566 V 598" class="arr" marker-end="url(#a)"/>
+  <rect x="260" y="600" width="180" height="72" rx="10" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="274" y="624" class="lbl">EOQ + reorder point</text>
+  <text x="274" y="642" class="sub">how much to order</text>
+  <text x="274" y="658" class="sub">and when</text>
+
+  <path d="M442 636 H 494" class="arr" marker-end="url(#a)"/>
+  <text x="500" y="630" class="flow">written back to</text>
+  <text x="500" y="648" class="flow">PostgreSQL, ready</text>
+  <text x="500" y="666" class="flow">for the morning</text>
+
+  <!-- ---------- ASSISTANT ---------- -->
+  <text x="788" y="26" class="tag">4 · ASSISTANT</text>
+  <rect x="788" y="38" width="180" height="72" rx="10" class="box"/>
+  <text x="802" y="64" class="lbl">Question in English</text>
+  <text x="802" y="82" class="sub">"what runs out first?"</text>
+  <text x="802" y="98" class="sub">streamed answer back</text>
+
+  <path d="M878 112 V 146" class="arr" marker-end="url(#a)"/>
+  <rect x="788" y="148" width="180" height="90" rx="10" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="802" y="172" class="lbl">Gemini + 9 tools</text>
+  <text x="802" y="190" class="sub">tools are bound to</text>
+  <text x="802" y="206" class="sub">this tenant only</text>
+  <text x="802" y="228" class="sub">output filtered on the way out</text>
+
+  <path d="M786 118 H 762 Q 748 118 748 132 V 186" class="arr" marker-end="url(#a)"/>
+  <text x="756" y="152" class="flow">reads</text>
+
+  <!-- ---------- DEPLOY ---------- -->
+  <text x="10" y="500" class="tag">5 · DELIVERY</text>
+  <rect x="10" y="512" width="200" height="52" rx="10" class="box"/>
+  <text x="26" y="536" class="lbl">git push</text>
+  <text x="26" y="553" class="sub">GitHub Actions</text>
+  <path d="M110 566 V 596" class="arr" marker-end="url(#a)"/>
+  <rect x="10" y="598" width="200" height="72" rx="10" class="box"/>
+  <text x="26" y="622" class="lbl">AWS EC2 · Docker</text>
+  <text x="26" y="640" class="sub">lint → test → build → deploy</text>
+  <text x="26" y="656" class="sub">6 containers, one host</text>
+  </g>
+</svg>
+<figcaption>
+  The dashed box is the one idea the whole design rests on: the stock change and the
+  notice about it are written in the <em>same</em> transaction, so they cannot disagree.
+</figcaption>
+</figure>
+
+<!-- ================================================================ -->
+<h2><span class="n">PRINCIPLE 1</span>The hardware seam</h2>
+
+<p>
+  A scan is three facts: <strong>what</strong>, <strong>where</strong>, and
+  <strong>which way</strong>. Nothing else. A barcode gun, an RFID gateway or an
+  ESP32 with a scanner module can all produce those three facts, so any of them can
+  drive the system without the system being changed.
+</p>
+
+<figure>
+<svg viewBox="0 0 1000 210" role="img" aria-label="Scan ingestion and idempotency">
+  <defs>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g color="var(--faint)">
+  <rect x="6" y="60" width="176" height="86" rx="10" fill="var(--hw-w)" stroke="var(--hw)" stroke-width="1.8"/>
+  <text x="22" y="88" class="lbl">Reader</text>
+  <text x="22" y="108" class="sub">sku = "SKU-1042"</text>
+  <text x="22" y="124" class="sub">direction = "out"</text>
+  <text x="22" y="140" class="sub">scan_reference = "A17"</text>
+
+  <path d="M184 103 H 246" class="arr" marker-end="url(#b)"/>
+  <text x="192" y="94" class="flow">HTTPS + token</text>
+
+  <rect x="248" y="60" width="180" height="86" rx="10" class="box"/>
+  <text x="264" y="88" class="lbl">Authenticate</text>
+  <text x="264" y="108" class="sub">the device has its own</text>
+  <text x="264" y="124" class="sub">account and narrow role</text>
+
+  <path d="M430 103 H 492" class="arr" marker-end="url(#b)"/>
+  <rect x="494" y="60" width="196" height="86" rx="10" class="box"/>
+  <text x="510" y="88" class="lbl">Seen this reference?</text>
+  <text x="510" y="108" class="sub">yes → return the same answer</text>
+  <text x="510" y="124" class="sub">no → move the stock</text>
+
+  <path d="M692 103 H 754" class="arr" marker-end="url(#b)"/>
+  <rect x="756" y="60" width="196" height="86" rx="10" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.6"/>
+  <text x="772" y="88" class="lbl">Ledger + outbox</text>
+  <text x="772" y="108" class="sub">one transaction,</text>
+  <text x="772" y="124" class="sub">as everything else</text>
+
+  <path d="M592 148 V 178 H 300 V 148" class="arr" marker-end="url(#b)" stroke-dasharray="5 4"/>
+  <text x="392" y="196" class="flow">a radio that retries lands here, and changes nothing</text>
+  </g>
+</svg>
+<figcaption>Idempotency: the device supplies its own reference, so a retry is safe by construction.</figcaption>
+</figure>
+
+<div class="panel why">
+  <h4>Why this matters in the viva</h4>
+  <p style="margin:.2rem 0 0">
+    Radio links drop and retry. If a held trigger or a retransmission deducted stock twice,
+    the inventory would drift and no one would know which reading was wrong. The device's own
+    reference makes a repeat harmless — the second attempt returns the first answer instead of
+    moving stock again.
+  </p>
+</div>
+
+<!-- ================================================================ -->
+<h2><span class="n">PRINCIPLE 2</span>Write once, react many times — the outbox</h2>
+
+<p>
+  When stock moves, two things must happen: the number changes, and everyone who cares
+  must find out. Doing the second one directly creates a classic failure — the database
+  commits, then the message fails to send, and the alert never fires. Or the message is
+  sent, then the database rolls back, and an alert fires for something that never happened.
+</p>
+
+<p>
+  The fix is to <strong>write the message into the same database, in the same transaction</strong>.
+  Either both survive or neither does. A separate process then carries it out to the queue.
+</p>
+
+<figure>
+<svg viewBox="0 0 1000 300" role="img" aria-label="Transactional outbox pattern">
+  <defs>
+    <marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g color="var(--faint)">
+  <rect x="18" y="60" width="300" height="150" rx="12" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="30" y="50" class="tag" style="fill:var(--accent)">ATOMIC — both, or neither</text>
+
+  <rect x="38" y="82" width="260" height="52" rx="8" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.6"/>
+  <text x="54" y="106" class="lbl">stock_levels — quantity changes</text>
+  <text x="54" y="124" class="sub">the fact</text>
+
+  <rect x="38" y="146" width="260" height="52" rx="8" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.6"/>
+  <text x="54" y="170" class="lbl">event_outbox — a row is added</text>
+  <text x="54" y="188" class="sub">the announcement about the fact</text>
+
+  <path d="M320 135 H 382" class="arr" marker-end="url(#c)"/>
+  <rect x="384" y="98" width="220" height="74" rx="10" class="box"/>
+  <text x="400" y="124" class="lbl">Relay</text>
+  <text x="400" y="144" class="sub">claims a batch nobody holds</text>
+  <text x="400" y="160" class="sub">publishes, then marks it done</text>
+
+  <path d="M606 135 H 668" class="arr" marker-end="url(#c)"/>
+  <rect x="670" y="98" width="150" height="74" rx="10" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.6"/>
+  <text x="686" y="128" class="lbl">Redis Stream</text>
+  <text x="686" y="148" class="sub">ordered, durable</text>
+
+  <path d="M822 135 H 884" class="arr" marker-end="url(#c)"/>
+  <rect x="886" y="98" width="106" height="74" rx="10" class="box"/>
+  <text x="900" y="128" class="lbl">Consumers</text>
+  <text x="900" y="148" class="sub">act on it</text>
+
+  <text x="384" y="212" class="flow">If the relay dies between publishing and marking,</text>
+  <text x="384" y="232" class="flow">the event is sent twice — never zero times.</text>
+  <text x="384" y="256" class="flow">Consumers ignore an event_id they have already seen,</text>
+  <text x="384" y="276" class="flow">so a duplicate is harmless. A lost event would not be.</text>
+  </g>
+</svg>
+<figcaption>
+  This is a deliberate choice of failure mode: at-least-once delivery. A duplicate can be
+  detected and discarded; a missing event cannot be detected at all.
+</figcaption>
+</figure>
+
+<!-- ================================================================ -->
+<h2><span class="n">PRINCIPLE 3</span>Turning history into a prediction</h2>
+
+<p>
+  Every night at 01:00 one chained job runs. It is chained rather than three separate
+  timers because each stage reads what the one before it wrote — as independent jobs,
+  a slow first stage would silently leave the rest analysing yesterday's data.
+</p>
+
+<figure>
+<svg viewBox="0 0 1000 250" role="img" aria-label="Nightly analytics pipeline">
+  <defs>
+    <marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g color="var(--faint)">
+  <rect x="6" y="70" width="168" height="88" rx="10" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.6"/>
+  <text x="22" y="96" class="lbl">Sales history</text>
+  <text x="22" y="116" class="sub">every transaction</text>
+  <text x="22" y="132" class="sub">since day one</text>
+
+  <path d="M176 114 H 228" class="arr" marker-end="url(#d)"/>
+  <text x="182" y="105" class="flow">ETL</text>
+  <rect x="230" y="70" width="168" height="88" rx="10" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="246" y="96" class="lbl">Parquet file</text>
+  <text x="246" y="116" class="sub">stored by column,</text>
+  <text x="246" y="132" class="sub">so sums are cheap</text>
+
+  <path d="M400 114 H 452" class="arr" marker-end="url(#d)"/>
+  <rect x="454" y="42" width="176" height="70" rx="10" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="470" y="68" class="lbl">ABC class</text>
+  <text x="470" y="88" class="sub">which few items earn</text>
+  <text x="470" y="104" class="sub">most of the revenue</text>
+
+  <rect x="454" y="122" width="176" height="86" rx="10" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="470" y="148" class="lbl">Demand forecast</text>
+  <text x="470" y="168" class="sub">units sold ÷ full window</text>
+  <text x="470" y="184" class="sub">= average daily velocity</text>
+  <text x="470" y="200" class="sub">extrapolated forward</text>
+
+  <path d="M632 165 H 684" class="arr" marker-end="url(#d)"/>
+  <rect x="686" y="70" width="176" height="112" rx="10" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="702" y="96" class="lbl">Reorder policy</text>
+  <text x="702" y="116" class="sub">reorder point =</text>
+  <text x="702" y="132" class="sub">velocity × lead time</text>
+  <text x="702" y="148" class="sub">+ safety buffer</text>
+  <text x="702" y="170" class="sub">order size = EOQ</text>
+
+  <path d="M864 126 H 900" class="arr" marker-end="url(#d)"/>
+  <rect x="902" y="82" width="92" height="88" rx="10" fill="var(--accent-w)" stroke="var(--accent)" stroke-width="1.6"/>
+  <text x="916" y="118" class="lbl">Advice</text>
+  <text x="916" y="140" class="sub">on the</text>
+  <text x="916" y="156" class="sub">screen</text>
+
+  <text x="6" y="222" class="flow">Yesterday's forecast is also SCORED against what actually sold,</text>
+  <text x="6" y="240" class="flow">so the screen can say how much to trust the next one.</text>
+  </g>
+</svg>
+<figcaption>
+  Note there is no machine-learning library here. The forecast is an average daily
+  velocity over a fixed window — deliberately simple, so every number on the screen
+  can be explained to the person acting on it.
+</figcaption>
+</figure>
+
+<div class="panel why">
+  <h4>One subtlety worth mentioning if asked</h4>
+  <p style="margin:.2rem 0 0">
+    Velocity divides by the <strong>full window length</strong>, not by the number of days
+    that had a sale. Dividing by active days made an item that sold 10 units on one day of
+    a 30-day window look like it sells 10 units <em>per day</em> — a 30× overestimate, and
+    the system would have ordered accordingly.
+  </p>
+</div>
+
+<!-- ================================================================ -->
+<h2><span class="n">PRINCIPLE 4</span>Asking in plain English</h2>
+
+<p>
+  The assistant does not have access to the database. It has access to nine
+  <strong>tools</strong> — small, fixed questions like "what is on hand" or "what runs out
+  first". Each tool is created for one request with the company already fixed inside it,
+  so the tenant is not something the model can supply, mistake, or be talked into changing.
+</p>
+
+<figure>
+<svg viewBox="0 0 1000 260" role="img" aria-label="Assistant request loop">
+  <defs>
+    <marker id="e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g color="var(--faint)">
+  <rect x="6" y="66" width="150" height="70" rx="10" class="box"/>
+  <text x="22" y="94" class="lbl">Question</text>
+  <text x="22" y="114" class="sub">typed by a person</text>
+
+  <path d="M158 101 H 208" class="arr" marker-end="url(#e)"/>
+  <rect x="210" y="66" width="170" height="70" rx="10" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="226" y="94" class="lbl">Model decides</text>
+  <text x="226" y="114" class="sub">which tools to call</text>
+
+  <path d="M382 101 H 432" class="arr" marker-end="url(#e)"/>
+  <rect x="434" y="66" width="170" height="70" rx="10" class="box"/>
+  <text x="450" y="94" class="lbl">Tools run</text>
+  <text x="450" y="114" class="sub">real SQL, this tenant</text>
+
+  <path d="M519 138 V 168 H 295 V 138" class="arr" marker-end="url(#e)" stroke-dasharray="5 4"/>
+  <text x="330" y="186" class="flow">results go back — loop until it can answer</text>
+
+  <path d="M606 101 H 656" class="arr" marker-end="url(#e)"/>
+  <rect x="658" y="66" width="164" height="70" rx="10" fill="var(--accent-w)" stroke="var(--accent)" stroke-width="1.6"/>
+  <text x="674" y="94" class="lbl">Output filter</text>
+  <text x="674" y="114" class="sub">checked before display</text>
+
+  <path d="M824 101 H 874" class="arr" marker-end="url(#e)"/>
+  <rect x="876" y="66" width="118" height="70" rx="10" class="box"/>
+  <text x="890" y="94" class="lbl">Answer</text>
+  <text x="890" y="114" class="sub">word by word</text>
+
+  <text x="6" y="222" class="flow">The filter blocks any claim to have CHANGED something. The assistant can read, and it can</text>
+  <text x="6" y="242" class="flow">propose a purchase order -- but a person must approve it before anything actually happens.</text>
+  </g>
+</svg>
+<figcaption>The model never sees the database, only the answers to nine fixed questions.</figcaption>
+</figure>
+
+<!-- ================================================================ -->
+<h2><span class="n">PRINCIPLE 5</span>How it reaches the internet</h2>
+
+<figure>
+<svg viewBox="0 0 1000 190" role="img" aria-label="Deployment pipeline">
+  <defs>
+    <marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g color="var(--faint)">
+  <rect x="6" y="52" width="146" height="72" rx="10" class="box"/>
+  <text x="22" y="80" class="lbl">git push</text>
+  <text x="22" y="100" class="sub">to main</text>
+
+  <path d="M154 88 H 200" class="arr" marker-end="url(#f)"/>
+  <rect x="202" y="52" width="146" height="72" rx="10" class="box"/>
+  <text x="218" y="80" class="lbl">Lint + tests</text>
+  <text x="218" y="100" class="sub">490 must pass</text>
+
+  <path d="M350 88 H 396" class="arr" marker-end="url(#f)"/>
+  <rect x="398" y="52" width="146" height="72" rx="10" class="box"/>
+  <text x="414" y="80" class="lbl">Docker build</text>
+  <text x="414" y="100" class="sub">one image</text>
+
+  <path d="M546 88 H 592" class="arr" marker-end="url(#f)"/>
+  <rect x="594" y="52" width="176" height="72" rx="10" class="box"/>
+  <text x="610" y="80" class="lbl">AWS EC2 t3.micro</text>
+  <text x="610" y="100" class="sub">6 containers, free tier</text>
+
+  <path d="M772 88 H 818" class="arr" marker-end="url(#f)"/>
+  <rect x="820" y="52" width="174" height="72" rx="10" fill="var(--accent-w)" stroke="var(--accent)" stroke-width="1.6"/>
+  <text x="836" y="80" class="lbl">Live, over HTTPS</text>
+  <text x="836" y="100" class="sub">certificate auto-renews</text>
+
+  <text x="202" y="160" class="flow">A failing test stops the deploy. Nothing reaches the server that has not passed everything.</text>
+  </g>
+</svg>
+</figure>
+
+<!-- ================================================================ -->
+<h2><span class="n">SUMMARY</span>Design decisions and their reasons</h2>
+
+<p>These are the questions most likely to be asked, and the honest answers.</p>
+
+<table>
+  <thead><tr><th>Decision</th><th>Why, in one line</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Outbox table instead of<br>sending directly</td><td>A database commit and a network send cannot be made atomic. Writing both to the database can be.</td></tr>
+    <tr><td class="k">At-least-once delivery</td><td>A duplicate can be spotted by its id and thrown away. A lost event leaves no trace to spot.</td></tr>
+    <tr><td class="k">Redis Stream, not a plain list</td><td>A consumer group tracks what each worker has acknowledged, so a crash mid-work does not lose the item.</td></tr>
+    <tr><td class="k">One <code>company_id</code> on every row</td><td>One database serves many companies. The id comes from the verified token, never from the request body.</td></tr>
+    <tr><td class="k">Parquet for history</td><td>Stored column by column, so "sum this one field across four years" reads only that field.</td></tr>
+    <tr><td class="k">Averages, not machine learning</td><td>Every number on screen must be explainable to the person acting on it. A black box that says "order 400" is not usable advice.</td></tr>
+    <tr><td class="k">The assistant proposes,<br>never acts</td><td>A wrong purchase order costs real money. A human approves on the Approvals screen.</td></tr>
+    <tr><td class="k">Scanner uses its own reference</td><td>Radio links retry. The reference makes a repeated scan harmless.</td></tr>
+  </tbody>
+</table>
+
+<h3>The system in numbers</h3>
+<div class="grid2">
+  <div class="stat"><span class="v">6</span><span class="l">containers on one small server</span></div>
+  <div class="stat"><span class="v">490</span><span class="l">automated tests, all passing</span></div>
+  <div class="stat"><span class="v">21</span><span class="l">feature modules in the backend</span></div>
+  <div class="stat"><span class="v">18</span><span class="l">screens in the web interface</span></div>
+  <div class="stat"><span class="v">22</span><span class="l">database migrations, each reversible</span></div>
+  <div class="stat"><span class="v">₹0</span><span class="l">running cost — entirely free tier</span></div>
+</div>
+
+<h3>Technology used</h3>
+<table>
+  <tbody>
+    <tr><td class="k">Interface</td><td>React, TypeScript, Tailwind, three.js for the 3D warehouse view</td></tr>
+    <tr><td class="k">Server</td><td>Python, FastAPI, SQLAlchemy</td></tr>
+    <tr><td class="k">Storage</td><td>PostgreSQL for records, Redis for the event stream, Parquet for history</td></tr>
+    <tr><td class="k">Analysis</td><td>pandas — ABC classification, demand forecast, EOQ</td></tr>
+    <tr><td class="k">Assistant</td><td>Google Gemini with tool calling</td></tr>
+    <tr><td class="k">Infrastructure</td><td>Docker Compose, Nginx, AWS EC2, Terraform, GitHub Actions</td></tr>
+  </tbody>
+</table>
+
+<p style="margin-top:2.5rem;color:var(--faint);font-size:.9rem">
+  Live at <strong>optistock.duckdns.org</strong> — sign in with the demo account shown on the page.
+</p>
+
+</div>
+</body>
+</html>
