@@ -209,6 +209,14 @@ jobs:
             # Optional. Absent or empty, the Assistant screen says it is not
             # configured and the rest of the application is unaffected.
             echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+            # Fallback models, in order. The free tier's daily cap is per
+            # PROJECT PER MODEL, so a chain multiplies the day's allowance --
+            # four models is four separate allowances rather than one shared
+            # one. Every model here was checked against the real API for tool
+            # calling and streaming before being listed. 3.7-flash is last on
+            # purpose: it works, and it was the slowest of the five by an order
+            # of magnitude, so it is a last resort rather than a second choice.
+            echo "ASSISTANT_FALLBACK_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.7-flash" >> .env
             # pgAdmin is gated behind the "dev" Compose profile and will not start
             # here, but Compose interpolates the whole file, so these must exist.
             echo "PGADMIN_EMAIL=disabled@example.com" >> .env

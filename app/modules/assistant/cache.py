@@ -31,7 +31,7 @@ develop a coherence bug across replicas because nothing depends on it agreeing.
 
 import logging
 import threading
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from cachetools import TTLCache
@@ -124,4 +124,118 @@ def stats() -> Dict[str, Any]:
         "entries": size,
         "ttl_seconds": _CACHE.ttl,
         "hit_rate": round(_STATS["hits"] / total, 3) if total else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Whole answers
+#
+# The tool cache above saves a database query, which is worth a millisecond.
+# This one saves a REQUEST, which on a free-tier key is worth considerably
+# more: the Gemini free tier allows a fixed number of requests per model per
+# day, and a question answered from here spends none of them.
+#
+# It is a stricter cache than the one above, and every restriction is there
+# because replaying an answer is a stronger claim than replaying a row:
+#
+# *   **Only first turns.** A follow-up means whatever the previous turn said.
+#     "And the other warehouse?" has no answer on its own, so anything with
+#     history behind it is never stored and never served.
+# *   **Only if every tool it used was a read.** The allow-list is the same one
+#     the tool cache uses, so a tool added later is excluded until somebody
+#     decides otherwise. This is what keeps create_purchase_order out: an
+#     answer that says "it is waiting for your approval" is TRUE the first time
+#     and a lie every time after, because replaying it proposes nothing.
+# *   **Only clean answers.** Anything the output filter flagged, anything that
+#     errored, and anything empty is not worth keeping and not safe to repeat.
+#
+# The TTL is short for the reason the one above is short, and then shorter
+# again for one that does not apply to tools: someone who asks the same
+# question twice is often asking BECAUSE they expect the answer to have
+# changed. "Is it still low?" deserves a fresh look, so this window is sized
+# for a refresh or a double-tap rather than for a conversation.
+# ---------------------------------------------------------------------------
+
+_ANSWER_LOCK = threading.Lock()
+_ANSWERS: TTLCache = TTLCache(
+    maxsize=256, ttl=max(1, settings.ANSWER_CACHE_TTL_SECONDS)
+)
+_ANSWER_STATS = {"hits": 0, "misses": 0, "skipped": 0}
+
+
+def _answer_key(company_id: UUID, question: str) -> Tuple:
+    """company_id first, always -- same rule, same reason, same test.
+
+    Whitespace and case are normalised so "What is low?" and "what is low?"
+    are one entry. Nothing cleverer: two questions that differ by a word are
+    two questions, and a fuzzy match here would answer one of them with the
+    other one's answer.
+    """
+    return (str(company_id), " ".join((question or "").lower().split()))
+
+
+def answer_for(
+    company_id: UUID, question: str, has_history: bool
+) -> Optional[Dict[str, Any]]:
+    """A stored answer for this exact question, or None."""
+    if has_history or settings.ANSWER_CACHE_TTL_SECONDS <= 0:
+        _ANSWER_STATS["skipped"] += 1
+        return None
+
+    with _ANSWER_LOCK:
+        hit = _ANSWERS.get(_answer_key(company_id, question))
+
+    if hit is None:
+        _ANSWER_STATS["misses"] += 1
+        return None
+
+    _ANSWER_STATS["hits"] += 1
+    logger.info("assistant.answer_cache_hit", extra={"saved_request": True})
+    return hit
+
+
+def remember_answer(
+    company_id: UUID,
+    question: str,
+    *,
+    has_history: bool,
+    text: str,
+    tools_used: List[str],
+    citations: List[Dict[str, str]],
+    flags: List[str],
+) -> None:
+    """Store an answer, if it is one of the kinds that may be repeated."""
+    if (
+        has_history
+        or settings.ANSWER_CACHE_TTL_SECONDS <= 0
+        or not text
+        or flags
+        or any(name not in CACHEABLE for name in tools_used)
+    ):
+        return
+
+    with _ANSWER_LOCK:
+        _ANSWERS[_answer_key(company_id, question)] = {
+            "text": text,
+            "tools": list(tools_used),
+            "citations": list(citations),
+        }
+
+
+def clear_answers() -> None:
+    with _ANSWER_LOCK:
+        _ANSWERS.clear()
+    for key in _ANSWER_STATS:
+        _ANSWER_STATS[key] = 0
+
+
+def answer_stats() -> Dict[str, Any]:
+    with _ANSWER_LOCK:
+        size = len(_ANSWERS)
+    total = _ANSWER_STATS["hits"] + _ANSWER_STATS["misses"]
+    return {
+        **_ANSWER_STATS,
+        "entries": size,
+        "ttl_seconds": _ANSWERS.ttl,
+        "hit_rate": round(_ANSWER_STATS["hits"] / total, 3) if total else None,
     }

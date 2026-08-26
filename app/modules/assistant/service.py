@@ -31,6 +31,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.modules.assistant import cache as answer_cache
 from app.modules.assistant.redaction import Redactor
 from app.modules.assistant.runtime import LLMRuntime, get_runtime
 from app.modules.assistant.streaming import AnswerGuard
@@ -318,6 +319,25 @@ async def converse(
     """
     runtime = runtime or get_runtime(client)
 
+    # Checked before anything else, because the whole point is to spend no
+    # request at all. A hit replays the same event shapes a live answer
+    # produces, so the client cannot tell the difference and does not have to.
+    cached = answer_cache.answer_for(company_id, question, bool(history))
+    if cached:
+        for call in cached["tools"]:
+            yield {"type": "tool", "name": call, "input": {}}
+        for citation in cached["citations"]:
+            yield {"type": "citation", "citation": citation}
+        yield {"type": "text", "text": cached["text"]}
+        yield {
+            "type": "done",
+            "rounds": len(cached["tools"]),
+            "truncated": False,
+            "flags": [],
+            "cached": True,
+        }
+        return
+
     used: List[Dict[str, Any]] = []
     citations: List[Dict[str, str]] = []
     seen: set = set()
@@ -461,7 +481,25 @@ async def converse(
         }
         return
 
+    answer_cache.remember_answer(
+        company_id,
+        question,
+        has_history=bool(history),
+        text=answer,
+        tools_used=[call["name"] for call in used],
+        citations=citations,
+        flags=flags,
+    )
+
     warnings = list(checked.warnings)
+    if runtime.model != settings.ASSISTANT_MODEL:
+        # Said rather than hidden. A fallback model is a different writer, and
+        # someone comparing this answer with yesterday's deserves to know why
+        # it reads differently instead of concluding the assistant got worse.
+        warnings.append(
+            f"Answered by {runtime.model}. The usual model has used up its "
+            "free quota for today."
+        )
     if failure:
         # Half an answer plus the reason it stopped, rather than throwing away
         # what the reader is already looking at.

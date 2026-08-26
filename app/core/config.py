@@ -61,6 +61,25 @@ class Settings(BaseSettings):
     # can trip them. A 429 is a wait, not a failure, so it is retried -- but
     # only a couple of times, because a person is watching a spinner.
     ASSISTANT_RETRY_ATTEMPTS: int = 2
+    # Models to fall back to when the primary has spent its allowance, in
+    # order, comma separated. The Gemini free tier's daily cap is per PROJECT
+    # PER MODEL -- the quota that refuses gemini-3.6-flash says nothing about
+    # gemini-3.5-flash -- so a chain multiplies the free allowance by the
+    # number of models on it. Measured, not assumed: 3.6-flash was returning
+    # 429 for every request while 3.1-flash-lite answered normally on the same
+    # key. Empty by default, because a fallback is a deliberate acceptance that
+    # some answers will come from a weaker model.
+    ASSISTANT_FALLBACK_MODELS: str = ""
+    # How long a model that reported a DAILY quota failure is skipped. Not a
+    # calculated reset time on purpose: the reset is a wall-clock event in
+    # Google's timezone rather than ours, and hard-coding a guess about it
+    # fails silently and permanently if the guess is wrong. Re-probing costs
+    # one request per model per hour and cannot get stuck.
+    ASSISTANT_MODEL_COOLDOWN_SECONDS: int = 3600
+    # Repeat questions served without spending a request. Shorter than it could
+    # be for the same reason the tool cache is short -- see cache.py -- and set
+    # to zero to switch it off entirely.
+    ANSWER_CACHE_TTL_SECONDS: int = 60
 
     # Where the nightly ETL writes Parquet. Must be backed by a Docker volume in
     # any deployed environment or the analytical history is destroyed on restart.

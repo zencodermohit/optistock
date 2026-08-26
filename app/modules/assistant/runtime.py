@@ -144,9 +144,68 @@ def _shared_client(api_key: str):
     return client
 
 
-def _is_rate_limited(error: Exception) -> bool:
+def _quota_scope(error: Exception) -> Optional[str]:
+    """Which quota a 429 is about: "minute", "day", or None if not a quota.
+
+    The distinction decides what to DO, which is why it is worth teasing apart
+    two errors that carry the same status code. A per-minute cap clears itself
+    while the person waits, so the answer is to wait. A per-day cap does not,
+    so waiting is the one thing guaranteed not to work -- that one calls for a
+    different model.
+
+    Read off the quotaId Google returns, e.g.
+    GenerateRequestsPerDayPerProjectPerModel-FreeTier, with the spaces and
+    underscores squeezed out so the match does not depend on formatting.
+    """
     message = str(error).lower()
-    return "429" in message or "resource_exhausted" in message
+    if "429" not in message and "resource_exhausted" not in message:
+        return None
+    squashed = message.replace(" ", "").replace("_", "").replace("-", "")
+    return "day" if "perday" in squashed else "minute"
+
+
+def _is_retired(error: Exception) -> bool:
+    """Whether the model simply is not there any more.
+
+    Worth handling beside the quota cases because it has the same remedy and a
+    different cause. Google retires models: the 2.5 Flash family already 404s
+    on a key that could reach it a year ago. Without this, the day a primary
+    model is withdrawn the assistant stops answering entirely, having been one
+    line away from carrying on with the next model in its own chain.
+
+    It is not hidden -- the fallback is named in the answer and logged, and if
+    every model 404s the reader still gets "set ASSISTANT_MODEL to a current
+    Gemini Flash model". A typo produces one loud degraded path rather than a
+    dead feature.
+    """
+    message = str(error).lower()
+    return "not_found" in message or "404" in message
+
+
+#: Models currently believed to be out of daily quota, and when to re-probe.
+#: Process-local by design. It is a cache of a guess, not a fact worth sharing:
+#: a second replica re-learning the same thing costs one request, where a
+#: shared store would need to be correct about a reset time nobody here knows.
+_COOLDOWN: Dict[str, float] = {}
+
+
+def _rest(model: str, reason: str = "daily_quota") -> None:
+    """Put a model aside for a while. Used for both ways one becomes unusable
+    without becoming unusable forever."""
+    _COOLDOWN[model] = time.time() + max(0, settings.ASSISTANT_MODEL_COOLDOWN_SECONDS)
+    logger.warning(
+        "assistant.model_set_aside",
+        extra={
+            "model": model,
+            "reason": reason,
+            "cooldown_seconds": settings.ASSISTANT_MODEL_COOLDOWN_SECONDS,
+        },
+    )
+
+
+def reset_cooldowns() -> None:
+    """Forget which models were exhausted. For tests and for /status resets."""
+    _COOLDOWN.clear()
 
 
 class GeminiRuntime(LLMRuntime):
@@ -183,10 +242,41 @@ class GeminiRuntime(LLMRuntime):
     def __init__(self, client=None):
         # Injectable so tests drive the whole path with a scripted fake.
         self._client = client
+        #: Which model actually answered. Only differs from the configured one
+        #: when the chain fell back, and the caller says so rather than letting
+        #: a quieter answer look like the usual one.
+        self._model: Optional[str] = None
 
     @staticmethod
     def is_configured() -> bool:
         return bool(settings.GEMINI_API_KEY)
+
+    @property
+    def model(self) -> str:
+        return self._model or settings.ASSISTANT_MODEL
+
+    @staticmethod
+    def chain() -> List[str]:
+        """The configured model, then its fallbacks, de-duplicated."""
+        raw = [settings.ASSISTANT_MODEL] + (
+            settings.ASSISTANT_FALLBACK_MODELS or ""
+        ).split(",")
+        ordered: List[str] = []
+        for name in (item.strip() for item in raw):
+            if name and name not in ordered:
+                ordered.append(name)
+        return ordered
+
+    def _usable(self) -> List[str]:
+        """The chain minus anything cooling down.
+
+        Falls back to the whole chain when everything is cooling down, rather
+        than refusing to try. The cooldown is a guess about when a quota resets;
+        a guess should never be the reason nobody gets an answer.
+        """
+        now = time.time()
+        fresh = [name for name in self.chain() if _COOLDOWN.get(name, 0.0) <= now]
+        return fresh or self.chain()
 
     @property
     def client(self):
@@ -231,7 +321,7 @@ class GeminiRuntime(LLMRuntime):
                 model_parts: List[Any] = []
                 calls: List[Any] = []
 
-                stream = await self._open(contents, config)
+                stream = await self._open(contents, config, may_switch=rounds == 1)
                 async for chunk in stream:
                     for part in _parts_of(chunk):
                         model_parts.append(part)
@@ -285,29 +375,84 @@ class GeminiRuntime(LLMRuntime):
             "rounds": rounds,
         }
 
-    async def _open(self, contents, config):
-        """Start one streamed turn, retrying a rate limit rather than failing it.
+    async def _open(self, contents, config, *, may_switch: bool):
+        """Start one streamed turn, treating the two 429s as different problems.
 
-        Free-tier keys are limited hard enough that two questions in quick
-        succession trip them, and a 429 is a wait rather than a fault. Retried
-        only here, before any text has been shown: once the reader is watching
-        an answer arrive, starting a second one would duplicate it.
+        A per-minute cap clears itself while the person waits, so it is waited
+        out. A per-day cap does not, so waiting is the one response guaranteed
+        to fail; that model is put aside and the next one on the chain answers
+        instead. On the free tier the daily cap is per model, which is what
+        makes a chain worth having at all.
+
+        Both are handled here, before anything has been shown. Once the reader
+        is watching an answer arrive, starting a second one would print it
+        twice.
+
+        `may_switch` is False after the first round. Contents by then carry
+        thought signatures belonging to the model that produced them, and
+        handing another model somebody else's signatures is not a thing to find
+        out about in production. In practice it costs nothing: a daily cap
+        refuses the first request of a question, not the third.
         """
         attempts = max(1, settings.ASSISTANT_RETRY_ATTEMPTS)
-        for attempt in range(1, attempts + 1):
-            try:
-                return await self.client.aio.models.generate_content_stream(
-                    model=self.model, contents=contents, config=config
-                )
-            except Exception as error:  # noqa: BLE001
-                if attempt >= attempts or not _is_rate_limited(error):
+        order = self._usable() if may_switch else [self.model]
+        if self.model in order:
+            # Carry on down the chain from wherever we already are rather than
+            # starting at a model this request has already been refused by.
+            order = order[order.index(self.model) :]
+
+        last: Optional[Exception] = None
+        for model in order:
+            for attempt in range(1, attempts + 1):
+                try:
+                    stream = await self.client.aio.models.generate_content_stream(
+                        model=model, contents=contents, config=config
+                    )
+                    # The await above sends nothing. The SDK defers the request
+                    # to the first iteration, so every check below is dead code
+                    # unless one chunk is actually pulled here -- which is how
+                    # the retry in the previous version of this method came to
+                    # be inert against the real API while passing its tests,
+                    # because a fake raises from the call and the SDK does not.
+                    head = await _first(stream)
+                    if model != self.model:
+                        logger.info(
+                            "assistant.model_fallback",
+                            extra={"from": self.model, "to": model},
+                        )
+                    self._model = model
+                    return _replay(head, stream)
+                except Exception as error:  # noqa: BLE001
+                    scope = _quota_scope(error)
+                    if scope == "day" or _is_retired(error):
+                        _rest(model, "daily_quota" if scope == "day" else "retired")
+                        last = error
+                        break  # no amount of waiting helps; next model
+                    if scope == "minute":
+                        if attempt < attempts:
+                            delay = 2.0 * attempt
+                            logger.warning(
+                                "assistant.rate_limited_retrying",
+                                extra={
+                                    "model": model,
+                                    "attempt": attempt,
+                                    "delay_seconds": delay,
+                                },
+                            )
+                            await asyncio.sleep(delay)
+                            continue
+                        # Out of patience with this one, but a per-minute limit
+                        # is per model too, so the next one may answer at once.
+                        # Not put to rest -- it will be fine in a minute, and
+                        # skipping it for an hour would waste the allowance it
+                        # still has. Found by a live test: without this, a busy
+                        # fallback aborted the whole chain.
+                        last = error
+                        break
                     raise
-                delay = 2.0 * attempt
-                logger.warning(
-                    "assistant.rate_limited_retrying",
-                    extra={"attempt": attempt, "delay_seconds": delay},
-                )
-                await asyncio.sleep(delay)
+
+        # Every model on the chain is out for the day.
+        raise last if last else RuntimeError("no model available")
 
     def _config(self, types, system_prompt, tools):
         declarations = [
@@ -427,6 +572,29 @@ class GeminiRuntime(LLMRuntime):
         # Deliberately vague as a fallback: an API error can quote request
         # content back, and that content is this tenant's data.
         return "The assistant hit an error. The details are in the server log."
+
+
+_EXHAUSTED = object()
+
+
+async def _first(stream):
+    """Pull one chunk, which is what actually performs the request.
+
+    Returns a sentinel for a stream that ended immediately, so that "no chunks"
+    and "a falsy first chunk" stay distinguishable.
+    """
+    try:
+        return await stream.__anext__()
+    except StopAsyncIteration:
+        return _EXHAUSTED
+
+
+async def _replay(head, stream):
+    """The stream as it would have been, with the chunk already taken put back."""
+    if head is not _EXHAUSTED:
+        yield head
+        async for chunk in stream:
+            yield chunk
 
 
 def _parts_of(chunk) -> Sequence[Any]:
