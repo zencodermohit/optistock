@@ -259,7 +259,7 @@ export function CursorLayer({ label }: { label?: string }) {
             visible ? "opacity-100" : "opacity-0",
           ].join(" ")}
         >
-          <span className="ml-4 mt-4 inline-block rounded-full bg-accent px-2.5 py-1 font-display text-2xs font-bold whitespace-nowrap text-white shadow-md">
+          <span className="ml-4 mt-4 inline-block rounded-full bg-accent px-2.5 py-1 font-display text-2xs font-bold whitespace-nowrap text-on-accent shadow-md">
             {label}
           </span>
         </div>

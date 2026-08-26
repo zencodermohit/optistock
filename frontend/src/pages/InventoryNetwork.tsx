@@ -215,7 +215,7 @@ function NetworkMap({ data, loading }: { data?: NetworkData; loading: boolean })
 
             {/* The hub */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-accent-border bg-accent text-white shadow-md">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-accent-border bg-accent text-on-accent shadow-md">
                 <WarehouseIcon className="h-5 w-5" />
               </div>
             </div>

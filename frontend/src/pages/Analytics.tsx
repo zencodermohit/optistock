@@ -24,7 +24,14 @@ import {
 import { PageHeader } from "@/components/layout/AppShell";
 import { Band } from "@/components/ui/Band";
 import { ErrorState, Skeleton } from "@/components/ui/states";
-import { count, currency, currencyCompact, date, percent, relativeTime } from "@/lib/format";
+import {
+  count,
+  currency,
+  currencyCompact,
+  date,
+  percent,
+  relativeTime,
+} from "@/lib/format";
 import {
   useAnalytics,
   useWarehouses,
@@ -60,7 +67,10 @@ export function Analytics() {
 
   if (analytics.isError) {
     return (
-      <ErrorState error={analytics.error} onRetry={() => void analytics.refetch()} />
+      <ErrorState
+        error={analytics.error}
+        onRetry={() => void analytics.refetch()}
+      />
     );
   }
 
@@ -85,7 +95,7 @@ export function Analytics() {
                 className={cn(
                   "cursor-pointer rounded-md px-3 py-1.5 text-sm font-semibold transition-colors",
                   days === range
-                    ? "bg-accent text-white"
+                    ? "bg-accent text-on-accent"
                     : "text-ink-muted hover:text-ink",
                 )}
               >
@@ -140,8 +150,18 @@ export function Analytics() {
           icon={<AlertTriangle className="h-4 w-4" />}
           label="Stockout risk"
           value={k ? `${count(k.at_risk)}` : undefined}
-          note={k ? `${count(k.critical)} critical · under 15 days cover` : undefined}
-          tone={k && k.critical > 0 ? "danger" : k && k.at_risk > 0 ? "warning" : undefined}
+          note={
+            k
+              ? `${count(k.critical)} critical · under 15 days cover`
+              : undefined
+          }
+          tone={
+            k && k.critical > 0
+              ? "danger"
+              : k && k.at_risk > 0
+                ? "warning"
+                : undefined
+          }
         />
         <Kpi
           icon={<PackageX className="h-4 w-4" />}
@@ -298,7 +318,9 @@ function WarehouseTable({
   return (
     <Band className="flex flex-col">
       <div className="border-b border-border px-4 py-3">
-        <h3 className="font-display text-lg font-bold">Warehouse performance</h3>
+        <h3 className="font-display text-lg font-bold">
+          Warehouse performance
+        </h3>
       </div>
 
       <div className="flex-1 overflow-x-auto">
@@ -327,7 +349,10 @@ function WarehouseTable({
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-b border-border last:border-0">
+                <tr
+                  key={row.id}
+                  className="border-b border-border last:border-0"
+                >
                   <td className="px-4 py-2.5 font-medium">{row.name}</td>
                   <td className="tnum px-4 py-2.5 text-right">
                     {currencyCompact(row.revenue)}
@@ -338,7 +363,9 @@ function WarehouseTable({
                   <td
                     className={cn(
                       "tnum px-4 py-2.5 text-right",
-                      row.stockouts > 0 ? "font-bold text-danger" : "text-ink-muted",
+                      row.stockouts > 0
+                        ? "font-bold text-danger"
+                        : "text-ink-muted",
                     )}
                   >
                     {row.stockouts}
@@ -419,11 +446,22 @@ function RevenueTrend({
           <Skeleton className="h-full min-h-[13rem] w-full" />
         ) : (
           <ResponsiveContainer width="100%" height="100%" minHeight={208}>
-            <AreaChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <AreaChart
+              data={series}
+              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            >
               <defs>
                 <linearGradient id="revfill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-accent)" stopOpacity={0.28} />
-                  <stop offset="100%" stopColor="var(--color-accent)" stopOpacity={0} />
+                  <stop
+                    offset="0%"
+                    stopColor="var(--color-accent)"
+                    stopOpacity={0.28}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="var(--color-accent)"
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
               <CartesianGrid
@@ -438,7 +476,11 @@ function RevenueTrend({
                 axisLine={false}
                 // Three labels, not thirty. A dense axis on a 90-day range is
                 // an unreadable smear.
-                ticks={[series[0]?.date, series[Math.floor(series.length / 2)]?.date, series[series.length - 1]?.date].filter(Boolean)}
+                ticks={[
+                  series[0]?.date,
+                  series[Math.floor(series.length / 2)]?.date,
+                  series[series.length - 1]?.date,
+                ].filter(Boolean)}
                 tickFormatter={(v: string) => date(v)}
               />
               <YAxis
@@ -530,7 +572,9 @@ function CriticalAlerts({
                 <AlertTriangle className="h-3 w-3" />
               </span>
               <div className="min-w-0">
-                <p className="text-sm leading-snug font-medium">{alert.title}</p>
+                <p className="text-sm leading-snug font-medium">
+                  {alert.title}
+                </p>
                 <p className="mt-0.5 text-2xs text-ink-subtle">
                   {relativeTime(alert.raised_at)}
                 </p>
@@ -614,7 +658,9 @@ function InventoryHealth({
         {parts.map((p) => (
           <li key={p.key} className="flex items-start justify-between gap-3">
             <span className="flex items-start gap-2">
-              <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", p.cls)} />
+              <span
+                className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", p.cls)}
+              />
               <span>
                 <span className="block text-sm font-semibold">{p.label}</span>
                 <span className="block text-2xs text-ink-subtle">{p.note}</span>
@@ -645,11 +691,14 @@ function RiskSummary({
   atRisk: number;
 }) {
   const total = bands.reduce((n, b) => n + b.count, 0) || 1;
+  // Fill and ink together, because the ink that reads on a filled hue is a
+  // property of that hue rather than one colour for all four -- see the
+  // --color-on-* tokens.
   const tone: Record<string, string> = {
-    critical: "bg-danger",
-    high: "bg-warning",
-    medium: "bg-capacity",
-    low: "bg-success",
+    critical: "bg-danger text-on-danger",
+    high: "bg-warning text-on-warning",
+    medium: "bg-capacity text-on-capacity",
+    low: "bg-success text-on-success",
   };
   const text: Record<string, string> = {
     critical: "text-danger",
@@ -667,8 +716,8 @@ function RiskSummary({
         </Link>
       </div>
       <p className="mt-1 text-sm text-ink-muted">
-        <span className="tnum font-bold text-ink">{count(atRisk)}</span> lines have
-        under 15 days of cover at their current sales rate.
+        <span className="tnum font-bold text-ink">{count(atRisk)}</span> lines
+        have under 15 days of cover at their current sales rate.
       </p>
 
       {/* Widths are proportional, but each band keeps a floor so a single
@@ -683,7 +732,7 @@ function RiskSummary({
           >
             <div
               className={cn(
-                "flex h-11 items-center justify-center rounded-lg text-lg font-extrabold text-white",
+                "flex h-11 items-center justify-center rounded-lg text-lg font-extrabold",
                 tone[band.key],
                 band.count === 0 && "opacity-30",
               )}

@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "@/App";
 import { ApiError } from "@/lib/api";
 import { AuthProvider } from "@/lib/auth";
+import { ThemeProvider } from "@/lib/theme";
 import "@/index.css";
 
 const queryClient = new QueryClient({
@@ -14,7 +15,9 @@ const queryClient = new QueryClient({
       // Retrying a 403 or a 404 just delays the error message. Only retry the
       // failures that might actually resolve themselves.
       retry: (failureCount, error) =>
-        error instanceof ApiError ? error.isRetryable && failureCount < 2 : failureCount < 2,
+        error instanceof ApiError
+          ? error.isRetryable && failureCount < 2
+          : failureCount < 2,
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     },
@@ -26,7 +29,9 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <ThemeProvider>
+            <App />
+          </ThemeProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

@@ -27,6 +27,7 @@ import { NavLink, Outlet } from "react-router-dom";
 
 import { Button } from "@/components/ui/Button";
 import { Mark } from "@/components/ui/Mark";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useAuth } from "@/lib/auth";
 import { useAlerts } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -166,51 +167,51 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
               <p className="eyebrow mb-2 px-2">{group.heading}</p>
             )}
             <ul className="space-y-0.5">
-              {group.items.map(({ to, label, icon: Icon, end, showAlertCount }) => (
-                <li key={to}>
-                  <NavLink
-                    to={to}
-                    end={end}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      cn(
-                        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-base transition-colors",
-                        // The active item carries a left rule as well as a
-                        // tint, so the current page survives being read on a
-                        // dim screen or by someone who can't separate the two
-                        // background greens.
-                        isActive
-                          ? "border-l-2 border-accent bg-accent-soft pl-1.5 font-medium text-accent-hover"
-                          : "text-ink-muted hover:bg-sunken hover:text-ink",
-                      )
-                    }
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    {label}
-                    {showAlertCount && openAlerts > 0 && (
-                      <span
-                        className={cn(
-                          "ml-auto rounded-sm px-1.5 py-0.5 font-mono text-2xs font-medium",
-                          criticalAlerts > 0
-                            ? "bg-danger-soft text-danger"
-                            : "bg-warning-soft text-warning",
-                        )}
-                      >
-                        {openAlerts}
-                      </span>
-                    )}
-                  </NavLink>
-                </li>
-              ))}
+              {group.items.map(
+                ({ to, label, icon: Icon, end, showAlertCount }) => (
+                  <li key={to}>
+                    <NavLink
+                      to={to}
+                      end={end}
+                      onClick={onClose}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-base transition-colors",
+                          // The active item carries a left rule as well as a
+                          // tint, so the current page survives being read on a
+                          // dim screen or by someone who can't separate the two
+                          // background greens.
+                          isActive
+                            ? "border-l-2 border-accent bg-accent-soft pl-1.5 font-medium text-accent-hover"
+                            : "text-ink-muted hover:bg-sunken hover:text-ink",
+                        )
+                      }
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {label}
+                      {showAlertCount && openAlerts > 0 && (
+                        <span
+                          className={cn(
+                            "ml-auto rounded-sm px-1.5 py-0.5 font-mono text-2xs font-medium",
+                            criticalAlerts > 0
+                              ? "bg-danger-soft text-danger"
+                              : "bg-warning-soft text-warning",
+                          )}
+                        >
+                          {openAlerts}
+                        </span>
+                      )}
+                    </NavLink>
+                  </li>
+                ),
+              )}
             </ul>
           </div>
         ))}
       </nav>
 
       <div className="shrink-0 border-t border-border px-5 py-3">
-        <p className="text-2xs text-ink-subtle">
-          Seeded demo · 2 tenants
-        </p>
+        <p className="text-2xs text-ink-subtle">Seeded demo · 2 tenants</p>
       </div>
     </aside>
   );
@@ -232,10 +233,12 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
         <Menu className="h-4 w-4" />
       </Button>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-2 sm:gap-3">
         <span className="hidden text-xs text-ink-muted sm:inline">
           TechNova Industries
         </span>
+
+        <ThemeToggle />
 
         <div className="relative">
           <button
@@ -306,9 +309,13 @@ export function PageHeader({
        was left, which on a 390px screen was a column about two words wide. */
     <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
       <div className="min-w-0">
-        <h1 className="text-xl leading-tight font-semibold sm:text-2xl">{title}</h1>
+        <h1 className="text-xl leading-tight font-semibold sm:text-2xl">
+          {title}
+        </h1>
         {description && (
-          <p className="mt-1.5 text-sm text-ink-muted sm:text-base">{description}</p>
+          <p className="mt-1.5 text-sm text-ink-muted sm:text-base">
+            {description}
+          </p>
         )}
       </div>
       {action && <div className="w-full shrink-0 sm:w-auto">{action}</div>}

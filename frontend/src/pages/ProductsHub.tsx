@@ -77,7 +77,7 @@ export function ProductsHub() {
                 className={cn(
                   "rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
                   days === option
-                    ? "bg-accent text-white"
+                    ? "bg-accent text-on-accent"
                     : "text-ink-muted hover:text-ink",
                 )}
               >

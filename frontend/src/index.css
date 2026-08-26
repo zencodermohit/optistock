@@ -80,6 +80,23 @@
   --color-capacity: #7c5cf5;
   --color-capacity-soft: #efeafe;
 
+  /* --- Ink ON a filled hue ------------------------------------------------
+     The colour of text sitting on top of a saturated fill, as opposed to on
+     the ground. White in this theme, which is what every accent button and
+     severity pill already hard-coded, so naming it changes nothing here.
+
+     It has to be a token because the two themes genuinely disagree, and not
+     as a matter of taste. In dark mode the accent is brightened so it can be
+     read as text on navy, and a colour light enough for that is too light to
+     put white on: white needs a fill below 0.183 luminance, legibility on the
+     dark ground needs one above 0.209. Nothing satisfies both, so the fill and
+     its ink stop being the same decision. */
+  --color-on-accent: #ffffff;
+  --color-on-danger: #ffffff;
+  --color-on-warning: #ffffff;
+  --color-on-success: #ffffff;
+  --color-on-capacity: #ffffff;
+
   /* --- Night --------------------------------------------------------------
      The sign-in panel, and nothing else so far.
 
@@ -144,16 +161,136 @@
      Four steps, all wide and low-opacity, tinted with the ground's blue rather
      than pure black — a grey shadow on a cool ground reads as dirt. This is
      the single biggest change from the previous system, which had none. */
-  --shadow-xs: 0 1px 2px -1px rgb(18 23 34 / 0.06), 0 1px 3px rgb(18 23 34 / 0.04);
-  --shadow-sm: 0 2px 4px -2px rgb(18 23 34 / 0.06), 0 4px 12px -2px rgb(18 23 34 / 0.06);
-  --shadow-md: 0 4px 8px -4px rgb(18 23 34 / 0.08), 0 12px 28px -6px rgb(18 23 34 / 0.10);
-  --shadow-lg: 0 8px 16px -8px rgb(18 23 34 / 0.10), 0 24px 56px -12px rgb(18 23 34 / 0.16);
+  --shadow-xs:
+    0 1px 2px -1px rgb(18 23 34 / 0.06), 0 1px 3px rgb(18 23 34 / 0.04);
+  --shadow-sm:
+    0 2px 4px -2px rgb(18 23 34 / 0.06), 0 4px 12px -2px rgb(18 23 34 / 0.06);
+  --shadow-md:
+    0 4px 8px -4px rgb(18 23 34 / 0.08), 0 12px 28px -6px rgb(18 23 34 / 0.1);
+  --shadow-lg:
+    0 8px 16px -8px rgb(18 23 34 / 0.1), 0 24px 56px -12px rgb(18 23 34 / 0.16);
 }
 
+/* ==========================================================================
+   Dark theme
+
+   Every screen composes tokens and never hard-codes a hex, which is the rule
+   the top of this file states and the reason a second theme is a palette swap
+   rather than sixteen rewrites. Redefining the same names under one attribute
+   re-themes the whole product; no component knows this exists.
+
+   Which theme is showing is decided in JavaScript, before first paint, and
+   written to <html data-theme>. It is resolved there rather than with a
+   prefers-color-scheme media query so the value is in exactly one place: a
+   query would need every token duplicated, once for "the OS says dark" and
+   once for "the user chose dark", and the two copies would drift.
+
+   The palette is not an inversion of the light one. It descends from the Night
+   ramp above -- the sign-in panel has been a night view of the network since it
+   was built, and it was drawn for this product rather than derived from it.
+   What it did not need, a working screen does: a recessed step, a strong
+   border, and soft fills for the semantic hues that do not go muddy on navy.
+
+   Two things had to change rather than darken:
+
+   *   ELEVATION INVERTS. On a light ground a card lifts by casting a shadow.
+       On a dark one shadows are nearly invisible, so lift comes from a lighter
+       surface -- --color-surface sits ABOVE --color-canvas here, where in the
+       light theme it sits below. Shadows stay, deeper and blacker, to hold the
+       edge; they are no longer doing the work alone.
+   *   HOVER GETS LIGHTER, NOT DARKER. --color-accent-hover is a step brighter
+       than --color-accent here. Darkening on hover reads as a control going
+       dead when the ground is already dark.
+
+   Every ink and hue below clears 4.5:1 against BOTH canvas and surface, and
+   ink clears 7:1, checked rather than eyeballed. The 11px uppercase labels
+   this system uses are not "large text" under WCAG, which is the same argument
+   the light ramp makes for itself.
+   ========================================================================== */
+:root[data-theme="dark"] {
+  /* Tells the browser to draw its own furniture -- form controls, the caret,
+     the default scrollbar -- in dark. Without it a native <select> stays a
+     white slab in the middle of a dark form. */
+  color-scheme: dark;
+
+  --color-canvas: #0a1020;
+  --color-surface: #111a31;
+  --color-sunken: #070d1a;
+  --color-border: #1f2b49;
+  --color-border-strong: #33426b;
+
+  --color-ink: #f2f5fd; /* 17.4:1 on canvas */
+  --color-ink-muted: #a8b5d1; /* 9.2:1 */
+  --color-ink-subtle: #7f8dab; /* 5.7:1 */
+  --color-ink-inverse: #0a1020;
+
+  /* The periwinkle that carries navigation on white disappears into navy, so
+     this is the Night accent -- two steps brighter -- and it hovers brighter
+     still. */
+  --color-accent: #6c85ff; /* 5.8:1 */
+  --color-accent-hover: #8fa2ff;
+  --color-accent-soft: #1a2450;
+  --color-accent-border: #35438f;
+
+  /* Same meanings, same reservation: amber is low stock, red is out of stock,
+     violet is capacity and never an alarm. Only the values move, because
+     #0e8f5d reads as almost black on navy. */
+  --color-success: #34d399;
+  --color-success-soft: #0c2b21;
+  --color-warning: #f0b45e;
+  --color-warning-soft: #33240c;
+  --color-danger: #fb7185;
+  --color-danger-soft: #3a1420;
+  --color-info: #6c85ff;
+  --color-info-soft: #1a2450;
+  --color-capacity: #a48bff;
+  --color-capacity-soft: #241a49;
+
+  /* Dark ink on the bright fills, each tinted with its own hue so a red pill
+     reads as a red object rather than a red rectangle with a black sticker on
+     it. All clear 6.6:1 against the fill they sit on -- better than the white
+     they replace manages in the light theme. */
+  --color-on-accent: #0a1020; /* 5.8:1 */
+  --color-on-danger: #2b0a12; /* 6.8:1 */
+  --color-on-warning: #2b1c05; /* 9.0:1 */
+  --color-on-success: #04231a; /* 8.7:1 */
+  --color-on-capacity: #180f33; /* 6.7:1 */
+
+  /* Black rather than blue-tinted. A navy shadow on a navy ground is a smudge;
+     these only have to keep a card's edge from dissolving. */
+  --shadow-xs: 0 1px 2px -1px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+  --shadow-sm:
+    0 2px 4px -2px rgb(0 0 0 / 0.4), 0 4px 12px -2px rgb(0 0 0 / 0.35);
+  --shadow-md:
+    0 4px 8px -4px rgb(0 0 0 / 0.45), 0 12px 28px -6px rgb(0 0 0 / 0.4);
+  --shadow-lg:
+    0 8px 16px -8px rgb(0 0 0 / 0.5), 0 24px 56px -12px rgb(0 0 0 / 0.45);
+}
+
+/* So a component can reach for `dark:` on the rare thing a token cannot carry
+   -- a white sheen, a canvas clear colour -- without inventing its own switch.
+   Kept for exceptions; the palette above is how the theme actually works. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @layer base {
   * {
     border-color: var(--color-border);
+  }
+
+  /* Only while the user is actually switching. A blanket transition on colour
+     would also animate every hover and every row that changes state, which
+     turns a dense table into a smear. The class is added for one frame's worth
+     of work and removed. */
+  :root.theme-switching,
+  :root.theme-switching *,
+  :root.theme-switching *::before,
+  :root.theme-switching *::after {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      fill 180ms ease,
+      stroke 180ms ease !important;
   }
 
   html {
@@ -266,10 +403,17 @@
     background-image: linear-gradient(
       90deg,
       transparent,
-      rgb(255 255 255 / 0.65),
+      var(--shimmer-sheen, rgb(255 255 255 / 0.65)),
       transparent
     );
     animation: shimmer 1.6s infinite;
+  }
+
+  /* A white sheen on a navy skeleton is a flashbulb. This is the one thing in
+     the system a colour token could not carry, because it is a highlight
+     rather than a surface. */
+  :root[data-theme="dark"] .shimmer::after {
+    --shimmer-sheen: rgb(148 170 255 / 0.12);
   }
 
   /* ------------------------------------------------------------------
@@ -307,7 +451,6 @@
     cursor: none !important;
   }
 }
-
 
 /* Users who ask their OS for less motion get less motion. */
 @media (prefers-reduced-motion: reduce) {

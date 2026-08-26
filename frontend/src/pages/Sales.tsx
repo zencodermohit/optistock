@@ -76,7 +76,7 @@ export function Sales() {
                   className={cn(
                     "rounded-sm border px-2 py-0.5 font-mono text-2xs uppercase transition-colors",
                     statusFilter === option.value
-                      ? "border-accent bg-accent text-white"
+                      ? "border-accent bg-accent text-on-accent"
                       : "border-border bg-surface text-ink-muted hover:border-accent-border",
                   )}
                 >

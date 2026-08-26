@@ -10,7 +10,7 @@ const badge = cva(
     variants: {
       tone: {
         neutral: "border-border-strong bg-sunken text-ink-muted",
-        accent: "border-accent bg-accent text-white",
+        accent: "border-accent bg-accent text-on-accent",
         outline: "border-accent-border bg-accent-soft text-accent-hover",
         success: "border-success/25 bg-success-soft text-success",
         warning: "border-warning/25 bg-warning-soft text-warning",

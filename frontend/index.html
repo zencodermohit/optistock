@@ -3,12 +3,43 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#faf9f6" />
+    <meta name="theme-color" content="#f5f7fb" />
     <title>OptiStock — Inventory Intelligence</title>
     <meta
       name="description"
       content="Multi-tenant inventory intelligence: live stock, demand forecasting and explainable reorder recommendations."
     />
+    <script>
+      /*
+        Decide the theme before the first paint.
+
+        This has to be inline and synchronous in <head>. The bundle loads after
+        the browser has already painted the body, so resolving the theme in
+        React means a white flash on every page load for anyone using dark --
+        the one bug that makes a theme switcher feel broken rather than slow.
+
+        Kept deliberately tiny and duplicated from src/lib/theme.tsx rather
+        than imported, because anything importable arrives too late to be of
+        any use here. The storage key and the two grounds are the whole of the
+        shared knowledge; if they change there, change them here.
+      */
+      (function () {
+        try {
+          var saved = localStorage.getItem("optistock:theme");
+          var dark =
+            saved === "dark" ||
+            (saved !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute("content", dark ? "#0a1020" : "#f5f7fb");
+        } catch (e) {
+          /* Private windows throw on localStorage. Light is a fine fallback. */
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

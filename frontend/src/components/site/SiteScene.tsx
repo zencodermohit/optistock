@@ -15,11 +15,19 @@ import {
   Selection,
   SelectiveBloom,
 } from "@react-three/postprocessing";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Vector3 } from "three";
 import type { DirectionalLight, Group } from "three";
 
 import type { SiteWarehouse } from "@/lib/queries";
+import { useTheme } from "@/lib/theme";
 
 /**
  * One site, in three dimensions.
@@ -50,7 +58,7 @@ import type { SiteWarehouse } from "@/lib/queries";
    for the eye to catch. Every surface below now sits at a deliberately
    different lightness, and the ground is pushed well down so the building has
    something to stand out against. */
-const PALETTE = {
+const DAY_PALETTE = {
   ground: "#d3dcee",
   road: "#c4cee4",
   apron: "#cad4e8",
@@ -66,7 +74,69 @@ const PALETTE = {
   foliageDeep: "#4c69b8",
   trunk: "#aab6ce",
   vehicle: "#ffffff",
+  sky: "#eaeef8",
+  bounce: "#a8bdea",
+  ao: "#54648c",
+  ambient: 0.34,
+  key: 2.6,
 };
+
+/* The same site after dark.
+ *
+ * Not the day palette dimmed. The rule that made the day one work is that
+ * every surface sits at a deliberately DIFFERENT lightness, and dimming
+ * uniformly would preserve the hues while collapsing exactly the thing the eye
+ * uses. So the gaps are re-cut: the ground drops much further than the walls,
+ * which widens the separation rather than narrowing it, and the building ends
+ * up reading as lit rather than merely visible.
+ *
+ * That is the sign-in screen's metaphor, which has always been a night view of
+ * the network with the warehouses lit up on it. This is the same picture from
+ * the floor instead of from orbit.
+ *
+ * Glass goes UP, against the trend, because windows at night are the one part
+ * of a building that emits rather than reflects. Foliage and vehicles lose
+ * most of their lightness -- unlit things at the edge of the site -- so they
+ * stop competing with the building for attention.
+ */
+const NIGHT_PALETTE: typeof DAY_PALETTE = {
+  ground: "#111a30",
+  road: "#0d1528",
+  apron: "#152039",
+  wall: "#8fa0c8",
+  wallWarm: "#7d8db4",
+  roof: "#5d6d94",
+  trim: "#47557a",
+  glass: "#b9cdf5",
+  dock: "#232c47",
+  capacity: "#a48bff",
+  danger: "#fb7185",
+  foliage: "#2a3c68",
+  foliageDeep: "#1e2c50",
+  trunk: "#39456a",
+  vehicle: "#8695bb",
+  sky: "#0a1020",
+  bounce: "#3f52a0",
+  ao: "#04070f",
+  ambient: 0.22,
+  key: 1.5,
+};
+
+/* Which palette this render is using.
+ *
+ * A context rather than a prop threaded through eleven meshes, and read into a
+ * local named PALETTE so the ~27 call sites below are unchanged -- they always
+ * meant "the palette in effect", and now there are two of those. The two
+ * sources are DAY_PALETTE and NIGHT_PALETTE; nothing outside this file names
+ * either.
+ *
+ * Read once per component rather than per material: a WebGL material wants its
+ * colour at construction, and re-reading on every frame would cost something
+ * and buy nothing. A theme change re-renders the tree, which is when the
+ * materials pick up their new values.
+ */
+const PaletteContext = createContext(DAY_PALETTE);
+const usePalette = () => useContext(PaletteContext);
 
 /** Footprint from capacity, on a square-root curve.
  *
@@ -90,7 +160,16 @@ function dimensions(capacity: number, largest: number) {
 /* ------------------------------------------------------------------ */
 
 /** Loading bays cut into the long face, with a canopy over them. */
-function DockFace({ width, depth, height }: { width: number; depth: number; height: number }) {
+function DockFace({
+  width,
+  depth,
+  height,
+}: {
+  width: number;
+  depth: number;
+  height: number;
+}) {
+  const PALETTE = usePalette();
   const bays = Math.max(3, Math.min(7, Math.round(width / 0.85)));
   const bayWidth = 0.42;
   const spacing = (width * 0.86) / bays;
@@ -101,7 +180,11 @@ function DockFace({ width, depth, height }: { width: number; depth: number; heig
       {/* Canopy */}
       <mesh position={[0, height * 0.56, z + 0.34]} castShadow>
         <boxGeometry args={[width * 0.92, 0.07, 0.72]} />
-        <meshStandardMaterial color={PALETTE.trim} roughness={0.55} metalness={0.15} />
+        <meshStandardMaterial
+          color={PALETTE.trim}
+          roughness={0.55}
+          metalness={0.15}
+        />
       </mesh>
 
       {Array.from({ length: bays }).map((_, i) => {
@@ -127,20 +210,39 @@ function DockFace({ width, depth, height }: { width: number; depth: number; heig
 
 /** A delivery van backed onto a bay. Simple masses — at this scale a van is a
  *  silhouette, and detail here would compete with the building. */
-function Van({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+function Van({
+  position,
+  rotation = 0,
+}: {
+  position: [number, number, number];
+  rotation?: number;
+}) {
+  const PALETTE = usePalette();
   return (
     <group position={position} rotation={[0, rotation, 0]}>
       <mesh position={[0, 0.19, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.34, 0.32, 0.72]} />
-        <meshStandardMaterial color={PALETTE.vehicle} roughness={0.42} metalness={0.2} />
+        <meshStandardMaterial
+          color={PALETTE.vehicle}
+          roughness={0.42}
+          metalness={0.2}
+        />
       </mesh>
       <mesh position={[0, 0.14, 0.46]} castShadow>
         <boxGeometry args={[0.32, 0.24, 0.24]} />
-        <meshStandardMaterial color={PALETTE.vehicle} roughness={0.42} metalness={0.2} />
+        <meshStandardMaterial
+          color={PALETTE.vehicle}
+          roughness={0.42}
+          metalness={0.2}
+        />
       </mesh>
       <mesh position={[0, 0.2, 0.575]}>
         <planeGeometry args={[0.24, 0.12]} />
-        <meshStandardMaterial color={PALETTE.glass} roughness={0.15} metalness={0.5} />
+        <meshStandardMaterial
+          color={PALETTE.glass}
+          roughness={0.15}
+          metalness={0.5}
+        />
       </mesh>
     </group>
   );
@@ -148,7 +250,14 @@ function Van({ position, rotation = 0 }: { position: [number, number, number]; r
 
 /** Storage silos on a platform — the detail that makes it read as industrial
  *  rather than as a shopping centre. */
-function Silos({ position, count = 5 }: { position: [number, number, number]; count?: number }) {
+function Silos({
+  position,
+  count = 5,
+}: {
+  position: [number, number, number];
+  count?: number;
+}) {
+  const PALETTE = usePalette();
   return (
     <group position={position}>
       <mesh position={[0, 0.03, 0]} receiveShadow>
@@ -159,11 +268,19 @@ function Silos({ position, count = 5 }: { position: [number, number, number]; co
         <group key={i} position={[(i - (count - 1) / 2) * 0.32, 0, 0]}>
           <mesh position={[0, 0.42, 0]} castShadow>
             <cylinderGeometry args={[0.115, 0.115, 0.72, 16]} />
-            <meshStandardMaterial color={PALETTE.wall} roughness={0.35} metalness={0.35} />
+            <meshStandardMaterial
+              color={PALETTE.wall}
+              roughness={0.35}
+              metalness={0.35}
+            />
           </mesh>
           <mesh position={[0, 0.82, 0]} castShadow>
             <coneGeometry args={[0.118, 0.16, 16]} />
-            <meshStandardMaterial color={PALETTE.trim} roughness={0.4} metalness={0.3} />
+            <meshStandardMaterial
+              color={PALETTE.trim}
+              roughness={0.4}
+              metalness={0.3}
+            />
           </mesh>
         </group>
       ))}
@@ -172,7 +289,16 @@ function Silos({ position, count = 5 }: { position: [number, number, number]; co
 }
 
 /** Rooftop plant — HVAC blocks and ducting. */
-function RoofPlant({ width, depth, height }: { width: number; depth: number; height: number }) {
+function RoofPlant({
+  width,
+  depth,
+  height,
+}: {
+  width: number;
+  depth: number;
+  height: number;
+}) {
+  const PALETTE = usePalette();
   const units = Math.max(2, Math.round(width / 1.6));
   return (
     <group position={[0, height + 0.09, -depth * 0.16]}>
@@ -183,14 +309,26 @@ function RoofPlant({ width, depth, height }: { width: number; depth: number; hei
           castShadow
         >
           <boxGeometry args={[0.44, 0.18, 0.36]} />
-          <meshStandardMaterial color={PALETTE.trim} roughness={0.55} metalness={0.25} />
+          <meshStandardMaterial
+            color={PALETTE.trim}
+            roughness={0.55}
+            metalness={0.25}
+          />
         </mesh>
       ))}
       {/* Rotation belongs on the mesh, not the geometry — a BufferGeometry has
           no transform of its own. */}
-      <mesh position={[0, 0.06, depth * 0.28]} rotation={[0, 0, Math.PI / 2]} castShadow>
+      <mesh
+        position={[0, 0.06, depth * 0.28]}
+        rotation={[0, 0, Math.PI / 2]}
+        castShadow
+      >
         <cylinderGeometry args={[0.07, 0.07, width * 0.6, 12]} />
-        <meshStandardMaterial color={PALETTE.trim} roughness={0.5} metalness={0.3} />
+        <meshStandardMaterial
+          color={PALETTE.trim}
+          roughness={0.5}
+          metalness={0.3}
+        />
       </mesh>
     </group>
   );
@@ -198,7 +336,14 @@ function RoofPlant({ width, depth, height }: { width: number; depth: number; hei
 
 /** The office annex, with a window grid. Sits lower and to one side so the
  *  main shed stays the subject. */
-function OfficeAnnex({ position, height }: { position: [number, number, number]; height: number }) {
+function OfficeAnnex({
+  position,
+  height,
+}: {
+  position: [number, number, number];
+  height: number;
+}) {
+  const PALETTE = usePalette();
   const rows = 2;
   const cols = 5;
   const w = 1.5;
@@ -209,7 +354,11 @@ function OfficeAnnex({ position, height }: { position: [number, number, number];
     <group position={position}>
       <mesh position={[0, h / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[w, h, d]} />
-        <meshStandardMaterial color={PALETTE.wallWarm} roughness={0.45} metalness={0.12} />
+        <meshStandardMaterial
+          color={PALETTE.wallWarm}
+          roughness={0.45}
+          metalness={0.12}
+        />
       </mesh>
       <mesh position={[0, h + 0.035, 0]} castShadow>
         <boxGeometry args={[w + 0.08, 0.07, d + 0.08]} />
@@ -238,7 +387,14 @@ function OfficeAnnex({ position, height }: { position: [number, number, number];
   );
 }
 
-function Tree({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
+function Tree({
+  position,
+  scale = 1,
+}: {
+  position: [number, number, number];
+  scale?: number;
+}) {
+  const PALETTE = usePalette();
   return (
     <group position={position} scale={scale}>
       <mesh position={[0, 0.2, 0]} castShadow>
@@ -247,11 +403,19 @@ function Tree({ position, scale = 1 }: { position: [number, number, number]; sca
       </mesh>
       <mesh position={[0, 0.56, 0]} castShadow>
         <icosahedronGeometry args={[0.3, 0]} />
-        <meshStandardMaterial color={PALETTE.foliage} roughness={0.85} flatShading />
+        <meshStandardMaterial
+          color={PALETTE.foliage}
+          roughness={0.85}
+          flatShading
+        />
       </mesh>
       <mesh position={[0.1, 0.4, 0.06]} castShadow>
         <icosahedronGeometry args={[0.19, 0]} />
-        <meshStandardMaterial color={PALETTE.foliageDeep} roughness={0.85} flatShading />
+        <meshStandardMaterial
+          color={PALETTE.foliageDeep}
+          roughness={0.85}
+          flatShading
+        />
       </mesh>
     </group>
   );
@@ -278,6 +442,7 @@ function CapacityRing({
   radius: number;
   utilisation: number;
 }) {
+  const PALETTE = usePalette();
   const sweep = Math.max(utilisation, 0.06) * Math.PI * 2;
   const thickness = 0.34;
 
@@ -288,7 +453,11 @@ function CapacityRing({
           sticker. */}
       <mesh position={[0, 0, -0.004]}>
         <ringGeometry args={[radius - 0.5, radius + thickness + 0.5, 96]} />
-        <meshBasicMaterial color={PALETTE.capacity} transparent opacity={0.09} />
+        <meshBasicMaterial
+          color={PALETTE.capacity}
+          transparent
+          opacity={0.09}
+        />
       </mesh>
 
       {/* The unfilled remainder. Visible, or the arc has nothing to be a
@@ -312,11 +481,13 @@ function CapacityRing({
 
 /** The trouble marker. Present only when stock is genuinely at zero here. */
 function Marker({ height }: { height: number }) {
+  const PALETTE = usePalette();
   const pin = useRef<Group>(null);
 
   useFrame(({ clock }) => {
     if (pin.current) {
-      pin.current.position.y = height + 1.05 + Math.sin(clock.elapsedTime * 1.9) * 0.08;
+      pin.current.position.y =
+        height + 1.05 + Math.sin(clock.elapsedTime * 1.9) * 0.08;
     }
   });
 
@@ -349,6 +520,7 @@ function Warehouse({
   largest: number;
   onOpen?: (warehouseId: string) => void;
 }) {
+  const PALETTE = usePalette();
   const size = dimensions(warehouse.capacity_units, largest);
 
   /* Double click opens this site's command centre.
@@ -386,7 +558,8 @@ function Warehouse({
   const ringRadius = Math.max(size.width, size.depth) * 0.62;
 
   const vans = useMemo(() => {
-    const spots: { position: [number, number, number]; rotation: number }[] = [];
+    const spots: { position: [number, number, number]; rotation: number }[] =
+      [];
     const n = Math.min(3, Math.max(1, Math.round(size.width / 2)));
     for (let i = 0; i < n; i++) {
       spots.push({
@@ -459,7 +632,11 @@ function Warehouse({
           floating in space rather than as ground. A disc has no corner to
           catch the eye, and its rim sits under the tree line where nothing
           reads it as an edge at all. */}
-      <mesh position={[0, 0.012, 0.1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh
+        position={[0, 0.012, 0.1]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        receiveShadow
+      >
         <circleGeometry args={[Math.max(size.width, size.depth) * 1.55, 64]} />
         <meshStandardMaterial color={PALETTE.apron} roughness={0.95} />
       </mesh>
@@ -467,35 +644,43 @@ function Warehouse({
       {/* Everything from here to the annex IS the building, and only these
           carry the click handlers. */}
       <group {...opens}>
-      {/* Main shed */}
-      <mesh position={[0, size.height / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[size.width, size.height, size.depth]} />
-        <meshStandardMaterial
-          color={PALETTE.wall}
-          roughness={0.34}
-          metalness={0.22}
-          envMapIntensity={0.9}
+        {/* Main shed */}
+        <mesh position={[0, size.height / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[size.width, size.height, size.depth]} />
+          <meshStandardMaterial
+            color={PALETTE.wall}
+            roughness={0.34}
+            metalness={0.22}
+            envMapIntensity={0.9}
+          />
+        </mesh>
+
+        {/* Roof slab, proud of the walls so the mass reads as a building */}
+        <mesh position={[0, size.height + 0.05, 0]} castShadow receiveShadow>
+          <boxGeometry args={[size.width + 0.16, 0.1, size.depth + 0.16]} />
+          <meshStandardMaterial
+            color={PALETTE.roof}
+            roughness={0.72}
+            metalness={0.1}
+          />
+        </mesh>
+
+        {/* A banding stripe, which is what stops a big box looking like a box */}
+        <mesh position={[0, size.height * 0.82, 0]}>
+          <boxGeometry args={[size.width + 0.02, 0.05, size.depth + 0.02]} />
+          <meshStandardMaterial
+            color={PALETTE.trim}
+            roughness={0.5}
+            metalness={0.25}
+          />
+        </mesh>
+
+        <DockFace width={size.width} depth={size.depth} height={size.height} />
+        <RoofPlant width={size.width} depth={size.depth} height={size.height} />
+        <OfficeAnnex
+          position={[-size.width / 2 - 0.95, 0, size.depth * 0.16]}
+          height={size.height}
         />
-      </mesh>
-
-      {/* Roof slab, proud of the walls so the mass reads as a building */}
-      <mesh position={[0, size.height + 0.05, 0]} castShadow receiveShadow>
-        <boxGeometry args={[size.width + 0.16, 0.1, size.depth + 0.16]} />
-        <meshStandardMaterial color={PALETTE.roof} roughness={0.72} metalness={0.1} />
-      </mesh>
-
-      {/* A banding stripe, which is what stops a big box looking like a box */}
-      <mesh position={[0, size.height * 0.82, 0]}>
-        <boxGeometry args={[size.width + 0.02, 0.05, size.depth + 0.02]} />
-        <meshStandardMaterial color={PALETTE.trim} roughness={0.5} metalness={0.25} />
-      </mesh>
-
-      <DockFace width={size.width} depth={size.depth} height={size.height} />
-      <RoofPlant width={size.width} depth={size.depth} height={size.height} />
-      <OfficeAnnex
-        position={[-size.width / 2 - 0.95, 0, size.depth * 0.16]}
-        height={size.height}
-      />
       </group>
       <Silos position={[size.width / 2 + 1.15, 0, -size.depth * 0.1]} />
 
@@ -623,15 +808,16 @@ function Scene({
       that is ON SCREEN. Optional: without it nothing becomes clickable. */
   onOpen?: (warehouseId: string) => void;
 }) {
+  const PALETTE = usePalette();
   const key = useRef<DirectionalLight>(null);
 
   return (
     <>
-      <ambientLight intensity={0.34} />
+      <ambientLight intensity={PALETTE.ambient} />
       <directionalLight
         ref={key}
         position={[6.5, 9, 5]}
-        intensity={2.6}
+        intensity={PALETTE.key}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0006}
@@ -643,14 +829,28 @@ function Scene({
       />
       {/* Cool bounce from the opposite side, so shadowed faces stay blue rather
           than going muddy grey. */}
-      <directionalLight position={[-7, 4, -5]} intensity={0.5} color="#a8bdea" />
+      <directionalLight
+        position={[-7, 4, -5]}
+        intensity={0.5}
+        color={PALETTE.bounce}
+      />
 
       {/* Reflections without a network fetch. These emissive planes are what the
           walls and silos actually mirror. */}
       <Environment resolution={256} frames={1}>
         <Lightformer intensity={2.4} position={[0, 6, 2]} scale={[12, 6, 1]} />
-        <Lightformer intensity={1.1} position={[-6, 3, -4]} scale={[8, 5, 1]} color="#dbe4fa" />
-        <Lightformer intensity={0.9} position={[6, 2, 4]} scale={[8, 4, 1]} color="#ffffff" />
+        <Lightformer
+          intensity={1.1}
+          position={[-6, 3, -4]}
+          scale={[8, 5, 1]}
+          color="#dbe4fa"
+        />
+        <Lightformer
+          intensity={0.9}
+          position={[6, 2, 4]}
+          scale={[8, 4, 1]}
+          color="#ffffff"
+        />
       </Environment>
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
@@ -695,7 +895,8 @@ function FitToViewport() {
     const aspect = width / Math.max(height, 1);
     // 4:3 and wider needs nothing; below that, pull back in proportion, and
     // stop at 1.9x so a very tall window does not send the camera to orbit.
-    const pull = aspect >= 1.34 ? 1 : Math.min(1.9, 1.34 / Math.max(aspect, 0.5));
+    const pull =
+      aspect >= 1.34 ? 1 : Math.min(1.9, 1.34 / Math.max(aspect, 0.5));
     camera.position.copy(new Vector3(7.6, 4.6, 8.2).multiplyScalar(pull));
     camera.updateProjectionMatrix();
   }, [camera, width, height]);
@@ -716,6 +917,12 @@ export function SiteScene({
       that is ON SCREEN. Optional: without it nothing becomes clickable. */
   onOpen?: (warehouseId: string) => void;
 }) {
+  // Resolved once at the root and provided to everything below. The canvas is
+  // a second surface the theme has to reach: WebGL has no CSS background, so a
+  // token swap alone would leave a lit rectangle in the middle of a dark page.
+  const { appearance } = useTheme();
+  const PALETTE = appearance === "dark" ? NIGHT_PALETTE : DAY_PALETTE;
+
   // Honoured rather than assumed: an orbiting camera is exactly the ambient
   // motion that makes some people ill.
   const stillness =
@@ -730,57 +937,63 @@ export function SiteScene({
       gl={{ antialias: false }}
       style={{ touchAction: "none" }}
     >
-      <FitToViewport />
+      <PaletteContext.Provider value={PALETTE}>
+        <FitToViewport />
 
-      <color attach="background" args={["#eaeef8"]} />
-      <fog attach="fog" args={["#eaeef8", 17, 34]} />
+        {/* The canvas has no CSS background of its own, so this is what makes
+          the panel belong to the page rather than sitting on it as a lit
+          rectangle. Matching the fog to it is what lets the ground plane run
+          out to the horizon without showing an edge. */}
+        <color attach="background" args={[PALETTE.sky]} />
+        <fog attach="fog" args={[PALETTE.sky, 17, 34]} />
 
-      {/* Selection wraps the scene so the ring and the marker can be the only
+        {/* Selection wraps the scene so the ring and the marker can be the only
           things bloom touches. */}
-      <Selection>
-        <EffectComposer multisampling={0} enableNormalPass>
-          <N8AO
-            aoRadius={1.1}
-            distanceFalloff={0.9}
-            intensity={4.2}
-            quality="medium"
-            color="#54648c"
-            halfRes
-          />
-          <SelectiveBloom
-            intensity={3.6}
-            luminanceThreshold={0.15}
-            luminanceSmoothing={0.35}
-            mipmapBlur
-            radius={0.72}
-          />
-          {/* N8AO needs multisampling off, which takes MSAA with it. SMAA puts
+        <Selection>
+          <EffectComposer multisampling={0} enableNormalPass>
+            <N8AO
+              aoRadius={1.1}
+              distanceFalloff={0.9}
+              intensity={4.2}
+              quality="medium"
+              color={PALETTE.ao}
+              halfRes
+            />
+            <SelectiveBloom
+              intensity={3.6}
+              luminanceThreshold={0.15}
+              luminanceSmoothing={0.35}
+              mipmapBlur
+              radius={0.72}
+            />
+            {/* N8AO needs multisampling off, which takes MSAA with it. SMAA puts
               the edge quality back as a post pass — without it the silo
               cylinders and roof edges crawl. */}
-          <SMAA />
-        </EffectComposer>
+            <SMAA />
+          </EffectComposer>
 
-        <Scene
-          warehouse={warehouse}
-          largest={largest}
-          direction={direction}
-          onOpen={onOpen}
+          <Scene
+            warehouse={warehouse}
+            largest={largest}
+            direction={direction}
+            onOpen={onOpen}
+          />
+        </Selection>
+
+        <OrbitControls
+          makeDefault
+          enablePan={false}
+          autoRotate={!stillness}
+          autoRotateSpeed={0.3}
+          target={[0, 0.75, 0]}
+          minPolarAngle={Math.PI / 7}
+          // Stops short of the horizon: below this the apron fills the frame and
+          // the building stops reading as a site.
+          maxPolarAngle={Math.PI / 2.5}
+          minDistance={6.5}
+          maxDistance={17}
         />
-      </Selection>
-
-      <OrbitControls
-        makeDefault
-        enablePan={false}
-        autoRotate={!stillness}
-        autoRotateSpeed={0.3}
-        target={[0, 0.75, 0]}
-        minPolarAngle={Math.PI / 7}
-        // Stops short of the horizon: below this the apron fills the frame and
-        // the building stops reading as a site.
-        maxPolarAngle={Math.PI / 2.5}
-        minDistance={6.5}
-        maxDistance={17}
-      />
+      </PaletteContext.Provider>
     </Canvas>
   );
 }

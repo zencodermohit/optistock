@@ -346,7 +346,7 @@ function SiteChip({
       className={cn(
         "flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
         active
-          ? "border-accent bg-accent text-white"
+          ? "border-accent bg-accent text-on-accent"
           : "border-border bg-surface text-ink-muted hover:border-accent-border hover:text-ink",
       )}
     >
@@ -355,7 +355,7 @@ function SiteChip({
         <span
           className={cn(
             "tnum rounded-full px-1.5 text-2xs font-bold",
-            active ? "bg-white/20 text-white" : "bg-danger-soft text-danger",
+            active ? "bg-on-accent/15 text-on-accent" : "bg-danger-soft text-danger",
           )}
         >
           {warehouse.out_lines}

@@ -295,7 +295,7 @@ function ZoneBay({
             <span className="text-sm">%</span>
           </span>
           {over && (
-            <span className="mt-1 rounded-full bg-danger px-1.5 py-px text-[10px] font-bold text-white">
+            <span className="mt-1 rounded-full bg-danger px-1.5 py-px text-[10px] font-bold text-on-danger">
               over capacity
             </span>
           )}
