@@ -30,10 +30,60 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Where the session token is kept.
+ *
+ * localStorage is not always there. A private window with site data blocked,
+ * an enterprise policy, or Firefox with cookies disabled do not hand back
+ * null -- they THROW on the property itself, before any method is called.
+ * These three lines used to touch it directly, so the exception escaped
+ * during render and React unmounted the tree: a completely blank page, with
+ * the real cause visible only as "blocked" in the console. Reproduced against
+ * production, where the root element measured zero characters.
+ *
+ * So every access is guarded, and a failure falls back to a variable in this
+ * module rather than to nothing. That distinction is the point. Swallowing
+ * the error would leave a person unable to log in at all, because the token
+ * would be written and then immediately not found. Holding it in memory means
+ * the app works normally for the life of the tab and only forgets across a
+ * reload -- which is exactly what someone browsing privately is asking for.
+ *
+ * Each call re-enters the try rather than probing once at startup: the same
+ * browser can permit storage on one origin and refuse it later in the session
+ * when a setting changes, and a cached answer would be wrong from then on.
+ */
+let tokenInMemory: string | null = null;
+
 export const tokenStore = {
-  get: () => localStorage.getItem(TOKEN_KEY),
-  set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+  get: (): string | null => {
+    try {
+      const stored = window.localStorage.getItem(TOKEN_KEY);
+      if (stored !== null) return stored;
+    } catch {
+      // Unavailable this time; fall through to the in-memory copy.
+    }
+    return tokenInMemory;
+  },
+
+  set: (token: string) => {
+    // Written to memory FIRST and unconditionally, so the session survives
+    // even if the write below throws half way through.
+    tokenInMemory = token;
+    try {
+      window.localStorage.setItem(TOKEN_KEY, token);
+    } catch {
+      // A session that does not outlive the tab still beats no session.
+    }
+  },
+
+  clear: () => {
+    tokenInMemory = null;
+    try {
+      window.localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      // Nothing to do: the copy that mattered is already gone.
+    }
+  },
 };
 
 /** Notified when the server rejects our token, so the app can send us to login. */
@@ -89,7 +139,9 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
     throw new ApiError(response.status, await readErrorMessage(response));
   }
 
-  return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+  return response.status === 204
+    ? (undefined as T)
+    : ((await response.json()) as T);
 }
 
 /**

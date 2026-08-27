@@ -279,3 +279,20 @@ jobs:
               docker compose logs --tail 50
               exit 1
             fi
+
+            # Reclaim the build cache, AFTER the deploy is known good.
+            #
+            # Every build leaves layers behind and nothing was ever removing
+            # them. On a 20GB disk that reached 72% -- of which 5.7GB was
+            # cache -- and the remaining headroom was smaller than the pile
+            # still growing. A full disk stops Postgres accepting writes, so
+            # the failure would have arrived as the whole site going down
+            # rather than as a deploy failing.
+            #
+            # Last, so a prune can never be the reason a deploy fails, and
+            # -af rather than a filter because the cache is pure derived data:
+            # the cost of dropping it is one slower build.
+            echo "Disk before prune:"; df -h / | tail -1
+            docker builder prune -af >/dev/null 2>&1 || true
+            docker image prune -f >/dev/null 2>&1 || true
+            echo "Disk after prune:"; df -h / | tail -1
