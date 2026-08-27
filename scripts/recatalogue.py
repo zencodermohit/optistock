@@ -66,21 +66,250 @@ CSV_OUT = ROOT / "docs" / "catalogue_products.csv"
 #: what lets a 200-row grid paint instantly over conference Wi-Fi.
 THUMB_PX = 160
 
-#: Which source categories may fill each OptiStock category. Chosen so the
-#: leading SKU segment stays true: ELEC draws from electronics, NETW from
-#: actual network hardware -- which is the one category where this source is
-#: genuinely excellent, being full of real Netgear, D-Link and TP-Link routers.
-FROM_CATEGORY: dict[str, str] = {
-    "Networking": r"Network Components",
-    "Electronics": r"Mobiles & Accessories|Computers",
-    # Home Decor is deliberately NOT here. It is mostly showpieces and
-    # religious figurines, and "Eight Armed Goddess Sherawali Maa Showpiece"
-    # as the top-earning line of a warehouse business reads as an accident.
-    "Furniture": r"Home Furnishing|Furniture",
-    "Office Supplies": r"Pens & Stationery|School Supplies",
-    "Packaging": r"Bags, Wallets & Belts|Kitchen & Dining",
-    "Safety & PPE": r"Tools & Hardware|Automotive",
+#: Where each OptiStock category draws from. Two forms, because the source is
+#: organised for a shopper and this catalogue is organised for a warehouse:
+#:
+#:   ("tree", pattern)  match the source's own category path
+#:   ("name", pattern)  match the product title
+#:
+#: The title form exists for Packaging and Safety, which have no source
+#: category at all -- an earlier version pulled them from "Kitchen & Dining"
+#: and "Automotive" and filled a warehouse's PPE shelf with car sun-shades and
+#: vehicle horns. Searching titles for gloves, helmets and storage containers
+#: finds fewer items but finds the right ones.
+FROM_CATEGORY: dict[str, tuple[str, str]] = {
+    "Networking": ("tree", r"Network Components"),
+    "Electronics": ("tree", r"Mobiles & Accessories|Computers"),
+    # Home Decor is deliberately absent: it is mostly showpieces and religious
+    # figurines, and one of those as a warehouse's top-earning line reads as an
+    # accident rather than a catalogue.
+    "Furniture": ("tree", r"Home Furnishing|Furniture"),
+    "Office Supplies": ("tree", r"Pens & Stationery"),
+    "Packaging": (
+        "name",
+        r"(?i)\b(container|storage box|air ?tight|jar|canister|lunch box|"
+        r"tiffin|organiser|organizer)\b",
+    ),
+    "Safety & PPE": (
+        "name",
+        # Word boundaries matter more here than anywhere else: without them
+        # "lock" matched "clock" and put a wall clock on the safety shelf.
+        r"(?i)\b(glove|gloves|helmet|goggle|goggles|face mask|safety|"
+        r"protective|first aid|knee ?pad|tool ?kit|screwdriver|wrench|"
+        r"plier|pliers|torch|extinguisher)\b",
+    ),
 }
+
+#: Source categories a target may NOT take, applied after the match above.
+#: Electronics draws from "Computers", and Network Components sits inside it --
+#: so without this the Electronics shelf fills with routers while Networking,
+#: which wants exactly those, competes for them.
+NOT_FROM: dict[str, str] = {
+    "Electronics": r"Network Components",
+}
+
+#: Product types, longest phrase first so "duvet cover" wins over "cover" and
+#: "range extender" over "extender". This is what turns a 60-character listing
+#: title into something a person can read in a table: the type is the only part
+#: of the title that says what the thing IS.
+TYPES = [
+    # networking
+    "wi-fi range extender",
+    "range extender",
+    "wifi repeater",
+    "wi-fi router",
+    "3g router",
+    "router",
+    "modem",
+    "network switch",
+    "access point",
+    "wire connector",
+    "charge controller",
+    "wifi adapter",
+    "usb adapter",
+    # electronics
+    "power bank",
+    "pen drive",
+    "hard disk",
+    "memory card",
+    "screen guard",
+    "tempered glass",
+    "back panel",
+    "mobile skin",
+    "phone holder",
+    "socket holder",
+    "camera lens",
+    "earphone",
+    "headphone",
+    "headset",
+    "bluetooth speaker",
+    "speaker",
+    "led light",
+    "usb cable",
+    "data cable",
+    "charger",
+    "keyboard",
+    "mouse",
+    "motherboard",
+    "book cover",
+    "flip cover",
+    # Added after reading the output: without these, "Tucasa LG-186 Table
+    # Lamp" matched only "table" and became "Tucasa Table", and a home
+    # security camera matched nothing and fell back to its first three words.
+    "security camera",
+    "cctv camera",
+    "web camera",
+    "camera",
+    "table lamp",
+    "desk lamp",
+    "lamp",
+    "table fan",
+    "usb fan",
+    "fan",
+    "wall clock",
+    "clock",
+    "photo frame",
+    "extension board",
+    "power strip",
+    "trimmer",
+    "iron",
+    "back cover",
+    "pouch",
+    "phone case",
+    "cable organizer",
+    # furniture / furnishing
+    "duvet cover",
+    "cushion cover",
+    "bed sheet",
+    "bedsheet",
+    "diwan set",
+    "window curtain",
+    "door curtain",
+    "curtain",
+    "mattress",
+    "blanket",
+    "carpet",
+    "table runner",
+    "runner",
+    "dressing table",
+    "coffee table",
+    "study table",
+    "desk chair",
+    "office chair",
+    "chair",
+    "table",
+    "bean bag",
+    "wardrobe",
+    "bookshelf",
+    "shelf",
+    "sofa",
+    "single bed",
+    "bed",
+    "coaster set",
+    "towel",
+    "pillow cover",
+    "apron",
+    "kitchen linen",
+    # The compounds below exist because "table" on its own is greedy: a set of
+    # table napkins matched it and shipped as "Brown Table" with a photograph
+    # of napkins. Longest-match wins, so naming the compound is the fix.
+    "table mat",
+    "table napkin",
+    "table cover",
+    "table cloth",
+    "napkin",
+    "sofa cover",
+    "chair cover",
+    "bed cover",
+    "wall sticker",
+    "wall decal",
+    "door mat",
+    "floor mat",
+    "mat",
+    "cushion",
+    "curtain rod",
+    "bed side table",
+    # office
+    "spiral notebook",
+    "notebook",
+    "diary",
+    "ball pen",
+    "pen",
+    "pencil",
+    "marker",
+    "highlighter",
+    "vacuum bottle",
+    "water bottle",
+    "bottle",
+    "file folder",
+    "sticky notes",
+    "paper weight",
+    # packaging / storage
+    "lunch box",
+    "storage box",
+    "container",
+    "jewel organizer",
+    "organizer",
+    "organiser",
+    "jar",
+    "canister",
+    "tiffin",
+    # safety
+    "safety gloves",
+    "gloves",
+    "glove",
+    "helmet lock",
+    "helmet",
+    "goggles",
+    "face mask",
+    "knee pad",
+    "first aid kit",
+]
+
+#: Words worth keeping in front of the type because they distinguish two
+#: otherwise identical rows. Anything else in the title is dropped.
+QUALIFIERS = [
+    "cotton",
+    "silk",
+    "polyester",
+    "leather",
+    "leatherette",
+    "wooden",
+    "wood",
+    "plastic",
+    "steel",
+    "ceramic",
+    "glass",
+    "solid wood",
+    "printed",
+    "abstract",
+    "floral",
+    "striped",
+    "magnetic",
+    "wireless",
+    "flexible",
+    "portable",
+    "rechargeable",
+    "waterproof",
+    "king",
+    "queen",
+    "single",
+    "double",
+    "black",
+    "white",
+    "blue",
+    "red",
+    "green",
+    "purple",
+    "orange",
+    "brown",
+    "grey",
+    "gray",
+    "pink",
+    "yellow",
+    "silver",
+    "golden",
+]
 
 #: Nothing that would read badly on a projector in a lecture theatre.
 _UNSUITABLE = re.compile(
@@ -100,18 +329,76 @@ def _first_image(cell: str) -> str | None:
     return found.group(0) if found else None
 
 
-def _tidy(name: str) -> str:
-    """Trim a listing title to something that fits a table cell.
+def _brandish(brand: str) -> str:
+    """The brand, if it is one worth printing.
 
-    Source titles carry the entire listing -- colour, pack size, compatibility
-    list. Cut at the first separator, then cap, because the cell this lands in
-    is a good deal narrower than the 255 characters the column allows.
+    Source brands include model codes, colour words and shop names forty
+    characters long. A brand earns its place in a table cell only when it is
+    short and looks like a name.
     """
-    name = re.sub(r"\s+", " ", str(name)).strip()
-    name = re.split(r"\s+[-–|(]\s+", name)[0].strip()
-    if len(name) > 58:
-        name = name[:55].rsplit(" ", 1)[0].rstrip(",") + "…"
-    return name
+    brand = re.sub(r"\s+", " ", str(brand or "")).strip()
+    if not (2 <= len(brand) <= 14):
+        return ""
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9&.\- ]*", brand):
+        return ""
+    if re.search(r"\d{3,}", brand):
+        return ""
+    return brand
+
+
+def _short_name(title: str, brand: str, category: str) -> str:
+    """A listing title reduced to something readable in a table row.
+
+    The source sells to shoppers, so a title carries everything a shopper might
+    search for: brand, model code, colour, size, compatibility list. In a
+    warehouse table none of that is the point -- the row has to say what the
+    thing IS, at a glance, in a column a few centimetres wide.
+
+    So: find the product TYPE, keep at most one distinguishing qualifier in
+    front of it, and put the brand first only when the brand is short enough to
+    be worth the space. "SANTOSH ROYAL FASHION Cotton Printed King sized Double
+    Bedsheet" becomes "Cotton Bedsheet". Titles with no recognisable type fall
+    back to their first few words, which is what a person skimming would keep
+    anyway.
+    """
+    text = re.sub(r"\s+", " ", str(title)).strip()
+    low = text.lower()
+
+    # Whole words, longest first. Both halves of that are load-bearing:
+    # a plain substring test matched "table" inside "portable" and turned a
+    # portable charger into "ShadowFax Table", and taking the first listed
+    # match rather than the longest turned an "Earphone Cable Organizer" into
+    # "Earphone". The most specific phrase that fits is the right answer.
+    kind = ""
+    for candidate in sorted(TYPES, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(candidate)}\b", low):
+            kind = candidate
+            break
+
+    if kind:
+        before = low[: low.index(kind)]
+        qualifier = next(
+            (q for q in QUALIFIERS if re.search(rf"\b{re.escape(q)}\b", before)), ""
+        )
+        core = f"{qualifier} {kind}".strip()
+    else:
+        # No known type in the title. Keep the opening words as they are,
+        # model code and all: "D-Link DAP1320" IS the product name for a
+        # router, and stripping the digits leaves "D-Link", which names the
+        # manufacturer and not the thing on the shelf.
+        core = " ".join(text.split()[:3])
+
+    name = core if not kind else core.title()
+    label = _brandish(brand)
+    if label and label.lower() not in name.lower():
+        candidate = f"{label} {name}"
+        if len(candidate) <= 34:
+            name = candidate
+
+    name = re.sub(r"\s+", " ", name).strip(" -,")
+    if len(name) > 38:
+        name = name[:35].rsplit(" ", 1)[0] + "…"
+    return name or str(title)[:30]
 
 
 def load_source() -> pd.DataFrame:
@@ -137,9 +424,9 @@ def load_source() -> pd.DataFrame:
     # better story than a phone socket holder -- both are real products, but
     # only one looks like the flagship line of a business.
     df["is_device"] = df["product_name"].str.contains(
-        r"(?i)(laptop|tablet|headphone|speaker|hard ?disk|pen ?drive|router|"
+        r"(?i)\b(laptop|tablet|headphone|speaker|hard ?disk|pen ?drive|router|"
         r"keyboard|mouse|monitor|camera|smartwatch|printer|scanner|"
-        r"chair|table|desk|sofa|wardrobe|shelf|mattress|cabinet)",
+        r"chair|table|desk|sofa|wardrobe|shelf|mattress|cabinet)\b",
         regex=True,
         na=False,
     )
@@ -177,9 +464,16 @@ def build_plan() -> list[dict]:
     log.info("Products to re-stock: %d", len(rows))
 
     tree = source["product_category_tree"]
+    title = source["product_name"]
     pools: dict[str, list[tuple[str, str, str]]] = {}
-    for category, pattern in FROM_CATEGORY.items():
-        hit = source[tree.str.contains(pattern, regex=True, na=False)]
+    for category, (form, pattern) in FROM_CATEGORY.items():
+        column = tree if form == "tree" else title
+        hit = source[column.str.contains(pattern, regex=True, na=False)]
+        exclude = NOT_FROM.get(category)
+        if exclude:
+            hit = hit[
+                ~tree.str.contains(exclude, regex=True, na=False).reindex(hit.index)
+            ]
         # Interleaved by brand rather than taken in score order. Score order
         # put four "Aroma Comfort" curtains in the top eight, which reads as a
         # catalogue with one supplier rather than a business with a range.
@@ -219,12 +513,16 @@ def build_plan() -> list[dict]:
             "source_url": None,
         }
         index = taken.get(row["category"], 0)
-        while index < len(pool) and _tidy(pool[index][0]) in used_names:
+        while (
+            index < len(pool)
+            and _short_name(pool[index][0], pool[index][2], row["category"])
+            in used_names
+        ):
             index += 1
         if index < len(pool):
             raw_name, url, brand = pool[index]
             taken[row["category"]] = index + 1
-            name = _tidy(raw_name)
+            name = _short_name(raw_name, brand, row["category"])
             used_names.add(name)
             entry["name"] = name
             entry["brand"] = brand
