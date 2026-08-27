@@ -180,6 +180,12 @@ jobs:
             echo "POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}" > .env
             echo "DATABASE_URL=postgresql://optistock:${{ secrets.DB_PASSWORD }}@db:5432/optistock_db" >> .env
             echo "REDIS_URL=redis://redis:6379/0" >> .env
+            # Rate-limit counters in Redis rather than in the process. In
+            # memory they reset on every deploy -- handing whoever was being
+            # throttled a fresh allowance -- and a second replica would get its
+            # own set, silently doubling every limit. Database 1, so a flush of
+            # the event stream on database 0 cannot clear the throttles.
+            echo "RATE_LIMIT_STORAGE=redis://redis:6379/1" >> .env
             echo "SECRET_KEY=${{ secrets.PROD_SECRET_KEY }}" >> .env
             echo "ALGORITHM=HS256" >> .env
             echo "ACCESS_TOKEN_EXPIRE_MINUTES=60" >> .env

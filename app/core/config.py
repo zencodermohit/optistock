@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     # disappear with nothing logged. Inside compose the containers use
     # redis://redis:6379/0 over the internal network and never see this.
     REDIS_URL: str = "redis://127.0.0.1:6380/0"
+    # Where rate-limit counters live. Empty means in-memory, which is what the
+    # test suite needs -- it resets the limiter between tests, and a shared
+    # store would make them depend on each other. Production points this at
+    # Redis so a restart does not hand every client a fresh allowance, and a
+    # second replica cannot silently double every limit. A database of its own
+    # so a FLUSHDB on the event stream cannot clear the throttles.
+    RATE_LIMIT_STORAGE: str = ""
     # No default — app MUST crash if SECRET_KEY is missing in production.
     # For local dev, set it in the .env file.
     SECRET_KEY: str
