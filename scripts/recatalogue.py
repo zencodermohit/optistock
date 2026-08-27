@@ -603,22 +603,47 @@ def write_outputs(plan: list[dict]) -> None:
 
 
 def apply_plan() -> None:
+    """Write the chosen names and image paths in, matching on SKU.
+
+    SKU rather than id, and this is not a style preference. A plan is built
+    against one database and applied to another -- built here, applied on the
+    server -- and the id of a product is generated per database. The same
+    ELEC-BLU-113-A is 2f4276b1 locally and 75968c78 in production, so matching
+    on id updates exactly nothing there while reporting success, which is the
+    worst possible combination: a deploy that looks clean and changes nothing.
+
+    SKU is the identifier the two environments actually share, because both are
+    seeded from the same script. It is unique across the products table in both
+    (233 of 233), and the count check below refuses to commit if that ever
+    stops being true somewhere.
+    """
     if not PLAN.exists():
         raise SystemExit("No plan found. Run --plan first.")
     plan = json.loads(PLAN.read_text(encoding="utf-8"))
     db = SessionLocal()
     try:
+        changed = 0
         for row in plan:
-            db.execute(
+            result = db.execute(
                 text(
                     "UPDATE products SET name = :name, image_url = :image "
-                    "WHERE id = CAST(:id AS uuid)"
+                    "WHERE sku = :sku"
                 ),
-                {"name": row["name"], "image": row["image_url"], "id": row["id"]},
+                {"name": row["name"], "image": row["image_url"], "sku": row["sku"]},
             )
+            changed += result.rowcount
+
+        if changed != len(plan):
+            db.rollback()
+            raise SystemExit(
+                f"Refusing to commit: {changed} rows matched for {len(plan)} "
+                "planned products. Either a SKU is missing from this database "
+                "or one is duplicated."
+            )
+
         db.commit()
         log.info(
-            "Updated %d products. Revenue, stock, ABC and history untouched.", len(plan)
+            "Updated %d products. Revenue, stock, ABC and history untouched.", changed
         )
     finally:
         db.close()

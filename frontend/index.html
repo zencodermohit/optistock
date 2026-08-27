@@ -9,6 +9,24 @@
       name="description"
       content="Multi-tenant inventory intelligence: live stock, demand forecasting and explainable reorder recommendations."
     />
+
+    <!--
+      The tab icon. A favicon.svg has been sitting in public/ since the project
+      started with nothing linking to it, so every tab showed the browser's
+      default globe -- and the file itself was a purple lightning bolt left
+      over from a template, unrelated to this product.
+
+      Three formats because browsers still disagree. The SVG is what modern
+      Chrome and Firefox use and the only one that stays sharp on a high-DPI
+      screen. The .ico carries 16/32/48/64 for Safari and for Windows, which
+      also requests /favicon.ico by path whatever the markup says. The
+      apple-touch-icon is what iOS uses when the site is saved to a home
+      screen, where a 32px image would be upscaled into mush.
+    -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <script>
       /*
         Decide the theme before the first paint.
