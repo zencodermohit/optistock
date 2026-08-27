@@ -19,7 +19,10 @@ import { ProductMark } from "@/components/products/ProductMark";
 import { Band } from "@/components/ui/Band";
 import { ErrorState, Skeleton } from "@/components/ui/states";
 import { count, currencyCompact, percent } from "@/lib/format";
-import { useProcurement, type Procurement as ProcurementData } from "@/lib/queries";
+import {
+  useProcurement,
+  type Procurement as ProcurementData,
+} from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 /**
@@ -45,7 +48,9 @@ export function Procurement() {
   const data = query.data;
 
   if (query.isError) {
-    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
+    return (
+      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+    );
   }
 
   return (
@@ -106,9 +111,15 @@ const KPI_ICON: Record<string, React.ReactNode> = {
 
 const TONE: Record<string, { chip: string; line: string }> = {
   accent: { chip: "bg-accent-soft text-accent", line: "var(--color-accent)" },
-  warning: { chip: "bg-warning-soft text-warning", line: "var(--color-warning)" },
+  warning: {
+    chip: "bg-warning-soft text-warning",
+    line: "var(--color-warning)",
+  },
   danger: { chip: "bg-danger-soft text-danger", line: "var(--color-danger)" },
-  success: { chip: "bg-success-soft text-success", line: "var(--color-success)" },
+  success: {
+    chip: "bg-success-soft text-success",
+    line: "var(--color-success)",
+  },
 };
 
 function KpiCard({
@@ -184,7 +195,10 @@ function KpiCard({
 function Sparkline({ values, stroke }: { values: number[]; stroke: string }) {
   const peak = Math.max(...values, 1);
   const points = values
-    .map((v, i) => `${(i / Math.max(values.length - 1, 1)) * 64},${24 - (v / peak) * 22}`)
+    .map(
+      (v, i) =>
+        `${(i / Math.max(values.length - 1, 1)) * 64},${24 - (v / peak) * 22}`,
+    )
     .join(" ");
 
   return (
@@ -238,9 +252,9 @@ function Recommendations({
           <CheckCircle2 className="h-8 w-8 text-success" />
           <p className="text-sm font-semibold">Nothing needs ordering</p>
           <p className="max-w-sm text-2xs text-ink-subtle">
-            Every product is forecast to have enough stock for the coming window.
-            Recommendations appear here when forecast demand exceeds what is on
-            the shelf.
+            Every product is forecast to have enough stock for the coming
+            window. Recommendations appear here when forecast demand exceeds
+            what is on the shelf.
           </p>
         </div>
       ) : (
@@ -248,7 +262,12 @@ function Recommendations({
           {rows.map((row) => (
             <li key={row.id} className="p-4">
               <div className="flex flex-wrap items-start gap-3">
-                <ProductMark sku={row.sku} category={row.category} size="lg" />
+                <ProductMark
+                  sku={row.sku}
+                  category={row.category}
+                  imageUrl={row.image_url}
+                  size="lg"
+                />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -357,7 +376,9 @@ function Recommendations({
                       style={{ width: `${row.confidence}%` }}
                     />
                   </span>
-                  <span className="tnum text-2xs font-bold">{row.confidence}%</span>
+                  <span className="tnum text-2xs font-bold">
+                    {row.confidence}%
+                  </span>
                 </span>
               </div>
             </li>
@@ -465,7 +486,9 @@ function Exceptions({
                   SEVERITY[row.severity].chip,
                 )}
               >
-                {EXCEPTION_ICON[row.kind] ?? <AlertTriangle className="h-3.5 w-3.5" />}
+                {EXCEPTION_ICON[row.kind] ?? (
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                )}
               </span>
 
               <div className="min-w-0 flex-1">
@@ -482,7 +505,9 @@ function Exceptions({
                     {currencyCompact(row.amount)}
                   </span>
                 </div>
-                <p className="mt-1 text-sm leading-snug font-semibold">{row.title}</p>
+                <p className="mt-1 text-sm leading-snug font-semibold">
+                  {row.title}
+                </p>
                 <p className="text-2xs text-ink-subtle">{row.detail}</p>
               </div>
 
@@ -518,7 +543,10 @@ function Workspaces({ data }: { data?: ProcurementData }) {
     <section className="mt-4">
       <div className="mb-3 flex items-baseline justify-between">
         <h3 className="font-display text-lg font-bold">Order workspaces</h3>
-        <Link to="/purchase-orders/all" className="text-2xs font-bold text-accent">
+        <Link
+          to="/purchase-orders/all"
+          className="text-2xs font-bold text-accent"
+        >
           Browse all orders →
         </Link>
       </div>
@@ -560,7 +588,9 @@ function Workspaces({ data }: { data?: ProcurementData }) {
                     <span
                       key={index}
                       className="flex-1 rounded-sm bg-accent/25"
-                      style={{ height: `${Math.max((value / peak) * 100, 6)}%` }}
+                      style={{
+                        height: `${Math.max((value / peak) * 100, 6)}%`,
+                      }}
                     />
                   );
                 })}
@@ -581,7 +611,9 @@ function Suppliers({ data }: { data?: ProcurementData }) {
   if (!data) return null;
 
   const rows = [...data.suppliers].sort(
-    (a, b) => b.overdue_now - a.overdue_now || (b.lead_time_days ?? 0) - (a.lead_time_days ?? 0),
+    (a, b) =>
+      b.overdue_now - a.overdue_now ||
+      (b.lead_time_days ?? 0) - (a.lead_time_days ?? 0),
   );
   if (rows.length === 0) return null;
 
@@ -617,8 +649,13 @@ function Suppliers({ data }: { data?: ProcurementData }) {
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map((supplier) => (
-              <tr key={supplier.id} className="transition-colors hover:bg-sunken/50">
-                <td className="px-4 py-2.5 text-sm font-semibold">{supplier.name}</td>
+              <tr
+                key={supplier.id}
+                className="transition-colors hover:bg-sunken/50"
+              >
+                <td className="px-4 py-2.5 text-sm font-semibold">
+                  {supplier.name}
+                </td>
                 <td className="tnum px-4 py-2.5 text-right text-sm">
                   {count(supplier.orders)}
                 </td>
@@ -630,10 +667,14 @@ function Suppliers({ data }: { data?: ProcurementData }) {
                 <td
                   className={cn(
                     "tnum px-4 py-2.5 text-right text-sm font-bold",
-                    supplier.overdue_now > 0 ? "text-danger" : "text-ink-subtle",
+                    supplier.overdue_now > 0
+                      ? "text-danger"
+                      : "text-ink-subtle",
                   )}
                 >
-                  {supplier.overdue_now === 0 ? "—" : count(supplier.overdue_now)}
+                  {supplier.overdue_now === 0
+                    ? "—"
+                    : count(supplier.overdue_now)}
                 </td>
                 <td className="tnum px-4 py-2.5 text-right text-sm text-ink-muted">
                   {supplier.stated_reliability === null

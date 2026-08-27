@@ -130,7 +130,9 @@ const SPECS: Record<string, Spec> = {
                 style={{ width: `${Math.min(r.cumulative * 100, 100)}%` }}
               />
             </span>
-            <span className="tnum text-sm">{percent(r.cumulative * 100, 0)}</span>
+            <span className="tnum text-sm">
+              {percent(r.cumulative * 100, 0)}
+            </span>
           </span>
         ),
       },
@@ -138,7 +140,9 @@ const SPECS: Record<string, Spec> = {
         key: "units",
         label: "Units",
         hideBelow: "lg",
-        render: (r) => <span className="tnum text-sm">{count(r.units_sold)}</span>,
+        render: (r) => (
+          <span className="tnum text-sm">{count(r.units_sold)}</span>
+        ),
       },
       COVER,
       {
@@ -166,7 +170,9 @@ const SPECS: Record<string, Spec> = {
         key: "units",
         label: "Units",
         hideBelow: "md",
-        render: (r) => <span className="tnum text-sm">{count(r.units_sold)}</span>,
+        render: (r) => (
+          <span className="tnum text-sm">{count(r.units_sold)}</span>
+        ),
       },
       REVENUE,
       COVER,
@@ -189,12 +195,12 @@ const SPECS: Record<string, Spec> = {
 
   dead: {
     label: "Dead inventory",
-    question: "How much capital is standing still, and for how long has it been?",
+    question:
+      "How much capital is standing still, and for how long has it been?",
     totalLabel: "capital tied up",
     total: (rows) =>
       currencyCompact(rows.reduce((s, r) => s + r.inventory_value, 0)),
-    empty:
-      "Nothing is dead. Every product in the catalogue has sold recently.",
+    empty: "Nothing is dead. Every product in the catalogue has sold recently.",
     columns: [
       {
         key: "value",
@@ -273,7 +279,8 @@ const SPECS: Record<string, Spec> = {
 
   overstocked: {
     label: "Overstocked",
-    question: "Where is the excess, and how long would it take to sell through?",
+    question:
+      "Where is the excess, and how long would it take to sell through?",
     totalLabel: "capital in excess stock",
     total: (rows) =>
       currencyCompact(rows.reduce((s, r) => s + r.inventory_value, 0)),
@@ -312,7 +319,9 @@ const SPECS: Record<string, Spec> = {
           r.days_cover === null ? (
             // No demand at all. "Never" is the honest answer and a far more
             // useful one than a blank cell or a very large number of months.
-            <span className="text-2xs font-bold text-danger">never at this rate</span>
+            <span className="text-2xs font-bold text-danger">
+              never at this rate
+            </span>
           ) : (
             <span className="tnum text-sm">
               {(r.days_cover / 30).toFixed(1)} months
@@ -330,7 +339,9 @@ export function ProductWorkspace() {
   const [params] = useSearchParams();
 
   const incoming = Number(params.get("days"));
-  const [days, setDays] = useState([30, 90, 180].includes(incoming) ? incoming : 30);
+  const [days, setDays] = useState(
+    [30, 90, 180].includes(incoming) ? incoming : 30,
+  );
 
   const spec = workspaceKey ? SPECS[workspaceKey] : undefined;
   const query = useProductIntelligence(days, workspaceKey);
@@ -359,7 +370,9 @@ export function ProductWorkspace() {
   if (!spec) return <Navigate to="/products" replace />;
 
   if (query.isError) {
-    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
+    return (
+      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+    );
   }
 
   const card = data?.workspaces.find((w) => w.key === workspaceKey);
@@ -376,7 +389,9 @@ export function ProductWorkspace() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <h1 className="text-2xl leading-tight font-semibold">{spec.label}</h1>
+            <h1 className="text-2xl leading-tight font-semibold">
+              {spec.label}
+            </h1>
             <p className="mt-1.5 text-base text-ink-muted">{spec.question}</p>
           </div>
         </div>
@@ -417,13 +432,17 @@ export function ProductWorkspace() {
         <Summary
           label="Products in this group"
           value={data ? count(rows.length) : undefined}
-          note={data ? `of ${count(data.kpis.total)} in the catalogue` : undefined}
+          note={
+            data ? `of ${count(data.kpis.total)} in the catalogue` : undefined
+          }
         />
         <Summary
           label={spec.totalLabel}
           value={data ? spec.total(rows) : undefined}
           note={
-            data && data.kpis.inventory_value > 0 && spec.totalLabel.includes("capital")
+            data &&
+            data.kpis.inventory_value > 0 &&
+            spec.totalLabel.includes("capital")
               ? `${percent(
                   (rows.reduce((s, r) => s + r.inventory_value, 0) /
                     data.kpis.inventory_value) *
@@ -487,7 +506,10 @@ export function ProductWorkspace() {
                 </tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="transition-colors hover:bg-sunken/50">
+                  <tr
+                    key={row.id}
+                    className="transition-colors hover:bg-sunken/50"
+                  >
                     <td className="tnum px-3 py-2.5 text-2xs text-ink-subtle">
                       {row.rank}
                     </td>
@@ -496,7 +518,12 @@ export function ProductWorkspace() {
                         to={`/products/${row.id}?days=${days}`}
                         className="flex items-center gap-2.5"
                       >
-                        <ProductMark sku={row.sku} category={row.category} size="sm" />
+                        <ProductMark
+                          sku={row.sku}
+                          category={row.category}
+                          imageUrl={row.image_url}
+                          size="sm"
+                        />
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-semibold hover:text-accent">
                             {row.name}
@@ -613,7 +640,18 @@ function Summary({
  *  where somebody goes to ask a question the screen did not answer, so it
  *  carries the whole row and the rank the workspace put it in. */
 function downloadCsv(rows: Row[], name: string) {
-  const header = ["Rank", "SKU", "Product", "Category", "On hand", "Days cover", "Units sold", "Revenue", "Inventory value", "Growth"];
+  const header = [
+    "Rank",
+    "SKU",
+    "Product",
+    "Category",
+    "On hand",
+    "Days cover",
+    "Units sold",
+    "Revenue",
+    "Inventory value",
+    "Growth",
+  ];
   const lines = rows.map((r) =>
     [
       r.rank,

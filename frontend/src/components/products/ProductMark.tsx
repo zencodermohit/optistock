@@ -1,20 +1,27 @@
+import { useState } from "react";
+
 import { cn } from "@/lib/utils";
 
 /**
- * A product's visual identity, generated rather than uploaded.
+ * A product's photograph, or a generated stand-in when there isn't one.
  *
- * There is no image column on Product and no photographs for two hundred SKUs.
- * The options were a broken-image placeholder on every card, no imagery at all,
- * or something derived — and derived wins, because it is DETERMINISTIC: the
- * same SKU produces the same mark on every screen, forever, with no storage, no
- * upload flow and no empty state.
+ * This began as the stand-in alone, because Product had no image column and
+ * there were no photographs for two hundred SKUs. Both of those are now false,
+ * so the photograph comes first and the generated mark became the fallback --
+ * which is the shape it should have had all along.
  *
- * Colour comes from the category, so a wall of Furniture reads as one family at
- * a glance. The glyph pattern comes from a hash of the SKU, so two products in
- * the same category are still distinguishable from each other.
+ * The fallback is worth keeping rather than replacing with a grey placeholder.
+ * It is DETERMINISTIC: the same SKU draws the same mark on every screen,
+ * forever, with no storage and no empty state. Colour comes from the category,
+ * so a wall of Furniture reads as one family; the glyph comes from a hash of
+ * the SKU, so two products in the same category still look different. A gap in
+ * a catalogue is ordinary, and this dresses it as a design rather than a fault.
  *
- * It is not pretending to be a photograph. It is a chip that identifies, which
- * is the job a thumbnail was doing on that card anyway.
+ * Everything about the image path is sized for lists: two hundred of these can
+ * be on screen at once, so the box is sized before the image arrives (nothing
+ * reflows), off-screen images are never requested, and decode happens off the
+ * main thread. A path that 404s falls back to the mark rather than to the
+ * browser's broken-image glyph.
  */
 
 /** Category → the pair of tokens its mark is drawn in. Anything unrecognised
@@ -53,19 +60,48 @@ function hash(value: string): number {
   return h;
 }
 
+const PIXELS = { sm: 32, md: 40, lg: 56 } as const;
+
 export function ProductMark({
   sku,
   category,
+  imageUrl,
   size = "md",
 }: {
   sku: string;
   category?: string | null;
+  /** Path to the product's photograph. Absent or null draws the mark. */
+  imageUrl?: string | null;
   size?: "sm" | "md" | "lg";
 }) {
+  const [failed, setFailed] = useState(false);
   const family = (category && FAMILY[category]) || NEUTRAL;
   const glyph = GLYPHS[hash(sku) % GLYPHS.length];
-  const box = size === "lg" ? "h-14 w-14" : size === "sm" ? "h-8 w-8" : "h-10 w-10";
-  const icon = size === "lg" ? "h-7 w-7" : size === "sm" ? "h-4 w-4" : "h-5 w-5";
+  const box =
+    size === "lg" ? "h-14 w-14" : size === "sm" ? "h-8 w-8" : "h-10 w-10";
+  const icon =
+    size === "lg" ? "h-7 w-7" : size === "sm" ? "h-4 w-4" : "h-5 w-5";
+
+  if (imageUrl && !failed) {
+    return (
+      <img
+        src={imageUrl}
+        // Empty, not the product name. The name is already beside this on
+        // every screen that uses it, and announcing it twice per row makes a
+        // list of two hundred twice as long to listen to.
+        alt=""
+        width={PIXELS[size]}
+        height={PIXELS[size]}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className={cn(
+          "shrink-0 rounded-xl border border-border bg-surface object-contain",
+          box,
+        )}
+      />
+    );
+  }
 
   return (
     <span
@@ -76,7 +112,11 @@ export function ProductMark({
         family.bg,
       )}
     >
-      <svg viewBox="0 0 24 24" className={cn(icon, family.fg)} fill="currentColor">
+      <svg
+        viewBox="0 0 24 24"
+        className={cn(icon, family.fg)}
+        fill="currentColor"
+      >
         <path d={glyph} opacity="0.85" />
       </svg>
     </span>

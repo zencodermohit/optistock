@@ -1071,6 +1071,8 @@ export interface ProductRow {
   sku: string;
   name: string;
   category: string | null;
+  /** Path to the product photograph, or null. */
+  image_url: string | null;
   status: string;
   abc_class: string | null;
   created_at: string;
@@ -1149,6 +1151,7 @@ export interface ProductCommandCenter {
     sku: string;
     name: string;
     category: string | null;
+    image_url: string | null;
     status: string;
     abc_class: string | null;
     unit_cost: number;
@@ -1206,6 +1209,7 @@ export interface ProductCommandCenter {
     sku: string;
     name: string;
     category: string | null;
+    image_url: string | null;
     orders: number;
     attach_rate: number | null;
   }[];
@@ -1273,6 +1277,7 @@ export interface Procurement {
     sku: string;
     name: string;
     category: string | null;
+    image_url: string | null;
     warehouse: string;
     on_hand: number;
     days_of_stock: number | null;

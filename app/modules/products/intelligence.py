@@ -172,6 +172,7 @@ def product_intelligence(
                 "sku": product.sku,
                 "name": product.name,
                 "category": product.category,
+                "image_url": product.image_url,
                 "status": product.status,
                 "abc_class": product.abc_class,
                 "created_at": product.created_at,

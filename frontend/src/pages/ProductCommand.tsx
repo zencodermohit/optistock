@@ -59,15 +59,15 @@ export function ProductCommand() {
   // reports demand falling -- both true, and together they read as a bug.
   const [params] = useSearchParams();
   const incoming = Number(params.get("days"));
-  const [days, setDays] = useState(
-    RANGES.includes(incoming) ? incoming : 90,
-  );
+  const [days, setDays] = useState(RANGES.includes(incoming) ? incoming : 90);
 
   const query = useProductCommand(productId, days);
   const data = query.data;
 
   if (query.isError) {
-    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
+    return (
+      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+    );
   }
 
   return (
@@ -133,7 +133,12 @@ function Header({
 
         {p ? (
           <>
-            <ProductMark sku={p.sku} category={p.category} size="lg" />
+            <ProductMark
+              sku={p.sku}
+              category={p.category}
+              imageUrl={p.image_url}
+              size="lg"
+            />
             <div>
               <h1 className="text-2xl leading-tight font-semibold">{p.name}</h1>
               <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
@@ -165,7 +170,9 @@ function Header({
             onClick={() => onDays(option)}
             className={cn(
               "rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
-              days === option ? "bg-accent text-on-accent" : "text-ink-muted hover:text-ink",
+              days === option
+                ? "bg-accent text-on-accent"
+                : "text-ink-muted hover:text-ink",
             )}
           >
             {option}d
@@ -179,10 +186,22 @@ function Header({
 /* -------------------------------------------------------------------------- */
 
 const BAND: Record<string, { ring: string; text: string; label: string }> = {
-  strong: { ring: "var(--color-success)", text: "text-success", label: "Strong" },
+  strong: {
+    ring: "var(--color-success)",
+    text: "text-success",
+    label: "Strong",
+  },
   fair: { ring: "var(--color-info)", text: "text-info", label: "Fair" },
-  weak: { ring: "var(--color-warning)", text: "text-warning", label: "Needs work" },
-  critical: { ring: "var(--color-danger)", text: "text-danger", label: "Critical" },
+  weak: {
+    ring: "var(--color-warning)",
+    text: "text-warning",
+    label: "Needs work",
+  },
+  critical: {
+    ring: "var(--color-danger)",
+    text: "text-danger",
+    label: "Critical",
+  },
 };
 
 /** The score, and every point it lost. Deliberately not a weighted average of
@@ -241,8 +260,12 @@ function HealthCard({ data }: { data: ProductCommandCenter }) {
                 {factor.impact}
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-semibold">{factor.label}</span>
-                <span className="block text-2xs text-ink-subtle">{factor.detail}</span>
+                <span className="block text-sm font-semibold">
+                  {factor.label}
+                </span>
+                <span className="block text-2xs text-ink-subtle">
+                  {factor.detail}
+                </span>
               </span>
             </li>
           ))}
@@ -250,8 +273,8 @@ function HealthCard({ data }: { data: ProductCommandCenter }) {
       )}
 
       <p className="mt-3 border-t border-border pt-2.5 text-2xs text-ink-subtle">
-        Starts at 100. Each named problem deducts a fixed number of points, so the
-        score can always be explained.
+        Starts at 100. Each named problem deducts a fixed number of points, so
+        the score can always be explained.
       </p>
     </Band>
   );
@@ -298,7 +321,9 @@ function Metrics({ data }: { data: ProductCommandCenter }) {
         icon={<TrendingUp className="h-4 w-4" />}
         label="Demand trend"
         value={
-          m.growth === null ? "—" : `${m.growth >= 0 ? "+" : "−"}${percent(Math.abs(m.growth) * 100, 0)}`
+          m.growth === null
+            ? "—"
+            : `${m.growth >= 0 ? "+" : "−"}${percent(Math.abs(m.growth) * 100, 0)}`
         }
         note={
           m.growth === null
@@ -325,15 +350,28 @@ function DemandChart({ data }: { data: ProductCommandCenter }) {
     <Band className="flex flex-1 flex-col">
       <div className="flex items-baseline justify-between border-b border-border px-4 py-3">
         <h3 className="font-display text-lg font-bold">Units sold</h3>
-        <span className="text-2xs text-ink-subtle">last {data.range_days} days</span>
+        <span className="text-2xs text-ink-subtle">
+          last {data.range_days} days
+        </span>
       </div>
       <div className="min-h-[13rem] flex-1 p-3">
         <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-          <AreaChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <AreaChart
+            data={series}
+            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+          >
             <defs>
               <linearGradient id="unitfill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-accent)" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="var(--color-accent)" stopOpacity={0} />
+                <stop
+                  offset="0%"
+                  stopColor="var(--color-accent)"
+                  stopOpacity={0.3}
+                />
+                <stop
+                  offset="100%"
+                  stopColor="var(--color-accent)"
+                  stopOpacity={0}
+                />
               </linearGradient>
             </defs>
             <CartesianGrid
@@ -415,7 +453,10 @@ function Seasonality({ data }: { data: ProductCommandCenter }) {
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%" minHeight={210}>
-            <BarChart data={months} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <BarChart
+              data={months}
+              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            >
               <CartesianGrid
                 stroke="var(--color-border)"
                 strokeDasharray="3 3"
@@ -449,8 +490,14 @@ function Seasonality({ data }: { data: ProductCommandCenter }) {
                   // bar would read as a collapse in demand.
                   <Cell
                     key={m.month}
-                    fill={m.partial ? "var(--color-accent-soft)" : "var(--color-accent)"}
-                    stroke={m.partial ? "var(--color-accent-border)" : undefined}
+                    fill={
+                      m.partial
+                        ? "var(--color-accent-soft)"
+                        : "var(--color-accent)"
+                    }
+                    stroke={
+                      m.partial ? "var(--color-accent-border)" : undefined
+                    }
                   />
                 ))}
               </Bar>
@@ -470,8 +517,18 @@ function Seasonality({ data }: { data: ProductCommandCenter }) {
 function monthLabel(value: string): string {
   const [year, month] = value.split("-");
   const names = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
   ];
   return `${names[Number(month) - 1] ?? month} ${year.slice(2)}`;
 }
@@ -612,7 +669,10 @@ function Distribution({ data }: { data: ProductCommandCenter }) {
                 {site.reorder_point > 0 &&
                   ` · reorders at ${count(site.reorder_point)}`}
                 {site.below_reorder && (
-                  <span className="font-bold text-danger"> · below reorder point</span>
+                  <span className="font-bold text-danger">
+                    {" "}
+                    · below reorder point
+                  </span>
                 )}
               </p>
             </li>
@@ -649,7 +709,12 @@ function BoughtTogether({ data }: { data: ProductCommandCenter }) {
                 to={`/products/${item.id}`}
                 className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-sunken/50"
               >
-                <ProductMark sku={item.sku} category={item.category} size="sm" />
+                <ProductMark
+                  sku={item.sku}
+                  category={item.category}
+                  imageUrl={item.image_url}
+                  size="sm"
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">
                     {item.name}
@@ -695,7 +760,9 @@ function Lifetime({ data }: { data: ProductCommandCenter }) {
           <Event
             label="First sale"
             value={date(l.first_sale)}
-            note={l.days_selling ? `${count(l.days_selling)} days ago` : undefined}
+            note={
+              l.days_selling ? `${count(l.days_selling)} days ago` : undefined
+            }
           />
           {l.best_month && (
             <Event
@@ -782,8 +849,8 @@ function Purchases({ data }: { data: ProductCommandCenter }) {
       </div>
       {purchases.length === 0 ? (
         <p className="px-4 py-6 text-sm text-ink-muted">
-          This product has never been ordered from a supplier. The lead time used
-          in the replenishment figures is an assumption, not a measurement.
+          This product has never been ordered from a supplier. The lead time
+          used in the replenishment figures is an assumption, not a measurement.
         </p>
       ) : (
         <ul className="divide-y divide-border">

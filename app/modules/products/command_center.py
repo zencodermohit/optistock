@@ -305,14 +305,16 @@ def product_command_center(
             "sku": row[1],
             "name": row[2],
             "category": row[3],
-            "orders": int(row[4]),
-            "attach_rate": round(int(row[4]) / order_count, 3) if order_count else None,
+            "image_url": row[4],
+            "orders": int(row[5]),
+            "attach_rate": round(int(row[5]) / order_count, 3) if order_count else None,
         }
         for row in db.query(
             Product.id,
             Product.sku,
             Product.name,
             Product.category,
+            Product.image_url,
             func.count(func.distinct(SaleItem.sale_id)).label("orders"),
         )
         .join(SaleItem, SaleItem.product_id == product_id)
@@ -324,7 +326,13 @@ def product_command_center(
             Sale.company_id == company_id,
             Sale.created_at >= window_start,
         )
-        .group_by(Product.id, Product.sku, Product.name, Product.category)
+        .group_by(
+            Product.id,
+            Product.sku,
+            Product.name,
+            Product.category,
+            Product.image_url,
+        )
         .order_by(func.count(func.distinct(SaleItem.sale_id)).desc())
         .limit(5)
         .all()
@@ -414,6 +422,7 @@ def product_command_center(
         "product": {
             "id": str(product.id),
             "sku": product.sku,
+            "image_url": product.image_url,
             "name": product.name,
             "category": product.category,
             "status": product.status,
@@ -421,9 +430,9 @@ def product_command_center(
             "unit_cost": cost,
             "selling_price": price,
             "margin": round(margin, 4) if margin is not None else None,
-            "created_at": product.created_at.isoformat()
-            if product.created_at
-            else None,
+            "created_at": (
+                product.created_at.isoformat() if product.created_at else None
+            ),
         },
         "health": _health(bucket, cover, growth, margin, days_since_sale),
         "metrics": {
@@ -450,9 +459,9 @@ def product_command_center(
                 "location_code": s.location_code,
                 "quantity": int(s.quantity or 0),
                 "reorder_point": int(s.reorder_point or 0),
-                "share": round(int(s.quantity or 0) / on_hand, 4)
-                if on_hand > 0
-                else 0.0,
+                "share": (
+                    round(int(s.quantity or 0) / on_hand, 4) if on_hand > 0 else 0.0
+                ),
                 "below_reorder": (s.reorder_point or 0) > 0
                 and int(s.quantity or 0) <= int(s.reorder_point or 0),
             }

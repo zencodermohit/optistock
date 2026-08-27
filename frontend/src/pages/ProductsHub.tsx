@@ -57,7 +57,9 @@ export function ProductsHub() {
   );
 
   if (query.isError) {
-    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
+    return (
+      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+    );
   }
 
   const k = data?.kpis;
@@ -106,14 +108,20 @@ export function ProductsHub() {
           icon={<Trophy className="h-4 w-4" />}
           label="Best sellers"
           value={k ? count(k.best_sellers) : undefined}
-          note={k ? `${currencyCompact(k.best_seller_revenue)} earned` : undefined}
+          note={
+            k ? `${currencyCompact(k.best_seller_revenue)} earned` : undefined
+          }
           tone="success"
         />
         <Metric
           icon={<TrendingUp className="h-4 w-4" />}
           label="Growing"
           value={k ? count(k.growing) : undefined}
-          note={data ? `over ${percent(data.definitions.growth_threshold * 100, 0)} up` : undefined}
+          note={
+            data
+              ? `over ${percent(data.definitions.growth_threshold * 100, 0)} up`
+              : undefined
+          }
           tone="info"
         />
         <Metric
@@ -126,8 +134,14 @@ export function ProductsHub() {
         <Metric
           icon={<Ban className="h-4 w-4" />}
           label="Capital stuck"
-          value={k ? currencyCompact(k.dead_value + k.overstock_value) : undefined}
-          note={k ? `${count(k.dead)} dead · ${count(k.overstocked)} overstocked` : undefined}
+          value={
+            k ? currencyCompact(k.dead_value + k.overstock_value) : undefined
+          }
+          note={
+            k
+              ? `${count(k.dead)} dead · ${count(k.overstocked)} overstocked`
+              : undefined
+          }
           tone="capacity"
         />
       </div>
@@ -166,7 +180,14 @@ export function ProductsHub() {
 
 const BUCKET: Record<
   Bucket,
-  { label: string; ring: string; dot: string; soft: string; text: string; hint: string }
+  {
+    label: string;
+    ring: string;
+    dot: string;
+    soft: string;
+    text: string;
+    hint: string;
+  }
 > = {
   critical: {
     label: "Out of stock",
@@ -226,7 +247,10 @@ const BUCKET: Record<
  * a ranking and "fastest growing" includes products whose bucket is something
  * more urgent — so each one restates the server's rule rather than guessing.
  */
-function applyFilter(products: ProductRow[], filter: string | null): ProductRow[] {
+function applyFilter(
+  products: ProductRow[],
+  filter: string | null,
+): ProductRow[] {
   if (!filter) return products;
   if (filter in BUCKET) return products.filter((p) => p.bucket === filter);
 
@@ -239,7 +263,9 @@ function applyFilter(products: ProductRow[], filter: string | null): ProductRow[
     case "growing":
       return products.filter((p) => p.growth !== null && p.growth > 0);
     case "at_risk":
-      return products.filter((p) => p.bucket === "at_risk" || p.bucket === "critical");
+      return products.filter(
+        (p) => p.bucket === "at_risk" || p.bucket === "critical",
+      );
     case "new": {
       const cutoff = Date.now() - 30 * 86_400_000;
       return products.filter((p) => new Date(p.created_at).getTime() >= cutoff);
@@ -283,7 +309,9 @@ function HealthRing({
   });
 
   const focused = selected && selected in BUCKET ? (selected as Bucket) : null;
-  const focusedEntry = focused ? distribution.find((d) => d.key === focused) : null;
+  const focusedEntry = focused
+    ? distribution.find((d) => d.key === focused)
+    : null;
 
   return (
     <Band className="flex flex-col p-4">
@@ -350,7 +378,12 @@ function HealthRing({
                   active ? "bg-sunken" : "hover:bg-sunken/60",
                 )}
               >
-                <span className={cn("h-2 w-2 shrink-0 rounded-full", BUCKET[entry.key].dot)} />
+                <span
+                  className={cn(
+                    "h-2 w-2 shrink-0 rounded-full",
+                    BUCKET[entry.key].dot,
+                  )}
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">
                     {BUCKET[entry.key].label}
@@ -359,7 +392,9 @@ function HealthRing({
                     {BUCKET[entry.key].hint}
                   </span>
                 </span>
-                <span className="tnum shrink-0 text-sm font-bold">{entry.count}</span>
+                <span className="tnum shrink-0 text-sm font-bold">
+                  {entry.count}
+                </span>
               </button>
             </li>
           );
@@ -374,33 +409,37 @@ function HealthRing({
 /** Icon and tone per workspace. The tones deliberately echo the ring: the card
  *  for the overstocked group is violet because the violet arc is the overstocked
  *  arc, so the eye connects the two halves of the page without a legend. */
-const WORKSPACE_STYLE: Record<string, { icon: React.ReactNode; chip: string }> = {
-  best_sellers: {
-    icon: <Trophy className="h-4 w-4" />,
-    chip: "bg-success-soft text-success",
-  },
-  growing: {
-    icon: <TrendingUp className="h-4 w-4" />,
-    chip: "bg-info-soft text-info",
-  },
-  dead: { icon: <Ban className="h-4 w-4" />, chip: "bg-sunken text-ink-muted" },
-  at_risk: {
-    icon: <PackageX className="h-4 w-4" />,
-    chip: "bg-danger-soft text-danger",
-  },
-  overstocked: {
-    icon: <Boxes className="h-4 w-4" />,
-    chip: "bg-capacity-soft text-capacity",
-  },
-  new: {
-    icon: <Sparkles className="h-4 w-4" />,
-    chip: "bg-accent-soft text-accent",
-  },
-  discontinued: {
-    icon: <Activity className="h-4 w-4" />,
-    chip: "bg-sunken text-ink-muted",
-  },
-};
+const WORKSPACE_STYLE: Record<string, { icon: React.ReactNode; chip: string }> =
+  {
+    best_sellers: {
+      icon: <Trophy className="h-4 w-4" />,
+      chip: "bg-success-soft text-success",
+    },
+    growing: {
+      icon: <TrendingUp className="h-4 w-4" />,
+      chip: "bg-info-soft text-info",
+    },
+    dead: {
+      icon: <Ban className="h-4 w-4" />,
+      chip: "bg-sunken text-ink-muted",
+    },
+    at_risk: {
+      icon: <PackageX className="h-4 w-4" />,
+      chip: "bg-danger-soft text-danger",
+    },
+    overstocked: {
+      icon: <Boxes className="h-4 w-4" />,
+      chip: "bg-capacity-soft text-capacity",
+    },
+    new: {
+      icon: <Sparkles className="h-4 w-4" />,
+      chip: "bg-accent-soft text-accent",
+    },
+    discontinued: {
+      icon: <Activity className="h-4 w-4" />,
+      chip: "bg-sunken text-ink-muted",
+    },
+  };
 
 /** What each workspace is worth, and what the number means. The value column
  *  changes meaning between cards — revenue for the ones about selling, capital
@@ -480,12 +519,15 @@ function Workspaces({
               <span
                 className={cn(
                   "flex h-7 w-7 items-center justify-center rounded-lg",
-                  WORKSPACE_STYLE[workspace.key]?.chip ?? "bg-accent-soft text-accent",
+                  WORKSPACE_STYLE[workspace.key]?.chip ??
+                    "bg-accent-soft text-accent",
                 )}
               >
                 {WORKSPACE_STYLE[workspace.key]?.icon}
               </span>
-              <span className="font-display text-sm font-bold">{workspace.label}</span>
+              <span className="font-display text-sm font-bold">
+                {workspace.label}
+              </span>
               <span className="tnum ml-auto text-lg font-extrabold">
                 {count(workspace.count)}
               </span>
@@ -515,14 +557,19 @@ function Workspaces({
                     <span
                       key={i}
                       className="flex-1 rounded-sm bg-accent/25"
-                      style={{ height: `${Math.max((value / peak) * 100, 6)}%` }}
+                      style={{
+                        height: `${Math.max((value / peak) * 100, 6)}%`,
+                      }}
                     />
                   ))}
                 </div>
 
                 {workspace.top_product && (
                   <p className="mt-2 truncate text-2xs text-ink-subtle">
-                    Top: <span className="text-ink-muted">{workspace.top_product}</span>
+                    Top:{" "}
+                    <span className="text-ink-muted">
+                      {workspace.top_product}
+                    </span>
                   </p>
                 )}
               </>
@@ -612,10 +659,16 @@ function Catalogue({
                 to={`/products/${product.id}?days=${days}`}
                 className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-sunken/50"
               >
-                <ProductMark sku={product.sku} category={product.category} />
+                <ProductMark
+                  sku={product.sku}
+                  category={product.category}
+                  imageUrl={product.image_url}
+                />
 
                 <div className="min-w-0 flex-[2]">
-                  <p className="truncate text-sm font-semibold">{product.name}</p>
+                  <p className="truncate text-sm font-semibold">
+                    {product.name}
+                  </p>
                   <p className="truncate text-2xs text-ink-subtle">
                     {product.sku}
                     {product.category && ` · ${product.category}`}
@@ -633,7 +686,9 @@ function Catalogue({
                 </span>
 
                 <div className="hidden w-24 shrink-0 text-right md:block">
-                  <p className="tnum text-sm font-bold">{count(product.on_hand)}</p>
+                  <p className="tnum text-sm font-bold">
+                    {count(product.on_hand)}
+                  </p>
                   <p className="text-2xs text-ink-subtle">on hand</p>
                 </div>
 
@@ -728,7 +783,12 @@ function Metric({
 
   return (
     <Band className="p-4">
-      <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg", chip)}>
+      <span
+        className={cn(
+          "flex h-8 w-8 items-center justify-center rounded-lg",
+          chip,
+        )}
+      >
         {icon}
       </span>
       <p className="eyebrow mt-3">{label}</p>
