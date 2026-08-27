@@ -30,6 +30,8 @@ export interface Product {
   unit_cost: string;
   selling_price: string;
   status: string;
+  /** Path on this origin, or null when the product has no photograph. */
+  image_url: string | null;
   abc_class: string | null;
   abc_calculated_at: string | null;
   created_at: string;
@@ -89,7 +91,8 @@ export const keys = {
   suggestions: () => ["insights", "recommendations"] as const,
   accuracy: () => ["insights", "accuracy"] as const,
   assistantStatus: () => ["assistant", "status"] as const,
-  assistantActions: (status?: string) => ["assistant", "actions", status] as const,
+  assistantActions: (status?: string) =>
+    ["assistant", "actions", status] as const,
   warehouses: () => ["warehouses"] as const,
   recommendations: () => ["recommendations"] as const,
 };
@@ -97,7 +100,12 @@ export const keys = {
 function queryString(params: Record<string, unknown>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== "" && value !== false) {
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== "" &&
+      value !== false
+    ) {
       search.set(key, String(value));
     }
   }
@@ -117,7 +125,9 @@ export function useProducts(
   return useQuery({
     queryKey: keys.products(params),
     queryFn: () =>
-      api<Paginated<Product>>(`/products/${queryString({ limit: 100, ...params })}`),
+      api<Paginated<Product>>(
+        `/products/${queryString({ limit: 100, ...params })}`,
+      ),
     placeholderData: (previous) => previous,
   });
 }
@@ -167,7 +177,11 @@ export interface AssistantStatus {
   provider: string;
   model: string | null;
   tools: { name: string; description: string }[];
-  data_mode: { mode: "demo" | "production"; masked_fields: string[]; note: string };
+  data_mode: {
+    mode: "demo" | "production";
+    masked_fields: string[];
+    note: string;
+  };
   max_tool_calls: number;
 }
 
@@ -227,7 +241,8 @@ export interface ScoredForecast {
 export function useSuggestions() {
   return useQuery({
     queryKey: keys.suggestions(),
-    queryFn: () => api<Paginated<Suggestion>>("/insights/recommendations?limit=100"),
+    queryFn: () =>
+      api<Paginated<Suggestion>>("/insights/recommendations?limit=100"),
   });
 }
 
@@ -304,7 +319,8 @@ export interface AlertPage extends Paginated<Alert> {
 export function useAlerts(params: { status?: string; severity?: string } = {}) {
   return useQuery({
     queryKey: keys.alerts(params),
-    queryFn: () => api<AlertPage>(`/alerts/${queryString({ limit: 100, ...params })}`),
+    queryFn: () =>
+      api<AlertPage>(`/alerts/${queryString({ limit: 100, ...params })}`),
     placeholderData: (previous) => previous,
     // Alerts are raised by a background consumer, not by anything this tab did,
     // so the page has to go looking for them.
@@ -603,7 +619,9 @@ export interface SaleLine {
   unit_price: number;
 }
 
-export function useSalesLedger(params: { status?: string; limit?: number } = {}) {
+export function useSalesLedger(
+  params: { status?: string; limit?: number } = {},
+) {
   return useQuery({
     queryKey: ["sales", "ledger", params] as const,
     queryFn: () =>
@@ -652,7 +670,9 @@ export function useCustomerDirectory(search?: string) {
   return useQuery({
     queryKey: ["customers", "directory", search] as const,
     queryFn: () =>
-      api<{ data: CustomerRow[] }>(`/customers/directory${queryString({ search })}`),
+      api<{ data: CustomerRow[] }>(
+        `/customers/directory${queryString({ search })}`,
+      ),
     placeholderData: (previous) => previous,
   });
 }
@@ -750,7 +770,13 @@ export function useReconciliations() {
 export function useReconDecision() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision }: { id: string; decision: "approve" | "reject" }) =>
+    mutationFn: ({
+      id,
+      decision,
+    }: {
+      id: string;
+      decision: "approve" | "reject";
+    }) =>
       api<ReconRow>(`/reconciliations/${id}/${decision}`, { method: "PATCH" }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["reconciliations"] });
@@ -772,7 +798,9 @@ export interface AuditEntry {
   new_values: Record<string, unknown> | null;
 }
 
-export function useAuditTrail(params: { entity_name?: string; action?: string } = {}) {
+export function useAuditTrail(
+  params: { entity_name?: string; action?: string } = {},
+) {
   return useQuery({
     queryKey: ["audit", "trail", params] as const,
     queryFn: () =>
@@ -1024,7 +1052,8 @@ export interface CommandCenter {
 export function useCommandCenter(warehouseId?: string) {
   return useQuery({
     queryKey: ["warehouses", "command", warehouseId] as const,
-    queryFn: () => api<CommandCenter>(`/warehouses/${warehouseId}/command-center`),
+    queryFn: () =>
+      api<CommandCenter>(`/warehouses/${warehouseId}/command-center`),
     enabled: Boolean(warehouseId),
     refetchInterval: 20_000,
   });
@@ -1035,12 +1064,7 @@ export function useCommandCenter(warehouseId?: string) {
 /* -------------------------------------------------------------------------- */
 
 export type Bucket =
-  | "critical"
-  | "at_risk"
-  | "dead"
-  | "overstocked"
-  | "growing"
-  | "healthy";
+  "critical" | "at_risk" | "dead" | "overstocked" | "growing" | "healthy";
 
 export interface ProductRow {
   id: string;
@@ -1216,7 +1240,9 @@ export function useProductCommand(productId: string | undefined, days: number) {
   return useQuery({
     queryKey: ["products", "command-center", productId, days] as const,
     queryFn: () =>
-      api<ProductCommandCenter>(`/products/${productId}/command-center?days=${days}`),
+      api<ProductCommandCenter>(
+        `/products/${productId}/command-center?days=${days}`,
+      ),
     enabled: Boolean(productId),
     placeholderData: (previous) => previous,
     staleTime: 60_000,

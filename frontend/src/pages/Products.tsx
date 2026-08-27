@@ -2,6 +2,7 @@ import { Package, Search } from "lucide-react";
 import { useState } from "react";
 
 import { PageHeader } from "@/components/layout/AppShell";
+import { ProductThumb } from "@/components/ui/ProductThumb";
 import { AbcBadge, StatusBadge } from "@/components/ui/Badge";
 import { Band, BandHeader } from "@/components/ui/Band";
 import { Button } from "@/components/ui/Button";
@@ -89,7 +90,10 @@ export function Products() {
         {products.isPending ? (
           <TableSkeleton rows={10} cols={6} />
         ) : products.isError ? (
-          <ErrorState error={products.error} onRetry={() => products.refetch()} />
+          <ErrorState
+            error={products.error}
+            onRetry={() => products.refetch()}
+          />
         ) : rows.length === 0 ? (
           <EmptyState
             icon={<Package className="h-5 w-5" />}
@@ -135,8 +139,16 @@ export function Products() {
                       <TD className="tnum text-2xs whitespace-nowrap text-ink-subtle">
                         {p.sku}
                       </TD>
-                      <TD className="max-w-[18rem] truncate font-medium">
-                        {p.name}
+                      <TD className="max-w-[20rem] font-medium">
+                        {/* Picture and name in one cell rather than two
+                            columns. They are one piece of information -- what
+                            this product IS -- and splitting them puts a
+                            column of images between the SKU and the thing it
+                            identifies. */}
+                        <div className="flex items-center gap-2.5">
+                          <ProductThumb src={p.image_url} name={p.name} />
+                          <span className="min-w-0 truncate">{p.name}</span>
+                        </div>
                       </TD>
                       <TD className="text-ink-muted">{p.category ?? "—"}</TD>
                       <TD>

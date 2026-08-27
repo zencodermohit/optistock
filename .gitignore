@@ -59,3 +59,9 @@ nginx/certbot-webroot/*
 # Written on the deploy host by the pipeline; it is a record of that host,
 # not of the repository, and every host has its own.
 .deploy-history
+
+# The source catalogue export. 37 MB of third-party data that the repository
+# does not need: scripts/recatalogue.py reads it once to produce
+# docs/catalogue_products.csv and the thumbnails, and both of those ARE
+# committed. Keep the original beside the project if you want to re-run it.
+flipkart_com-ecommerce_sample.csv

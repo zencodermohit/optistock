@@ -27,6 +27,9 @@ class Product(Base):
 
     # Lifecycle state (active, archived, discontinued)
     status = Column(String(20), default="active", nullable=False)
+    # A path under our own origin, not a supplier's link. See the migration
+    # a7f31c9b02d4 for why that distinction is load-bearing rather than tidy.
+    image_url = Column(String(500), nullable=True)
 
     # Written by the nightly ABC analysis. Nullable because a product has no
     # class until it has appeared in a completed sale.
