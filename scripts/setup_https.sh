@@ -78,8 +78,17 @@ install_cert() {
 
 if [ "${1:-}" = "--renew" ]; then
   certbot renew --quiet --webroot -w "${WEBROOT}"
-  DOMAIN=$(ls -1 /etc/letsencrypt/live/ 2>/dev/null | grep -v README | head -1)
-  [ -n "${DOMAIN}" ] && install_cert "${DOMAIN}"
+  # The domain this host actually serves, not whichever lineage sorts first.
+  # `ls | head -1` was the original bug: once a second certificate existed,
+  # 43-205-36-210.sslip.io sorted ahead of optistock.duckdns.org and this
+  # installed the wrong one.
+  DOMAIN=$(grep -E '^PUBLIC_HOST=' "${PROJECT_DIR}/.env" 2>/dev/null \
+    | cut -d= -f2- | tr -d '"' | tr -d "'")
+  if [ -z "${DOMAIN}" ]; then
+    echo "PUBLIC_HOST is not set in ${PROJECT_DIR}/.env; nothing to install" >&2
+    exit 1
+  fi
+  install_cert "${DOMAIN}"
   exit 0
 fi
 
@@ -144,15 +153,48 @@ install_cert "${DOMAIN}"
 # copy anything into the container's view. This hook is what closes that gap.
 echo "==> installing the renewal hook"
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
-cat >/etc/letsencrypt/renewal-hooks/deploy/optistock.sh <<HOOK
+# Written with the domain resolved at RUN time, not baked in at write time.
+#
+# The previous version interpolated ${DOMAIN} into the hook, which froze
+# whatever this script happened to pick on the day it was run. After the move
+# from sslip.io to DuckDNS the host had two lineages, the hook still named the
+# old one, and the next renewal would have copied a certificate for a name
+# nobody visits and restarted nginx serving it -- every browser refusing the
+# site, months later, with nothing having been touched in between.
+#
+# PUBLIC_HOST in the application's own .env is the single place the domain is
+# already declared, so the hook reads that and cannot drift from it.
+cat >/etc/letsencrypt/renewal-hooks/deploy/optistock.sh <<'HOOK'
 #!/usr/bin/env bash
 # Written by scripts/setup_https.sh. Runs after every successful renewal.
-set -e
-cp -L /etc/letsencrypt/live/${DOMAIN}/fullchain.pem ${CERT_DIR}/origin.pem
-cp -L /etc/letsencrypt/live/${DOMAIN}/privkey.pem ${CERT_DIR}/origin.key
-chmod 644 ${CERT_DIR}/origin.pem
-chmod 600 ${CERT_DIR}/origin.key
-cd ${PROJECT_DIR} && docker compose restart nginx
+set -euo pipefail
+
+ENV_FILE=/home/ubuntu/project_IV/.env
+CERT_DIR=/home/ubuntu/project_IV/nginx/certs
+
+DOMAIN=$(grep -E '^PUBLIC_HOST=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+if [ -z "${DOMAIN}" ]; then
+  echo "renewal hook: PUBLIC_HOST is not set in ${ENV_FILE}; nothing to install" >&2
+  exit 0
+fi
+
+LIVE="/etc/letsencrypt/live/${DOMAIN}"
+
+# certbot sets RENEWED_LINEAGE to the lineage it just renewed. Ignore any
+# other certificate on this host, so a stale lineage renewing cannot install
+# itself over the one the site serves. Absent when run by hand, and installing
+# the configured domain is then exactly what was wanted.
+if [ -n "${RENEWED_LINEAGE:-}" ] && [ "${RENEWED_LINEAGE}" != "${LIVE}" ]; then
+  exit 0
+fi
+
+cp -L "${LIVE}/fullchain.pem" "${CERT_DIR}/origin.pem"
+cp -L "${LIVE}/privkey.pem"  "${CERT_DIR}/origin.key"
+chmod 644 "${CERT_DIR}/origin.pem"
+chmod 600 "${CERT_DIR}/origin.key"
+
+cd /home/ubuntu/project_IV && docker compose restart nginx
+echo "renewal hook: installed ${DOMAIN} and restarted nginx"
 HOOK
 chmod +x /etc/letsencrypt/renewal-hooks/deploy/optistock.sh
 
