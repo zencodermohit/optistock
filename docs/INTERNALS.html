@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OptiStock — How It Actually Works</title>
+<style>
+  /* ------------------------------------------------------------------
+     A reference, not a slide deck. LEARN.html teaches the vocabulary;
+     this assumes it and goes down a level. Long-form measure, generous
+     code blocks, and a table of contents that sticks on a wide screen
+     because nobody reads this front to back twice.
+     ------------------------------------------------------------------ */
+  :root {
+    --bg:#fbfbfd; --panel:#fff; --ink:#14181f; --muted:#4a5568; --faint:#858e9e;
+    --line:#e3e6ec; --rule:#f0f2f6;
+    --accent:#2f5bd0; --accent-w:#eaf0ff;
+    --warn:#a8620d; --warn-w:#fdf3e3;
+    --bad:#b4342b;  --bad-w:#fdecea;
+    --good:#0d7a55; --good-w:#e4f6ef;
+    --code-bg:#f6f7f9; --code-ink:#1c2330;
+    --sans:"Segoe UI",Roboto,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0e1117; --panel:#161a22; --ink:#e6e9ef; --muted:#a3adbd; --faint:#7b8494;
+      --line:#262c38; --rule:#1c212b;
+      --accent:#7fa0ff; --accent-w:#18234a; --accent-w:#16213f;
+      --warn:#e0a458; --warn-w:#2e2410;
+      --bad:#f0837a;  --bad-w:#31191a;
+      --good:#4fc99a; --good-w:#0f2b22;
+      --code-bg:#12161e; --code-ink:#d6dcE6; --code-ink:#d6dce6;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       font-size:16.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+  .page{max-width:1280px;margin:0 auto;padding:0 1.5rem 6rem;
+        display:grid;grid-template-columns:1fr;gap:2rem}
+  @media(min-width:1100px){
+    .page{grid-template-columns:230px 1fr;align-items:start}
+    nav.toc{position:sticky;top:1.5rem;max-height:calc(100vh - 3rem);overflow:auto}
+  }
+  header.hero{grid-column:1/-1;padding:3.5rem 0 1.5rem;border-bottom:3px solid var(--ink)}
+  header.hero h1{font-size:2.5rem;margin:0 0 .4rem;letter-spacing:-.02em;line-height:1.1}
+  header.hero p{margin:0;color:var(--muted);font-size:1.1rem;max-width:62ch}
+  header.hero .meta{margin-top:1rem;font-family:var(--mono);font-size:.8rem;color:var(--faint)}
+
+  nav.toc{font-size:.86rem;line-height:1.5}
+  nav.toc strong{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;
+                 color:var(--faint);margin:1.2rem 0 .5rem}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:.24rem 0;
+            border-left:2px solid transparent;padding-left:.6rem}
+  nav.toc a:hover{color:var(--accent);border-left-color:var(--accent)}
+
+  main{min-width:0}
+  h2{font-size:1.6rem;margin:3.2rem 0 .3rem;padding-top:1.6rem;border-top:1px solid var(--line);
+     letter-spacing:-.01em;scroll-margin-top:1rem}
+  h2 .k{display:block;font-family:var(--mono);font-size:.78rem;letter-spacing:.12em;
+        color:var(--accent);margin-bottom:.35rem}
+  h3{font-size:1.12rem;margin:2.2rem 0 .3rem;scroll-margin-top:1rem}
+  h4{font-size:.98rem;margin:1.4rem 0 .2rem;color:var(--muted)}
+  p{margin:.75rem 0;max-width:74ch}
+  ul,ol{max-width:74ch;padding-left:1.3rem}
+  li{margin:.35rem 0}
+  .lead{font-size:1.04rem;color:var(--muted)}
+
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:9px;
+      padding:.9rem 1.1rem;overflow-x:auto;font-family:var(--mono);font-size:.83rem;
+      line-height:1.6;color:var(--code-ink);margin:1rem 0}
+  code{font-family:var(--mono);font-size:.88em;background:var(--accent-w);color:var(--accent);
+       padding:.09em .36em;border-radius:4px}
+  pre code{background:none;color:inherit;padding:0;font-size:1em}
+  .fileref{display:block;font-family:var(--mono);font-size:.74rem;color:var(--faint);
+           margin:-.3rem 0 .4rem;letter-spacing:.02em}
+
+  .box{border:1px solid var(--line);border-left-width:4px;border-radius:9px;
+       padding:.9rem 1.15rem;margin:1.2rem 0;background:var(--panel)}
+  .box h4{margin:0 0 .3rem;font-size:.95rem}
+  .box p:last-child{margin-bottom:0}
+  .why{border-left-color:var(--accent)} .why h4{color:var(--accent)}
+  .trap{border-left-color:var(--bad)}   .trap h4{color:var(--bad)}
+  .note{border-left-color:var(--warn)}  .note h4{color:var(--warn)}
+  .win{border-left-color:var(--good)}   .win h4{color:var(--good)}
+
+  table{border-collapse:collapse;width:100%;margin:1.1rem 0;font-size:.92rem}
+  th,td{text-align:left;padding:.55rem .7rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)}
+  td.k{font-family:var(--mono);font-size:.82rem;white-space:nowrap}
+  .scroll{overflow-x:auto}
+
+  figure{margin:1.5rem 0}
+  figure svg{width:100%;height:auto;display:block}
+  figcaption{margin-top:.5rem;font-size:.85rem;color:var(--faint);font-style:italic}
+  svg text{font-family:var(--sans);fill:var(--ink)}
+  svg .l{font-size:13px;font-weight:600}
+  svg .s{font-size:10.5px;fill:var(--muted)}
+  svg .m{font-family:var(--mono);font-size:10px;fill:var(--faint)}
+  svg .b{fill:var(--panel);stroke:var(--line);stroke-width:1.4}
+  svg .a{stroke:var(--faint);stroke-width:1.6;fill:none}
+
+  .bug{border:1px solid var(--line);border-radius:10px;padding:1.1rem 1.3rem;margin:1.4rem 0;
+       background:var(--panel)}
+  .bug h3{margin:0 0 .5rem;font-size:1.05rem}
+  .bug .tag{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;
+            padding:.12rem .5rem;border-radius:20px;background:var(--bad-w);color:var(--bad);
+            margin-right:.5rem;vertical-align:.12em}
+  .bug dl{margin:.6rem 0 0;display:grid;grid-template-columns:auto 1fr;gap:.3rem .9rem}
+  .bug dt{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);
+          padding-top:.22rem}
+  .bug dd{margin:0}
+  .bug .lesson{margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--rule);
+               font-size:.95rem}
+  .bug .lesson b{color:var(--accent)}
+
+  @media print{
+    body{background:#fff;font-size:10.5pt}
+    .page{display:block;max-width:none}
+    nav.toc{display:none}
+    h2{page-break-after:avoid} pre,.box,.bug,figure,table{page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="hero">
+  <h1>How OptiStock actually works</h1>
+  <p>
+    The mechanisms, not the vocabulary. This assumes you have read
+    <strong>LEARN.html</strong> and know what an event and an API are — it picks up from
+    there and goes down a level, into why each piece is built the way it is and what
+    breaks when it isn't.
+  </p>
+  <p class="meta">
+    15,889 lines of Python · 15,314 of TypeScript · 21 modules · 23 migrations · 502 tests
+  </p>
+</header>
+
+<nav class="toc">
+  <strong>Part 1</strong>
+  <a href="#spine">Follow one scan</a>
+  <strong>Part 2 · Mechanisms</strong>
+  <a href="#tenant">1 · The tenant boundary</a>
+  <a href="#outbox">2 · The outbox</a>
+  <a href="#once">3 · At-least-once</a>
+  <a href="#stream">4 · The stream</a>
+  <a href="#night">5 · The night job</a>
+  <a href="#assistant">6 · The assistant</a>
+  <a href="#who">7 · Who is asking</a>
+  <strong>Part 3</strong>
+  <a href="#bugs">Nine real bugs</a>
+  <strong>Part 4</strong>
+  <a href="#ship">How it ships</a>
+  <a href="#map">Where things live</a>
+</nav>
+
+<main>
+
+<p class="lead">
+  Almost every design decision in this project comes from the same question, asked in
+  different places: <em>what happens when this fails half way through?</em> Read it with
+  that in mind and the architecture stops looking elaborate and starts looking
+  inevitable.
+</p>
+
+<!-- ================================================================= -->
+<h2 id="spine"><span class="k">PART 1</span>Follow one scan</h2>
+
+<p>
+  The fastest way to understand a system is to follow one piece of data all the way
+  through it. So: somebody in the Mumbai warehouse scans a barcode as a carton goes out.
+  Here is every place that scan touches, in order.
+</p>
+
+<figure>
+<svg viewBox="0 0 1000 320" role="img" aria-label="One scan, traced through the system">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+  <g color="var(--faint)">
+    <rect x="4" y="30" width="150" height="58" rx="9" class="b"/>
+    <text x="18" y="54" class="l">1 · Scanner</text><text x="18" y="72" class="s">3 facts, over HTTPS</text>
+    <path d="M156 59 H 196" class="a" marker-end="url(#ar)"/>
+    <rect x="198" y="30" width="150" height="58" rx="9" class="b"/>
+    <text x="212" y="54" class="l">2 · Nginx</text><text x="212" y="72" class="s">TLS, rate limit</text>
+    <path d="M350 59 H 390" class="a" marker-end="url(#ar)"/>
+    <rect x="392" y="30" width="164" height="58" rx="9" class="b"/>
+    <text x="406" y="54" class="l">3 · FastAPI</text><text x="406" y="72" class="s">token → company_id</text>
+    <path d="M558 59 H 598" class="a" marker-end="url(#ar)"/>
+    <rect x="600" y="30" width="164" height="58" rx="9" class="b"/>
+    <text x="614" y="54" class="l">4 · Idempotency</text><text x="614" y="72" class="s">seen this scan before?</text>
+
+    <path d="M682 90 V 118" class="a" marker-end="url(#ar)"/>
+    <rect x="392" y="120" width="372" height="74" rx="10" fill="none"
+          stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="5 4"/>
+    <text x="404" y="114" class="m" style="fill:var(--accent)">5 · ONE TRANSACTION</text>
+    <rect x="404" y="130" width="172" height="24" rx="6" class="b"/>
+    <text x="414" y="147" class="s">inventory.quantity -= 1</text>
+    <rect x="404" y="160" width="172" height="24" rx="6" class="b"/>
+    <text x="414" y="177" class="s">event_outbox += row</text>
+    <text x="592" y="150" class="s">both land,</text>
+    <text x="592" y="166" class="s">or neither does</text>
+
+    <path d="M578 157 H 586" class="a"/>
+    <path d="M392 157 H 352" class="a" marker-end="url(#ar)"/>
+    <rect x="196" y="128" width="152" height="58" rx="9" class="b"/>
+    <text x="210" y="152" class="l">6 · Relay</text><text x="210" y="170" class="s">publishes, then marks</text>
+
+    <path d="M272 188 V 216" class="a" marker-end="url(#ar)"/>
+    <rect x="196" y="218" width="152" height="52" rx="9" class="b"/>
+    <text x="210" y="240" class="l">7 · Redis Stream</text><text x="210" y="258" class="s">durable, ordered</text>
+
+    <path d="M350 244 H 390" class="a" marker-end="url(#ar)"/>
+    <rect x="392" y="218" width="164" height="52" rx="9" class="b"/>
+    <text x="406" y="240" class="l">8 · Consumers</text><text x="406" y="258" class="s">de-duplicate, then act</text>
+
+    <path d="M558 244 H 598" class="a" marker-end="url(#ar)"/>
+    <rect x="600" y="206" width="164" height="34" rx="8" fill="var(--bad-w)" stroke="var(--bad)" stroke-width="1.4"/>
+    <text x="614" y="228" class="l">Alert raised</text>
+    <rect x="600" y="248" width="164" height="34" rx="8" class="b"/>
+    <text x="614" y="270" class="l">Dashboards updated</text>
+
+    <text x="790" y="52" class="m">The scanner is answered</text>
+    <text x="790" y="70" class="m">at step 5. Everything</text>
+    <text x="790" y="88" class="m">after it happens without</text>
+    <text x="790" y="106" class="m">anyone waiting.</text>
+  </g>
+</svg>
+<figcaption>Steps 1–5 are synchronous: the device waits. Steps 6–8 are not.</figcaption>
+</figure>
+
+<h3>What each stop is really doing</h3>
+
+<p>
+  <strong>1. The scanner sends three facts.</strong> What, where, which way. Nothing else.
+  A barcode gun, an RFID gateway or an ESP32 can all produce those, which is what makes
+  the hardware interchangeable — the API speaks the reader's vocabulary, not the
+  database's.
+</p>
+
+<pre><code>POST /api/v1/ingest/scan
+{ "sku": "ELEC-LAP-001-A", "warehouse_id": "...", "direction": "out",
+  "quantity": 1, "scan_reference": "A17" }</code></pre>
+
+<p>
+  <strong>2. Nginx</strong> terminates TLS, throttles, and passes the request on. It also
+  sets <code>X-Real-IP</code>, which turns out to matter a great deal — see
+  <a href="#who">§7</a>.
+</p>
+
+<p>
+  <strong>3. FastAPI turns the token into a tenant.</strong> The <code>company_id</code>
+  comes from the signed token, never from the request body. <a href="#tenant">§1</a>.
+</p>
+
+<p>
+  <strong>4. Idempotency.</strong> The device supplied <code>scan_reference: "A17"</code>.
+  If a movement with that reference already exists, the endpoint returns the original
+  answer and moves nothing. A radio that retries, or a trigger held a beat too long,
+  therefore costs nothing.
+</p>
+
+<p>
+  <strong>5. One transaction.</strong> The stock change and the announcement of it are
+  written together. This is the keystone — <a href="#outbox">§2</a>.
+</p>
+
+<p>
+  <strong>6–8.</strong> A separate process carries the announcement to Redis; consumers
+  read it and react. The scanner is long gone by then. That is why a slow alert never
+  slows a scan.
+</p>
+
+<!-- ================================================================= -->
+<h2 id="tenant"><span class="k">MECHANISM 1</span>The tenant boundary</h2>
+
+<p>
+  One database holds several companies. Every row that belongs to somebody carries a
+  <code>company_id</code>, and the entire security model reduces to one sentence:
+  <strong>that value is never taken from the request.</strong>
+</p>
+
+<pre><code>payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+user_id    = payload.get("sub")
+company_id = payload.get("company_id")
+...
+user = db.query(User).filter(User.id == user_id).first()
+if not user or not user.is_active:
+    raise HTTPException(status_code=401, detail="Inactive or unknown user")
+if str(user.company_id) != company_id:
+    raise HTTPException(status_code=401, detail="Invalid token payload")</code></pre>
+<span class="fileref">app/core/dependencies.py</span>
+
+<div class="why">
+  <h4>Why check the database when the token is already signed?</h4>
+  <p>
+    A signed token proves the server issued it. It does not prove the claim is
+    <em>still</em> true. Between issuing and using, an account can be deactivated or moved
+    to another company — and a token is valid until it expires no matter what happened in
+    between. Re-reading the user costs one indexed lookup and closes the window where a
+    sacked employee's laptop still works.
+  </p>
+</div>
+
+<p>
+  Downstream, nothing has to remember this. The assistant's tools are built as closures
+  with the company already bound inside them, so the model literally cannot supply a
+  tenant — the argument does not exist in any signature it can see.
+</p>
+
+<!-- ================================================================= -->
+<h2 id="outbox"><span class="k">MECHANISM 2</span>The outbox</h2>
+
+<p>
+  When stock moves, two things must happen: the number changes, and everyone who cares
+  finds out. The obvious implementation is to update the row and then publish a message.
+  It has a failure that cannot be engineered away:
+</p>
+
+<table>
+  <thead><tr><th>Order</th><th>What goes wrong</th></tr></thead>
+  <tbody>
+    <tr><td class="k">commit, then publish</td><td>Process dies in between. Stock changed, nobody was told. The alert never fires and <em>nothing anywhere records that it should have</em>.</td></tr>
+    <tr><td class="k">publish, then commit</td><td>Transaction rolls back. An alert fires for a movement that never happened.</td></tr>
+  </tbody>
+</table>
+
+<p>
+  There is no third ordering. A database commit and a network send cannot be made atomic
+  with each other — so the fix is to stop trying, and make the message a database write
+  too:
+</p>
+
+<pre><code>class EventOutbox(Base):
+    sequence     = Column(BigInteger, primary_key=True, autoincrement=True)
+    event_id     = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False)
+    company_id   = Column(...)
+    published_at = Column(DateTime(timezone=True), nullable=True)</code></pre>
+<span class="fileref">app/modules/events/models.py</span>
+
+<p>
+  Now both writes are in one transaction. Either both survive or neither does. A separate
+  process — the relay — reads unpublished rows and carries them out to Redis.
+</p>
+
+<div class="note">
+  <h4>Two details in that model worth noticing</h4>
+  <p>
+    <code>published_at</code> is a <em>timestamp</em>, not a boolean. "Published" and
+    "published at 14:32:07" cost the same to store, and only one of them can answer
+    "how far behind is the relay right now?"
+  </p>
+  <p>
+    <code>sequence</code> is an auto-incrementing integer, so events have a total order
+    independent of clocks. Two servers with slightly different times cannot disagree
+    about which movement came first.
+  </p>
+</div>
+
+<!-- ================================================================= -->
+<h2 id="once"><span class="k">MECHANISM 3</span>At-least-once, and living with it</h2>
+
+<p>The relay claims a batch, publishes it, and only then marks it published.</p>
+
+<pre><code>SELECT ... FROM event_outbox
+WHERE published_at IS NULL
+ORDER BY sequence
+FOR UPDATE SKIP LOCKED</code></pre>
+
+<p>
+  <code>FOR UPDATE</code> means two relays cannot publish the same row.
+  <code>SKIP LOCKED</code> means the second relay takes the <em>next</em> batch instead of
+  blocking on the first one's locks. Together they make the relay horizontally scalable
+  without any coordination.
+</p>
+
+<div class="why">
+  <h4>Publish first, mark second — a deliberate choice of failure</h4>
+  <p>
+    If the process dies between the two, the event is published <strong>twice</strong> on
+    restart. Marking first would give the opposite: an event published
+    <strong>zero</strong> times. Both are failures; they are not equally bad. A duplicate
+    carries an <code>event_id</code>, so a consumer can recognise it and discard it. A
+    lost event leaves nothing behind to notice — no row, no log, no gap. You cannot write
+    code that detects an absence you have no record of.
+  </p>
+</div>
+
+<p>
+  Duplicates therefore have to be harmless, which shows up twice in this system: consumers
+  de-duplicate on <code>event_id</code>, and the scan endpoint de-duplicates on the
+  device's own <code>scan_reference</code>. Same idea, two layers — one protects against
+  the relay retrying, the other against the radio retrying.
+</p>
+
+<!-- ================================================================= -->
+<h2 id="stream"><span class="k">MECHANISM 4</span>The stream</h2>
+
+<p>
+  Redis Streams rather than a plain list, because a list gives you no way to know whether
+  a worker that took an item actually finished it. A consumer group tracks exactly that:
+</p>
+
+<pre><code>self.redis.xgroup_create(STREAM_KEY, CONSUMER_GROUP, id="0", mkstream=True)
+...
+response = self.redis.xreadgroup(CONSUMER_GROUP, name, {STREAM_KEY: "&gt;"}, ...)
+...
+self.redis.xack(STREAM_KEY, CONSUMER_GROUP, entry_id)</code></pre>
+<span class="fileref">app/workers/consumers.py</span>
+
+<p>
+  An entry read but not acknowledged stays in the group's pending list. If the worker
+  crashes half way through raising an alert, the entry is still there to be reclaimed —
+  it is not quietly gone.
+</p>
+
+<p>
+  Handlers register themselves against event types, so adding a reaction never means
+  editing the loop:
+</p>
+
+<pre><code>@on(event_types.STOCK_BELOW_REORDER_POINT)
+def raise_low_stock_alert(...): ...
+
+@on(event_types.STOCK_DEPLETED)
+def raise_stockout_alert(...): ...</code></pre>
+<span class="fileref">app/modules/alerts/handlers.py</span>
+
+<!-- ================================================================= -->
+<h2 id="night"><span class="k">MECHANISM 5</span>The night job</h2>
+
+<p>
+  At 01:00 one job runs. It is <em>one</em> job rather than three timers for a specific
+  reason: each stage reads what the last one wrote, and as independent jobs a slow ETL
+  would leave the others analysing yesterday's data — silently, and correctly-looking.
+</p>
+
+<pre><code>run_nightly_etl()                       # sales history → Parquet
+
+abc_df      = run_abc_analysis()        # which items earn the revenue
+forecast_df = run_demand_forecast()     # how fast each one sells
+
+persist_abc_classes(db, abc_df)
+persist_reorder_recommendations(db, forecast_df)
+persist_forecast_runs(db, forecast_df)  # record tonight's predictions
+score_due_forecasts(db)                 # grade the ones whose window closed</code></pre>
+<span class="fileref">app/core/scheduler.py</span>
+
+<h3>The maths, in full</h3>
+
+<p><strong>ABC</strong> sorts products by revenue and splits them by cumulative share — the
+few that earn most (A), the middle (B), the long tail (C). It is Pareto, applied to a
+catalogue.</p>
+
+<p><strong>The forecast</strong> is an average daily velocity over a fixed window:</p>
+
+<pre><code>velocity = units_sold_in_window / window_length_in_days</code></pre>
+
+<div class="trap">
+  <h4>The divisor is the whole trick</h4>
+  <p>
+    Dividing by <em>days that had a sale</em> instead of the <em>window length</em> looks
+    more precise and is catastrophically wrong. An item that sold 10 units on a single day
+    of a 30-day window scores 10 units/day rather than 0.33 — a thirty-fold overestimate,
+    which the reorder policy then multiplies into a purchase order. The fix is one
+    denominator; the bug was invisible until somebody compared a recommendation with
+    reality.
+  </p>
+</div>
+
+<p><strong>The reorder point</strong> is when to buy — enough to cover the wait for a
+delivery, plus a cushion for weeks busier than average:</p>
+
+<pre><code>reorder_point = daily_usage × lead_time + safety_stock
+
+safety_stock  = (max_daily × max_lead_time) − (avg_daily × avg_lead_time)</code></pre>
+<span class="fileref">app/modules/analytics/stockout.py · app/modules/analytics/eoq.py</span>
+
+<p><strong>EOQ</strong> — economic order quantity — is how much, balancing the cost of
+placing an order against the cost of holding stock:</p>
+
+<pre><code>EOQ = √( 2 × annual_demand × order_cost / holding_cost_per_unit )</code></pre>
+
+<div class="note">
+  <h4>An honest limitation, stated in the code itself</h4>
+  <p>
+    That safety-stock formula wants a <em>maximum</em> lead time as well as an average,
+    and this schema cannot supply one: no purchase order records when a delivery was
+    promised versus when it actually landed. So the same average is passed for both, which
+    collapses the formula to demand variability alone —
+    <code>(peak daily − average daily) × lead time</code> — and under-covers a supplier who
+    is late as well as busy.
+  </p>
+  <p>
+    The interesting part is that this is written down in the docstring rather than quietly
+    tolerated. A figure that <em>looks</em> like it accounts for supplier reliability, but
+    doesn't, is more dangerous than one that admits the gap.
+  </p>
+</div>
+
+<div class="why">
+  <h4>Why no machine learning</h4>
+  <p>
+    Not because it would be hard. Because every number on the screen has to be defensible
+    to the person acting on it. "Order 400" from a model nobody can interrogate is not
+    advice, it is an instruction — and the first time it is wrong, the whole system stops
+    being trusted. An average and a square root can be explained in one sentence each,
+    and the screen states its own assumptions beside the answer.
+  </p>
+</div>
+
+<!-- ================================================================= -->
+<h2 id="assistant"><span class="k">MECHANISM 6</span>The assistant</h2>
+
+<p>
+  The model has no database access. It has nine <strong>tools</strong> — fixed questions
+  like "what is on hand" or "what runs out first" — each one a closure with the tenant
+  already bound inside it.
+</p>
+
+<h3>The loop</h3>
+
+<p>
+  The provider's SDK can run the tool loop for you. This project runs it by hand, and the
+  reason is worth knowing because it is invisible until it bites:
+</p>
+
+<div class="trap">
+  <h4>Streaming plus automatic function calling loses the answer</h4>
+  <p>
+    With tools declared and streaming on, the tools run and then a single empty chunk
+    arrives marked STOP. The SDK consumes the post-tool turn internally and never
+    re-streams it. Measured on two different models; without tools declared, the same call
+    streams normally.
+  </p>
+</div>
+
+<p>
+  Taking the loop back has its own trap. Gemini 3 models carry a
+  <code>thought_signature</code> through a turn, and rebuilding the model's turn from the
+  function calls you read out of it — the obvious way to write the loop — drops it. A
+  model that loses its signature re-issues the same tool call forever instead of
+  answering. The fix is one line: echo the model's own parts back <em>verbatim</em>.
+</p>
+
+<h3>Three layers on the way out</h3>
+
+<table>
+  <thead><tr><th>Layer</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td class="k">redaction</td><td>In demo mode, real SKUs are replaced with stable pseudonyms <em>before</em> anything leaves the process, and turned back afterwards. The provider never sees a real catalogue; the reader never sees a hash.</td></tr>
+    <tr><td class="k">output filter</td><td>The answer is untrusted input. A product named "ignore previous instructions" is a note somebody typed into a form. The filter blocks claims of having <em>changed</em> anything, strips anything shaped like a credential, and caps runaway length.</td></tr>
+    <tr><td class="k">hold-back</td><td>Streaming breaks the filter's core assumption — text leaves before there is a whole answer to check. So text is released only once no rewrite can still apply to it.</td></tr>
+  </tbody>
+</table>
+
+<div class="why">
+  <h4>Why the assistant can propose but never act</h4>
+  <p>
+    It can create a purchase order <em>suggestion</em>. Nothing is ordered and no stock
+    moves until a person approves it on the Approvals screen. A wrong order costs real
+    money, and the gap between "the model was confident" and "the model was right" is
+    exactly where a human belongs.
+  </p>
+</div>
+
+<!-- ================================================================= -->
+<h2 id="who"><span class="k">MECHANISM 7</span>Who is asking</h2>
+
+<p>
+  Rate limits are easy. Deciding <em>whose</em> quota a request spends is not, and getting
+  it wrong inverts the feature.
+</p>
+
+<p>
+  Behind a reverse proxy, the socket peer is the proxy. Counting it means every visitor on
+  earth shares one bucket — so six failed logins from one laptop lock out everybody:
+</p>
+
+<pre><code>attempt 1..5   401
+attempt 6      429
+real login     429   ← valid credentials, refused
+after 55s      200</code></pre>
+
+<p>Nginx sets two headers that look interchangeable and are not:</p>
+
+<table>
+  <thead><tr><th>Header</th><th>Directive</th><th>Trustworthy?</th></tr></thead>
+  <tbody>
+    <tr><td class="k">X-Real-IP</td><td class="k">$remote_addr</td><td><strong>Yes</strong> — overwritten on every request, so a client cannot influence it.</td></tr>
+    <tr><td class="k">X-Forwarded-For</td><td class="k">$proxy_add_x_forwarded_for</td><td><strong>No</strong> — appends to what the client sent, so its first element is attacker-chosen.</td></tr>
+  </tbody>
+</table>
+
+<p>
+  Honouring the second would let one caller mint a fresh bucket per request by inventing
+  an address, and the limit would stop existing. And even the safe header is only read
+  when the peer is on a network we control — a request arriving directly is counted by its
+  real socket. Wrong in the strict direction, never the bypassable one.
+</p>
+
+<!-- ================================================================= -->
+<h2 id="bugs"><span class="k">PART 3</span>Nine real bugs, and what each one teaches</h2>
+
+<p class="lead">
+  These all happened in this project. They are here because a mechanism explained is
+  half-learned, and a mechanism you have watched fail is understood.
+</p>
+
+<div class="bug">
+  <h3><span class="tag">DEPLOY</span>The deploy that deployed nothing</h3>
+  <dl>
+    <dt>Symptom</dt><dd>Pipeline green. Site unchanged.</dd>
+    <dt>Cause</dt><dd><code>git pull</code> aborted because untracked files were in the way. The script carried on and rebuilt the <em>old</em> code.</dd>
+    <dt>Fix</dt><dd><code>set -euo pipefail</code>, so a failing step stops the script.</dd>
+  </dl>
+  <p class="lesson"><b>Lesson:</b> a shell script without <code>set -e</code> reports success for whatever it happened to reach last. Green means "the last command worked", not "the deploy worked".</p>
+</div>
+
+<div class="bug">
+  <h3><span class="tag">SQL</span>Revenue at three times reality</h3>
+  <dl>
+    <dt>Symptom</dt><dd>A product showing ₹57 crore instead of ₹19 crore.</dd>
+    <dt>Cause</dt><dd>One query joined both sales <em>and</em> stock. A product on three shelves counted its entire sales history three times.</dd>
+    <dt>Fix</dt><dd>Aggregate each side separately, then join the results.</dd>
+  </dl>
+  <p class="lesson"><b>Lesson:</b> joining two one-to-many relations in a single <code>SUM</code> multiplies them together. If a total looks like a suspiciously round multiple of the truth, count your joins.</p>
+</div>
+
+<div class="bug">
+  <h3><span class="tag">SDK</span>The request that never happened</h3>
+  <dl>
+    <dt>Symptom</dt><dd>A retry-on-429 that passed its tests and had never once run in production.</dd>
+    <dt>Cause</dt><dd><code>await generate_content_stream(...)</code> sends nothing. The SDK defers the request to the first iteration, so the error surfaced outside the <code>try</code>.</dd>
+    <dt>Fix</dt><dd>Pull one chunk inside the handler, and put it back afterwards.</dd>
+  </dl>
+  <p class="lesson"><b>Lesson:</b> a fake that raises where the real thing doesn't will confirm any belief you hold. The test must fail against the old code, or it is decoration.</p>
+</div>
+
+<div class="bug">
+  <h3><span class="tag">SECURITY</span>Everybody in one bucket</h3>
+  <dl>
+    <dt>Symptom</dt><dd>A valid login refused with 429 because of somebody else's typing.</dd>
+    <dt>Cause</dt><dd>Rate limits counted the socket peer, which behind nginx is nginx.</dd>
+    <dt>Fix</dt><dd>Count <code>X-Real-IP</code>, and only from a hop on our own network.</dd>
+  </dl>
+  <p class="lesson"><b>Lesson:</b> a protection that throttles everyone equally is a denial of service wearing a badge. Ask who a limit is <em>for</em>, not just whether it triggers.</p>
+</div>
+
+<div class="bug">
+  <h3><span class="tag">TLS</span>A certificate for a domain nobody visits</h3>
+  <dl>
+    <dt>Symptom</dt><dd>None yet. The site was scheduled to become unreachable in October.</dd>
+    <dt>Cause</dt><dd>The renewal hook was written by <code>ls /etc/letsencrypt/live | head -1</code>. Once a second certificate existed, the stale one sorted first alphabetically.</dd>
+    <dt>Fix</dt><dd>Read the domain from <code>PUBLIC_HOST</code>, where it is already declared once.</dd>
+  </dl>
+  <p class="lesson"><b>Lesson:</b> <code>head -1</code> over a directory is a guess that works until the day it doesn't. Scheduled tasks fail months later, silently, with nothing having changed.</p>
+</div>
+
+<div class="bug">
+  <h3><span class="tag">FRONTEND</span>The blank page</h3>
+  <dl>
+    <dt>Symptom</dt><dd>Completely white page in a private window. Zero characters rendered.</dd>
+    <dt>Cause</dt><dd>Blocked <code>localStorage</code> does not return null — it <em>throws on the property</em>. The exception escaped during render and React unmounted everything.</dd>
+    <dt>Fix</dt><dd>Guard every access, and fall back to memory so the session still works for the tab.</dd>
+  </dl>
+  <p class="lesson"><b>Lesson:</b> guarding the error was only half. Swallowing it left the token written and immediately not found, so nobody could log in. <b>Degrade to something that works, not to nothing.</b></p>
+</div>
+
+<div class="bug">
+  <h3><span class="tag">TOOLING</span>The typechecker that checked nothing</h3>
+  <dl>
+    <dt>Symptom</dt><dd><code>npx tsc --noEmit</code> passed on code containing deliberate type errors.</dd>
+    <dt>Cause</dt><dd><code>tsconfig.json</code> is a solutions file — <code>"files": []</code> with project references — so plain <code>tsc</code> resolves no inputs and exits clean.</dd>
+    <dt>Fix</dt><dd><code>tsc -b</code>, which is what <code>npm run build</code> already used.</dd>
+  </dl>
+  <p class="lesson"><b>Lesson:</b> a check that has never failed has not been proven to work. Break something on purpose and watch it catch — otherwise you are trusting a command, not a result.</p>
+</div>
+
+<div class="bug">
+  <h3><span class="tag">DATA</span>The inflatable hippo</h3>
+  <dl>
+    <dt>Symptom</dt><dd>A "Featherlite Visitor Chair" illustrated with a purple inflatable hippo.</dd>
+    <dt>Cause</dt><dd>Names were kept and photographs searched for separately. "Chair" matches both.</dd>
+    <dt>Fix</dt><dd>Take the name and the picture from the <em>same source row</em>, making a mismatch impossible by construction.</dd>
+  </dl>
+  <p class="lesson"><b>Lesson:</b> when two things must agree, derive them from one source rather than matching them carefully. Careful matching fails eventually; construction doesn't.</p>
+</div>
+
+<div class="bug">
+  <h3><span class="tag">SUBTLE</span>The right answer in the wrong window</h3>
+  <dl>
+    <dt>Symptom</dt><dd>Products deliberately set to "at risk" rendered as healthy.</dd>
+    <dt>Cause</dt><dd>Stock levels were sized from a 90-day sales rate; the screen computes cover over 30 days. A slower recent month buys more cover from the same quantity.</dd>
+    <dt>Fix</dt><dd>Measure over the window the reader is actually looking at.</dd>
+  </dl>
+  <p class="lesson"><b>Lesson:</b> a rate is meaningless without its window. Two correct calculations over different periods will disagree, and neither is wrong.</p>
+</div>
+
+<!-- ================================================================= -->
+<h2 id="ship"><span class="k">PART 4</span>How it ships, and stays up</h2>
+
+<h3>The pipeline</h3>
+<pre><code>git push → lint → tests (502) → docker build → deploy → health check → prune</code></pre>
+
+<p>
+  The build runs <em>before</em> anything is stopped. An earlier version ran
+  <code>docker compose down</code> first, so a failed build left the host with nothing
+  serving and no way back except a manual checkout. Building first makes a failed build a
+  no-op: the old containers are still up, still serving.
+</p>
+
+<p>
+  After <code>up -d</code> it checks for containers that exited. Without that the step was
+  green whenever <code>up -d</code> returned — including when the API crash-looped on its
+  first tick.
+</p>
+
+<h3>Migrations</h3>
+<p>
+  23 of them, each with a real <code>downgrade()</code>. Only the API container runs them
+  (<code>RUN_MIGRATIONS=1</code>); the relay and consumers share the same image but must
+  not race it. A failed migration exits that container, which the health check turns into
+  a failed deploy.
+</p>
+
+<h3>Living on a free tier</h3>
+<table>
+  <thead><tr><th>Constraint</th><th>What it forced</th></tr></thead>
+  <tbody>
+    <tr><td>t3.micro, 1 GB RAM</td><td>Six containers on one host. No room for a second replica, which is why some state is deliberately process-local.</td></tr>
+    <tr><td>20 GB disk</td><td>Docker build cache reached 5.7 GB and nothing was clearing it. A full disk stops Postgres accepting writes — the site dies, rather than the deploy failing.</td></tr>
+    <tr><td>Gemini free tier</td><td>20 requests per model per day. The quota is per <em>model</em>, so the runtime walks a chain of them, and repeat questions are answered from cache.</td></tr>
+  </tbody>
+</table>
+
+<h3>Backups</h3>
+<p>
+  Nightly at 02:30: dump, verify the dump is complete, upload to S3, delete the local
+  copy. The verification step is the point — an unverified backup is a belief, not a
+  backup. The IAM role deliberately has no <code>DeleteObject</code> permission, so a
+  compromised server cannot erase its own history.
+</p>
+
+<!-- ================================================================= -->
+<h2 id="map"><span class="k">PART 4</span>Where things live</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>If you want to understand…</th><th>Read this</th></tr></thead>
+  <tbody>
+    <tr><td>How a tenant is bound to a request</td><td class="k">app/core/dependencies.py</td></tr>
+    <tr><td>The outbox, and what a row means</td><td class="k">app/modules/events/models.py</td></tr>
+    <tr><td>Publishing, and the SKIP LOCKED claim</td><td class="k">app/workers/relay.py</td></tr>
+    <tr><td>Reading the stream and dispatching</td><td class="k">app/workers/consumers.py</td></tr>
+    <tr><td>The nightly chain</td><td class="k">app/core/scheduler.py</td></tr>
+    <tr><td>Forecast, ABC, EOQ, stockout maths</td><td class="k">app/modules/analytics/</td></tr>
+    <tr><td>The assistant's provider boundary</td><td class="k">app/modules/assistant/runtime.py</td></tr>
+    <tr><td>Tenant-bound tools and the budget</td><td class="k">app/modules/assistant/service.py</td></tr>
+    <tr><td>What is checked before an answer is shown</td><td class="k">app/modules/assistant/validation.py</td></tr>
+    <tr><td>Streaming without weakening that filter</td><td class="k">app/modules/assistant/streaming.py</td></tr>
+    <tr><td>Whose quota a request spends</td><td class="k">app/core/rate_limit.py</td></tr>
+    <tr><td>The hardware seam</td><td class="k">app/modules/ingest/router.py</td></tr>
+    <tr><td>Every colour, size and shadow in the UI</td><td class="k">frontend/src/index.css</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="win">
+  <h4>How to read this codebase</h4>
+  <p>
+    Start with the module docstrings, not the code. Almost every file in
+    <code>app/</code> opens with several paragraphs explaining what the module is for,
+    what was tried before, and why it is shaped this way. They were written as the
+    decisions were made, so they record the reasoning while it was still fresh — including
+    the versions that did not work.
+  </p>
+</div>
+
+<p style="margin-top:2.5rem;color:var(--faint);font-size:.9rem">
+  Companion to <strong>LEARN.html</strong> (the concepts, from scratch) and
+  <strong>PRESENTATION.html</strong> (the flowchart, for projecting).
+  Live at <strong>optistock.duckdns.org</strong>.
+</p>
+
+</main>
+</div>
+</body>
+</html>
