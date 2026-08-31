@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>OptiStock — seven layers</title>
+<style>
+  /* ------------------------------------------------------------------
+     A LAYERED view of the same system, in the house style.
+
+     The tiers, their order and the cross-cutting band down the right are
+     kept from the hand-drawn version this replaces. What changed is the
+     set of things that were factually wrong in it:
+
+       * Redis sat in the Data Layer with the arrows drawn
+         relay -> consumers, so the queue read as a dead-end side branch.
+         Consumers do not read the relay; they read the stream. The fix
+         is the U below: down into the data layer with XADD, back up out
+         of it with XREADGROUP. The queue is infrastructure the two
+         services talk THROUGH, and now it looks like it.
+
+       * An arrow ran between "stock changes" and "outbox row written".
+         An arrow means "then". These are one commit. No arrow.
+
+       * "reads the ledger, never writes it" was attached to the nightly
+         analytics arrow. The nightly job is the one thing here that
+         DOES write back -- persist_abc_classes and
+         persist_reorder_recommendations. The label belongs to Gemini.
+
+       * "6 containers, one host" was inside the Gemini box. That is a
+         deployment fact and it now lives in Running Environment.
+
+       * "200 OK, device released" floated in the Business tier. A
+         response goes back to whoever asked, so it is drawn as a return
+         arrow climbing to the Access tier.
+
+       * The stock "Overall Governance & Policy Control" band matched
+         nothing in this system. Replaced with the concerns that
+         genuinely do cut across every layer.
+
+     Reading rule: down is dependency -- each layer asks the one below
+     it. Exactly one path goes down and comes back up, and that path is
+     the queue.
+     ------------------------------------------------------------------ */
+  :root{
+    --bg:#0b0f18; --panel:#151b28; --ink:#eef1f7; --muted:#a8b3c6; --faint:#79849a;
+    --line:#2a3342; --band:#101725;
+    --hot:#7d97ff;   --hot-w:#1b2444;
+    --hw:#3fc79a;    --hw-w:#0e2c23;
+    --store:#e0a35c; --store-w:#2f2410;
+    --brain:#b49bff; --brain-w:#241a44;
+    --alert:#f0837a; --alert-w:#31191a;
+    --sans:"Segoe UI",Roboto,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  }
+  body.light{
+    --bg:#ffffff; --panel:#f7f8fb; --ink:#14181f; --muted:#4a5568; --faint:#6b7688;
+    --line:#dfe3ea; --band:#f4f6fa;
+    --hot:#2f5bd0;   --hot-w:#e9efff;
+    --hw:#0b7a57;    --hw-w:#e3f6ef;
+    --store:#a8620d; --store-w:#fdf1e0;
+    --brain:#6f4bcc; --brain-w:#efeaff;
+    --alert:#b4342b; --alert-w:#fdecea;
+  }
+  html,body{margin:0;padding:0;background:var(--bg)}
+  #slide{width:1600px;height:900px;background:var(--bg)}
+  svg{display:block;width:1600px;height:900px}
+  svg text{font-family:var(--sans);fill:var(--ink)}
+  .t    {font-size:30px;font-weight:700;letter-spacing:-.4px}
+  .tsub {font-size:15px;fill:var(--muted)}
+  .tier {font-size:14px;font-weight:700;letter-spacing:.4px}
+  .tsm  {font-size:11.5px;fill:var(--faint);font-family:var(--mono)}
+  .band {font-size:14px;font-weight:700;letter-spacing:.5px}
+  .l    {font-size:16px;font-weight:600}
+  .l2   {font-size:15px;font-weight:600}
+  .s    {font-size:12.5px;fill:var(--muted)}
+  .f    {font-family:var(--mono);font-size:11.5px;fill:var(--faint)}
+  .box  {fill:var(--panel);stroke:var(--line);stroke-width:1.6}
+  .cell {fill:var(--band)}
+  /* One artery is heavier than everything else, so the eye has a single
+     thing to follow rather than five equal candidates. */
+  .main {stroke:var(--hot);stroke-width:3.2;fill:none}
+  .side {stroke:var(--faint);stroke-width:1.8;fill:none}
+  .ret  {stroke:var(--hw);stroke-width:2.6;fill:none}
+</style>
+</head>
+<body>
+<div id="slide">
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--hot)"/>
+    </marker>
+    <marker id="s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--faint)"/>
+    </marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--hw)"/>
+    </marker>
+  </defs>
+  <rect width="1600" height="900" fill="var(--bg)"/>
+
+  <!-- ── header ─────────────────────────────────────────────── -->
+  <text x="40" y="50" class="t">OptiStock, layer by layer</text>
+  <text x="40" y="76" class="tsub">Down is dependency: every layer asks only the one beneath it. One path goes down and comes back up, and that path is the queue.</text>
+  <line x1="40" y1="96" x2="1560" y2="96" stroke="var(--line)" stroke-width="1.5"/>
+
+  <!-- ════════ tier label gutter ════════ -->
+  <rect x="40" y="108" width="156" height="102" rx="10" class="cell"/>
+  <text x="56" y="146" class="tier">ACCESS</text>
+  <text x="56" y="165" class="tier">TERMINAL</text>
+  <text x="56" y="187" class="tsm">who starts it</text>
+
+  <rect x="40" y="218" width="156" height="102" rx="10" class="cell"/>
+  <text x="56" y="256" class="tier">API</text>
+  <text x="56" y="275" class="tier">INTERFACE</text>
+  <text x="56" y="297" class="tsm">FastAPI</text>
+
+  <rect x="40" y="328" width="156" height="158" rx="10" class="cell"/>
+  <text x="56" y="384" class="tier">BUSINESS</text>
+  <text x="56" y="403" class="tier">SERVICE</text>
+  <text x="56" y="425" class="tsm">the rules</text>
+
+  <rect x="40" y="494" width="156" height="102" rx="10" class="cell"/>
+  <text x="56" y="532" class="tier">BASIC</text>
+  <text x="56" y="551" class="tier">SERVICE</text>
+  <text x="56" y="573" class="tsm">workers</text>
+
+  <rect x="40" y="604" width="156" height="86" rx="10" class="cell"/>
+  <text x="56" y="642" class="tier">DATA</text>
+  <text x="56" y="664" class="tsm">queue and lake</text>
+
+  <rect x="40" y="698" width="156" height="82" rx="10" class="cell"/>
+  <text x="56" y="734" class="tier">DATABASE</text>
+  <text x="56" y="756" class="tsm">the ledger</text>
+
+  <rect x="40" y="788" width="156" height="70" rx="10" class="cell"/>
+  <text x="56" y="818" class="tier">RUNNING</text>
+  <text x="56" y="837" class="tier">ENVIRONMENT</text>
+
+  <!-- ════════ ACCESS TERMINAL ════════ -->
+  <rect x="212" y="120" width="206" height="78" rx="11" fill="var(--hw-w)" stroke="var(--hw)" stroke-width="2"/>
+  <text x="230" y="152" class="l">Scanner</text>
+  <text x="230" y="176" class="s">barcode · RFID · ESP32</text>
+
+  <rect x="668" y="120" width="206" height="78" rx="11" fill="var(--hw-w)" stroke="var(--hw)" stroke-width="2"/>
+  <text x="686" y="152" class="l">Operator panel</text>
+  <text x="686" y="176" class="s">React, in a browser</text>
+
+  <rect x="896" y="120" width="206" height="78" rx="11" fill="var(--hw-w)" stroke="var(--hw)" stroke-width="2"/>
+  <text x="914" y="152" class="l">A typed question</text>
+  <text x="914" y="176" class="s">&#8220;what runs out first?&#8221;</text>
+
+  <rect x="1124" y="120" width="206" height="78" rx="11" fill="none" stroke="var(--faint)" stroke-width="1.6" stroke-dasharray="6 5"/>
+  <text x="1142" y="152" class="l2" style="fill:var(--faint)">No one is here</text>
+  <text x="1142" y="176" class="s">a clock starts this one</text>
+
+  <!-- ════════ API INTERFACE ════════ -->
+  <rect x="212" y="230" width="206" height="78" rx="11" class="box"/>
+  <text x="230" y="256" class="l">Ingest</text>
+  <text x="230" y="278" class="f">/api/v1/ingest/scan</text>
+  <text x="230" y="298" class="s">sent twice, same answer</text>
+
+  <rect x="668" y="230" width="206" height="78" rx="11" class="box"/>
+  <text x="686" y="256" class="l">Reads</text>
+  <text x="686" y="278" class="f">/api/v1/dashboard/*</text>
+  <text x="686" y="298" class="s">stock · alerts · KPIs</text>
+
+  <rect x="896" y="230" width="206" height="78" rx="11" class="box"/>
+  <text x="914" y="256" class="l">Assistant</text>
+  <text x="914" y="278" class="f">/api/v1/assistant/ask</text>
+  <text x="914" y="298" class="s">streams as it thinks</text>
+
+  <rect x="1124" y="230" width="206" height="78" rx="11" class="box"/>
+  <text x="1142" y="256" class="l">APScheduler</text>
+  <text x="1142" y="278" class="f">cron · 01:00 daily</text>
+  <text x="1142" y="298" class="s">no request, no user</text>
+
+  <!-- ════════ BUSINESS SERVICE ════════ -->
+  <!-- No arrow between the two rows below. An arrow would mean "then",
+       and the whole guarantee is that there is no "then". -->
+  <!-- Set to the right of the artery: at x=214 the incoming arrowhead
+       landed on top of the final letter. -->
+  <text x="328" y="338" class="f" style="fill:var(--hot);font-weight:700;font-size:11px">ONE TRANSACTION</text>
+  <rect x="212" y="344" width="206" height="120" rx="12" fill="none"
+        stroke="var(--hot)" stroke-width="2.4" stroke-dasharray="7 5"/>
+  <rect x="222" y="356" width="186" height="40" rx="8" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.8"/>
+  <text x="236" y="381" class="l2">stock level changes</text>
+  <rect x="222" y="402" width="186" height="40" rx="8" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.8"/>
+  <text x="236" y="427" class="l2">outbox rows written</text>
+  <text x="236" y="456" class="f" style="fill:var(--hot)">both land, or neither</text>
+  <text x="336" y="478" class="f">the row is locked while it changes</text>
+
+  <text x="440" y="378" class="s" style="fill:var(--hot);font-weight:600">The device has already</text>
+  <text x="440" y="396" class="s" style="fill:var(--hot);font-weight:600">been answered by here.</text>
+  <text x="440" y="424" class="s">Nothing below this point</text>
+  <text x="440" y="442" class="s">can slow a scan down.</text>
+
+  <rect x="668" y="348" width="206" height="116" rx="11" class="box"/>
+  <text x="686" y="378" class="l">Query services</text>
+  <text x="686" y="402" class="s">stock · alerts · KPIs</text>
+  <text x="686" y="422" class="s">filtered by company_id</text>
+  <text x="686" y="442" class="s">reads only</text>
+
+  <rect x="896" y="348" width="206" height="116" rx="11" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.8"/>
+  <text x="914" y="378" class="l">Gemini · 9 tools</text>
+  <text x="914" y="400" class="s">each tool bound to one</text>
+  <text x="914" y="418" class="s">company. Reads the ledger.</text>
+  <text x="914" y="438" class="s">Its one write is a proposal</text>
+  <text x="914" y="457" class="f">a human has to approve</text>
+
+  <rect x="1124" y="348" width="206" height="116" rx="11" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.8"/>
+  <text x="1142" y="378" class="l">ABC → forecast → EOQ</text>
+  <text x="1142" y="400" class="s">chained, not three jobs</text>
+  <text x="1142" y="418" class="s">four years of history</text>
+  <text x="1142" y="438" class="s">no ML library at all</text>
+  <text x="1142" y="457" class="f">moving average, EOQ</text>
+
+  <!-- ════════ BASIC SERVICE ════════ -->
+  <rect x="212" y="504" width="206" height="80" rx="11" class="box"/>
+  <text x="230" y="532" class="l">Relay worker</text>
+  <text x="230" y="554" class="s">publish, THEN mark</text>
+  <text x="230" y="574" class="f">FOR UPDATE SKIP LOCKED</text>
+
+  <rect x="440" y="504" width="206" height="80" rx="11" class="box"/>
+  <text x="458" y="532" class="l">Consumers</text>
+  <text x="458" y="554" class="s">commit, THEN ack</text>
+  <text x="458" y="574" class="f">alerts · read models</text>
+
+  <text x="1190" y="548" class="f">nightly extract</text>
+
+  <!-- ════════ DATA ════════ -->
+  <rect x="212" y="614" width="434" height="66" rx="11" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.8"/>
+  <text x="232" y="642" class="l">Redis Stream</text>
+  <text x="372" y="642" class="f">optistock:events</text>
+  <text x="232" y="666" class="s">one consumer group · server-side offsets · capped at 10,000</text>
+
+  <rect x="1124" y="614" width="150" height="66" rx="11" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.8"/>
+  <text x="1140" y="642" class="l">Parquet lake</text>
+  <text x="1140" y="664" class="f">columnar files</text>
+
+  <!-- ════════ DATABASE ════════ -->
+  <rect x="212" y="708" width="1118" height="64" rx="11" fill="var(--store-w)" stroke="var(--store)" stroke-width="2.2"/>
+  <text x="232" y="736" class="l">PostgreSQL</text>
+  <text x="356" y="736" class="s">the one source of truth — every row in it carries company_id</text>
+  <text x="232" y="760" class="f">inventory · inventory_movements · event_outbox · alerts · recommendations · assistant_actions · audit_logs</text>
+
+  <!-- ════════ RUNNING ENVIRONMENT ════════ -->
+  <rect x="212" y="796" width="1348" height="54" rx="11" class="box"/>
+  <text x="232" y="820" class="s">AWS EC2, one host · Docker Compose · 6 containers: nginx · api · relay · consumers · postgres · redis</text>
+  <text x="232" y="841" class="f">23 Alembic migrations, run by the api container only · TLS from Let&#39;s Encrypt, renewed on a timer · optistock.duckdns.org</text>
+
+  <!-- ════════ ARROWS ════════ -->
+  <!-- the scan artery -->
+  <path d="M315 198 V 228" class="main" marker-end="url(#m)"/>
+  <path d="M315 308 V 342" class="main" marker-end="url(#m)"/>
+  <path d="M315 464 V 502" class="main" marker-end="url(#m)"/>
+
+  <!-- the U through the data layer: this is the correction that matters.
+       Consumers never read the relay. They read the stream. -->
+  <path d="M315 584 V 612" class="main" marker-end="url(#m)"/>
+  <text x="325" y="604" class="f" style="fill:var(--hot)">XADD</text>
+  <path d="M543 614 V 586" class="main" marker-end="url(#m)"/>
+  <text x="553" y="604" class="f" style="fill:var(--hot)">XREADGROUP</text>
+
+  <!-- consumers write down into the ledger -->
+  <path d="M646 544 H 657 V 706" class="main" marker-end="url(#m)"/>
+
+  <!-- the response climbing back to the device -->
+  <path d="M418 404 H 436 V 159 H 420" class="ret" marker-end="url(#r)"/>
+  <text x="444" y="268" class="s" style="fill:var(--hw);font-weight:600">200 OK, about 200 ms</text>
+  <text x="444" y="286" class="s">the device is released</text>
+
+  <!-- read paths: short and direct, on purpose -->
+  <path d="M771 198 V 228" class="side" marker-end="url(#s)"/>
+  <path d="M771 308 V 346" class="side" marker-end="url(#s)"/>
+  <path d="M771 464 V 706" class="side" marker-end="url(#s)"/>
+  <text x="781" y="600" class="f">no queue, no cache</text>
+
+  <path d="M999 198 V 228" class="side" marker-end="url(#s)"/>
+  <path d="M999 308 V 346" class="side" marker-end="url(#s)"/>
+  <path d="M999 464 V 706" class="side" marker-end="url(#s)"/>
+  <text x="1009" y="600" class="f">reads, never writes</text>
+
+  <!-- nightly -->
+  <path d="M1227 198 V 228" class="side" marker-end="url(#s)"/>
+  <path d="M1227 308 V 346" class="side" marker-end="url(#s)"/>
+  <path d="M1180 464 V 612" class="side" marker-end="url(#s)"/>
+  <path d="M1302 464 V 706" class="side" marker-end="url(#s)"/>
+  <!-- Anchored low and to the right of its own arrow. Rotated -90, the
+       glyphs grow up and to the left, so an anchor at (1296,590) ran the
+       label straight through the box above and through the arrow. -->
+  <text x="1330" y="700" class="f" transform="rotate(-90 1330 700)">recommendations written back</text>
+
+  <!-- ════════ CROSS-CUTTING BAND ════════ -->
+  <rect x="1348" y="108" width="212" height="672" rx="12" class="cell"/>
+  <text x="1368" y="140" class="band">AT EVERY LAYER</text>
+  <line x1="1368" y1="152" x2="1540" y2="152" stroke="var(--line)" stroke-width="1.4"/>
+
+  <text x="1368" y="182" class="l2">Tenant isolation</text>
+  <text x="1368" y="204" class="s">company_id comes from</text>
+  <text x="1368" y="222" class="s">the token and is checked</text>
+  <text x="1368" y="240" class="s">against the live row</text>
+
+  <text x="1368" y="308" class="l2">Authentication</text>
+  <text x="1368" y="330" class="s">JWT at the edge.</text>
+  <text x="1368" y="348" class="s">No anonymous path in.</text>
+
+  <text x="1368" y="434" class="l2">Rate limiting</text>
+  <text x="1368" y="456" class="s">counted per client,</text>
+  <text x="1368" y="474" class="s">not per proxy</text>
+
+  <text x="1368" y="560" class="l2">At-least-once</text>
+  <text x="1368" y="582" class="s">an event may arrive</text>
+  <text x="1368" y="600" class="s">twice. Handlers are</text>
+  <text x="1368" y="618" class="s">built to expect it.</text>
+
+  <text x="1368" y="686" class="l2">Audit trail</text>
+  <text x="1368" y="708" class="s">every write leaves</text>
+  <text x="1368" y="726" class="s">a row behind it</text>
+</svg>
+</div>
+</body>
+</html>
