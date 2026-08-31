@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>OptiStock — architecture slide</title>
+<style>
+  /* ------------------------------------------------------------------
+     One 16:9 diagram, sized to be exported as a PNG and pasted onto a
+     slide. Differences from the version inside PRESENTATION.html, all of
+     them because a slide is READ IN THREE SECONDS and a page is not:
+
+       - 16:9, so it fills a slide instead of letterboxing
+       - the sections are renumbered to match reading order. They ran
+         1, 2, 4 across the top and 3, 5 down the left, which is fine
+         when you can scroll back and is not fine on a projector
+       - a legend, because the colours mean something and that meaning
+         lived on the surrounding page rather than in the picture
+       - a title, so the image stands on its own
+       - larger type throughout, since a projector eats one size step
+         and the back row eats another
+     ------------------------------------------------------------------ */
+  :root{
+    --bg:#0b0f18; --panel:#151b28; --ink:#eef1f7; --muted:#a8b3c6; --faint:#79849a;
+    --line:#2a3342;
+    --accent:#7d97ff; --accent-w:#1b2444;
+    --hw:#3fc79a;   --hw-w:#0e2c23;
+    --store:#e0a35c; --store-w:#2f2410;
+    --brain:#b49bff; --brain-w:#241a44;
+    --out:#7d97ff;   --out-w:#1b2444;
+    --sans:"Segoe UI",Roboto,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  }
+  body.light{
+    --bg:#ffffff; --panel:#f7f8fb; --ink:#14181f; --muted:#4a5568; --faint:#7c8698;
+    --line:#dfe3ea;
+    --accent:#2f5bd0; --accent-w:#e9efff;
+    --hw:#0e8a63;   --hw-w:#e3f6ef;
+    --store:#a8620d; --store-w:#fdf1e0;
+    --brain:#6f4bcc; --brain-w:#efeaff;
+    --out:#2f5bd0;   --out-w:#e9efff;
+  }
+  html,body{margin:0;padding:0;background:var(--bg)}
+  #slide{width:1600px;height:900px;background:var(--bg)}
+  svg{display:block;width:1600px;height:900px}
+  svg text{font-family:var(--sans);fill:var(--ink)}
+  .t   {font-size:30px;font-weight:700;letter-spacing:-.4px}
+  .tsub{font-size:15px;fill:var(--muted)}
+  .tag {font-family:var(--mono);font-size:12px;fill:var(--faint);letter-spacing:1.4px}
+  .l   {font-size:16px;font-weight:600}
+  .s   {font-size:12.5px;fill:var(--muted)}
+  .f   {font-family:var(--mono);font-size:12px;fill:var(--faint)}
+  .lg  {font-size:13px;fill:var(--muted)}
+  .box {fill:var(--panel);stroke:var(--line);stroke-width:1.6}
+  .arr {stroke:var(--faint);stroke-width:2;fill:none}
+</style>
+</head>
+<body>
+<div id="slide">
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <rect width="1600" height="900" fill="var(--bg)"/>
+  <g color="var(--faint)">
+
+  <!-- ── header ─────────────────────────────────────────────── -->
+  <text x="48" y="52" class="t">OptiStock — system architecture</text>
+  <text x="48" y="78" class="tsub">Every stock movement is written once, and three independent consumers act on it.</text>
+
+  <!-- legend, so the colour coding travels with the picture -->
+  <rect x="1042" y="30" width="16" height="16" rx="4" fill="var(--hw-w)"    stroke="var(--hw)"    stroke-width="1.6"/>
+  <text x="1068" y="43" class="lg">Hardware</text>
+  <rect x="1042" y="56" width="16" height="16" rx="4" fill="var(--panel)"   stroke="var(--line)"  stroke-width="1.6"/>
+  <text x="1068" y="69" class="lg">Service</text>
+  <rect x="1200" y="30" width="16" height="16" rx="4" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.6"/>
+  <text x="1226" y="43" class="lg">Storage</text>
+  <rect x="1200" y="56" width="16" height="16" rx="4" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.6"/>
+  <text x="1226" y="69" class="lg">Computation</text>
+  <rect x="1360" y="30" width="16" height="16" rx="4" fill="var(--out-w)"   stroke="var(--out)"   stroke-width="1.6"/>
+  <text x="1386" y="43" class="lg">Output</text>
+  <line x1="48" y1="96" x2="1552" y2="96" stroke="var(--line)" stroke-width="1.5"/>
+
+  <!-- ── 1 · INPUT ──────────────────────────────────────────── -->
+  <text x="48" y="128" class="tag">1 · INPUT</text>
+  <rect x="48" y="140" width="260" height="86" rx="11" fill="var(--hw-w)" stroke="var(--hw)" stroke-width="2"/>
+  <text x="68" y="170" class="l">Scanner / RFID / ESP32</text>
+  <text x="68" y="192" class="s">POST /api/v1/ingest/scan</text>
+  <text x="68" y="212" class="s">sku · warehouse · in|out · qty</text>
+
+  <rect x="48" y="242" width="260" height="66" rx="11" class="box"/>
+  <text x="68" y="272" class="l">Browser (React)</text>
+  <text x="68" y="294" class="s">staff entering movements</text>
+
+  <path d="M310 183 H 354" class="arr" marker-end="url(#a)"/>
+  <path d="M310 275 H 332 Q 348 275 348 252 V 208" class="arr" marker-end="url(#a)"/>
+
+  <!-- ── 2 · REQUEST PATH ───────────────────────────────────── -->
+  <text x="360" y="128" class="tag">2 · REQUEST PATH</text>
+  <rect x="360" y="140" width="242" height="86" rx="11" class="box"/>
+  <text x="380" y="170" class="l">Nginx</text>
+  <text x="380" y="192" class="s">HTTPS · rate limit</text>
+  <text x="380" y="212" class="s">serves the React build</text>
+
+  <path d="M481 228 V 252" class="arr" marker-end="url(#a)"/>
+  <rect x="360" y="254" width="242" height="104" rx="11" class="box"/>
+  <text x="380" y="284" class="l">FastAPI</text>
+  <text x="380" y="306" class="s">JWT → company_id</text>
+  <text x="380" y="326" class="s">every query scoped to</text>
+  <text x="380" y="346" class="s">that one tenant</text>
+
+  <path d="M604 248 H 660" class="arr" marker-end="url(#a)"/>
+  <text x="606" y="238" class="f">write</text>
+
+  <!-- ── the atomic pair ────────────────────────────────────── -->
+  <rect x="664" y="140" width="324" height="166" rx="13" fill="none"
+        stroke="var(--accent)" stroke-width="2.2" stroke-dasharray="7 5"/>
+  <text x="666" y="128" class="tag" style="fill:var(--accent)">ONE DATABASE TRANSACTION</text>
+  <rect x="682" y="160" width="288" height="58" rx="9" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.8"/>
+  <text x="700" y="196" class="l">PostgreSQL — the ledger</text>
+  <rect x="682" y="230" width="288" height="58" rx="9" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.8"/>
+  <text x="700" y="266" class="l">event_outbox — the notice</text>
+
+  <!-- ── 3 · ASSISTANT (moved here so the numbers read L→R) ─── -->
+  <text x="1042" y="128" class="tag">3 · ASSISTANT</text>
+  <rect x="1042" y="140" width="290" height="86" rx="11" class="box"/>
+  <text x="1062" y="170" class="l">Question in English</text>
+  <text x="1062" y="192" class="s">"what runs out first?"</text>
+  <text x="1062" y="212" class="s">answer streamed back</text>
+
+  <path d="M1187 228 V 252" class="arr" marker-end="url(#a)"/>
+  <rect x="1042" y="254" width="290" height="104" rx="11" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.8"/>
+  <text x="1062" y="284" class="l">Gemini + 9 tools</text>
+  <text x="1062" y="306" class="s">each tool bound to</text>
+  <text x="1062" y="326" class="s">this tenant only</text>
+  <text x="1062" y="346" class="s">output filtered on the way out</text>
+
+  <path d="M1040 300 H 1014 V 189 H 976" class="arr" marker-end="url(#a)"/>
+  <text x="996" y="252" class="f">reads</text>
+
+  <!-- ── event path down the centre ─────────────────────────── -->
+  <path d="M826 308 V 344" class="arr" marker-end="url(#a)"/>
+  <text x="838" y="330" class="f">FOR UPDATE SKIP LOCKED</text>
+  <rect x="682" y="346" width="288" height="74" rx="11" class="box"/>
+  <text x="702" y="378" class="l">Relay worker</text>
+  <text x="702" y="400" class="s">publish, THEN mark published</text>
+
+  <path d="M826 422 V 452" class="arr" marker-end="url(#a)"/>
+  <rect x="682" y="454" width="288" height="66" rx="11" fill="var(--store-w)" stroke="var(--store)" stroke-width="1.8"/>
+  <text x="702" y="484" class="l">Redis Stream</text>
+  <text x="702" y="506" class="s">durable · consumer group</text>
+
+  <path d="M826 522 V 552" class="arr" marker-end="url(#a)"/>
+  <text x="838" y="542" class="f">XREADGROUP</text>
+  <rect x="682" y="554" width="288" height="74" rx="11" class="box"/>
+  <text x="702" y="586" class="l">Consumer workers</text>
+  <text x="702" y="608" class="s">de-duplicate on event_id</text>
+
+  <path d="M972 578 H 1036" class="arr" marker-end="url(#a)"/>
+  <rect x="1042" y="550" width="290" height="58" rx="10" fill="var(--out-w)" stroke="var(--out)" stroke-width="1.8"/>
+  <text x="1062" y="576" class="l">Alerts raised</text>
+  <text x="1062" y="596" class="s">below reorder · out of stock</text>
+
+  <path d="M760 630 V 660 H 1036" class="arr" marker-end="url(#a)"/>
+  <rect x="1042" y="632" width="290" height="58" rx="10" class="box"/>
+  <text x="1062" y="658" class="l">Read models updated</text>
+  <text x="1062" y="678" class="s">dashboards stay fast</text>
+
+  <!-- ── 4 · NIGHTLY ────────────────────────────────────────── -->
+  <text x="48" y="400" class="tag">4 · NIGHTLY, 01:00</text>
+  <rect x="48" y="412" width="260" height="66" rx="11" class="box"/>
+  <text x="68" y="442" class="l">Scheduler</text>
+  <text x="68" y="464" class="s">one chained job</text>
+
+  <path d="M178 480 V 506" class="arr" marker-end="url(#a)"/>
+  <rect x="48" y="508" width="260" height="66" rx="11" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.8"/>
+  <text x="68" y="538" class="l">ETL → Parquet</text>
+  <text x="68" y="560" class="s">history, stored column-wise</text>
+
+  <path d="M178 576 V 602" class="arr" marker-end="url(#a)"/>
+  <rect x="48" y="604" width="260" height="78" rx="11" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.8"/>
+  <text x="68" y="634" class="l">ABC + Forecast</text>
+  <text x="68" y="656" class="s">which items matter,</text>
+  <text x="68" y="676" class="s">how fast they sell</text>
+
+  <path d="M178 684 V 710" class="arr" marker-end="url(#a)"/>
+  <rect x="48" y="712" width="260" height="78" rx="11" fill="var(--brain-w)" stroke="var(--brain)" stroke-width="1.8"/>
+  <text x="68" y="742" class="l">EOQ + reorder point</text>
+  <text x="68" y="764" class="s">how much to order,</text>
+  <text x="68" y="784" class="s">and when</text>
+
+  <path d="M310 751 H 348" class="arr" marker-end="url(#a)"/>
+  <text x="356" y="740" class="f">written back to PostgreSQL,</text>
+  <text x="356" y="758" class="f">on the screen by morning</text>
+
+  <!-- ── 5 · DELIVERY ───────────────────────────────────────── -->
+  <text x="360" y="400" class="tag">5 · DELIVERY</text>
+  <rect x="360" y="412" width="242" height="66" rx="11" class="box"/>
+  <text x="380" y="442" class="l">git push</text>
+  <text x="380" y="464" class="s">GitHub Actions</text>
+
+  <path d="M481 480 V 506" class="arr" marker-end="url(#a)"/>
+  <rect x="360" y="508" width="242" height="86" rx="11" class="box"/>
+  <text x="380" y="538" class="l">AWS EC2 · Docker</text>
+  <text x="380" y="560" class="s">lint → test → build</text>
+  <text x="380" y="580" class="s">6 containers, one host</text>
+
+  <text x="360" y="632" class="f">502 tests must pass</text>
+  <text x="360" y="650" class="f">before anything ships</text>
+
+  <!-- ── the one sentence worth reading aloud ───────────────── -->
+  <line x1="682" y1="736" x2="1332" y2="736" stroke="var(--line)" stroke-width="1.5"/>
+  <text x="682" y="774" class="s" style="font-size:15.5px">
+    The dashed box is the idea the whole design rests on: the stock
+  </text>
+  <text x="682" y="798" class="s" style="font-size:15.5px">
+    change and the notice about it are written in the same transaction,
+  </text>
+  <text x="682" y="822" class="s" style="font-size:15.5px">
+    so they can never disagree.
+  </text>
+  </g>
+</svg>
+</div>
+</body>
+</html>
