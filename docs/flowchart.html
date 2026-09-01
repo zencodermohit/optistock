@@ -1,0 +1,459 @@
+<title>OptiStock Walkthrough</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" />
+<style>
+  /* ------------------------------------------------------------------
+     Light palette on bare :root, dark redefined twice so the un-stamped
+     "system" state and the explicit toggle both resolve.
+     ------------------------------------------------------------------ */
+  :root{
+    --ground:#f8f9fb;
+    --card:#ffffff;
+    --ink:#171a21;
+    --muted:#59616f;
+    --faint:#7b8492;
+    --line:#dee3ea;
+
+    /* the five kinds of thing */
+    --ppl:#0b6b4a;   --ppl-b:#2f9d74;  --ppl-f:#e4f4ed;
+    --api:#1f4fa8;   --api-b:#4d7fd6;  --api-f:#e6eefb;
+    --rul:#9c2b52;   --rul-b:#d4708f;  --rul-f:#fbe8ee;
+    --wrk:#5b34a8;   --wrk-b:#9678d8;  --wrk-f:#eee9fb;
+    --sto:#8a5300;   --sto-b:#d09a45;  --sto-f:#fbf1de;
+
+    /* the seven layer bands -- pale tints, ground not figure */
+    --b1:#edf6f2; --b2:#eef3fc; --b3:#fcf0f4; --b4:#f3eefc;
+    --b5:#fdf6ea; --b6:#fdf3e3; --b7:#eff1f5;
+
+    --sans:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --disp:"Archivo","Source Sans 3",system-ui,sans-serif;
+    --mono:"JetBrains Mono","Cascadia Mono",Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#101319; --card:#171b23; --ink:#e8ecf3; --muted:#a2acbb;
+      --faint:#798494; --line:#272d38;
+      --ppl:#6fdcae; --ppl-b:#2f9d74; --ppl-f:#0f2b21;
+      --api:#93b4f5; --api-b:#3d6cc0; --api-f:#131f36;
+      --rul:#f0a0b8; --rul-b:#b85a7c; --rul-f:#2c1620;
+      --wrk:#c2a9f5; --wrk-b:#7a5cc4; --wrk-f:#1d1833;
+      --sto:#e8b968; --sto-b:#b8863a; --sto-f:#2a1f0e;
+      --b1:#131e1a; --b2:#131924; --b3:#1e141a; --b4:#181430;
+      --b5:#1f1a10; --b6:#231c0f; --b7:#161a21;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#101319; --card:#171b23; --ink:#e8ecf3; --muted:#a2acbb;
+    --faint:#798494; --line:#272d38;
+    --ppl:#6fdcae; --ppl-b:#2f9d74; --ppl-f:#0f2b21;
+    --api:#93b4f5; --api-b:#3d6cc0; --api-f:#131f36;
+    --rul:#f0a0b8; --rul-b:#b85a7c; --rul-f:#2c1620;
+    --wrk:#c2a9f5; --wrk-b:#7a5cc4; --wrk-f:#1d1833;
+    --sto:#e8b968; --sto-b:#b8863a; --sto-f:#2a1f0e;
+    --b1:#131e1a; --b2:#131924; --b3:#1e141a; --b4:#181430;
+    --b5:#1f1a10; --b6:#231c0f; --b7:#161a21;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.55;
+    margin:0;
+  }
+  .wrap{max-width:1600px;margin:0 auto;padding:40px 28px 72px;
+        display:flex;flex-direction:column;gap:34px}
+
+  header{display:flex;flex-direction:column;gap:10px}
+  h1{font-family:var(--disp);font-size:34px;font-weight:700;letter-spacing:-.5px;
+     margin:0;text-wrap:balance}
+  .thesis{font-size:18px;color:var(--muted);max-width:74ch;margin:0}
+
+  .legend{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;
+          padding-top:6px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:13px;
+        font-weight:600;padding:5px 11px;border-radius:999px;border:1.5px solid}
+  .chip .dot{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .c-ppl{color:var(--ppl);border-color:var(--ppl-b);background:var(--ppl-f)}
+  .c-api{color:var(--api);border-color:var(--api-b);background:var(--api-f)}
+  .c-rul{color:var(--rul);border-color:var(--rul-b);background:var(--rul-f)}
+  .c-wrk{color:var(--wrk);border-color:var(--wrk-b);background:var(--wrk-f)}
+  .c-sto{color:var(--sto);border-color:var(--sto-b);background:var(--sto-f)}
+  .legend-note{font-size:13.5px;color:var(--faint);flex-basis:100%;margin:2px 0 0}
+
+  figure{margin:0;display:flex;flex-direction:column;gap:12px}
+  .scroller{overflow-x:auto;background:var(--card);border:1px solid var(--line);
+            border-radius:14px;padding:14px}
+  svg.chart{display:block;width:1520px;max-width:none;height:auto}
+  figcaption{font-size:14px;color:var(--faint);max-width:80ch}
+
+  /* ---- SVG type scale ---- */
+  svg text{font-family:var(--sans);fill:var(--ink)}
+  .tier-n {font-family:var(--disp);font-size:14.5px;font-weight:700;letter-spacing:.2px}
+  .tier-t {font-family:var(--mono);font-size:10px;fill:var(--faint)}
+  .b-t    {font-size:16px;font-weight:600}
+  .b-s    {font-size:13px;fill:var(--muted)}
+  .b-m    {font-family:var(--mono);font-size:10.5px;fill:var(--faint)}
+  .a-l    {font-family:var(--mono);font-size:10.5px;fill:var(--faint)}
+  .num    {font-family:var(--disp);font-size:12px;font-weight:700;fill:var(--ground)}
+  .artery {stroke:var(--ink);stroke-width:2.8;fill:none}
+  .thin   {stroke:var(--faint);stroke-width:1.5;fill:none}
+  .back   {stroke:var(--ppl-b);stroke-width:2.2;fill:none}
+
+  h2{font-family:var(--disp);font-size:22px;font-weight:600;margin:0 0 4px;
+     letter-spacing:-.2px}
+  section{display:flex;flex-direction:column;gap:16px}
+  .lede{color:var(--muted);margin:0;max-width:72ch;font-size:15.5px}
+
+  ol.steps{list-style:none;margin:0;padding:0;display:grid;
+           grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  ol.steps li{background:var(--card);border:1px solid var(--line);border-radius:12px;
+              padding:14px 16px;display:flex;gap:13px;align-items:flex-start}
+  .marker{flex:0 0 26px;height:26px;border-radius:999px;background:var(--ink);
+          color:var(--ground);font-family:var(--disp);font-weight:700;font-size:13px;
+          display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .step-h{font-weight:600;display:block;margin-bottom:2px}
+  .step-b{font-size:14.5px;color:var(--muted)}
+  code{font-family:var(--mono);font-size:.88em;background:var(--b7);
+       border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--ink)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:18px 20px;display:flex;flex-direction:column;gap:7px;
+        border-top:3px solid var(--rul-b)}
+  .card h3{font-family:var(--disp);font-size:16.5px;font-weight:600;margin:0}
+  .card p{margin:0;font-size:14.5px;color:var(--muted)}
+  .ask{font-size:13.5px;color:var(--faint);font-style:italic}
+
+  ul.cross{list-style:none;margin:0;padding:0;display:grid;
+           grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+  ul.cross li{background:var(--card);border:1px solid var(--line);border-radius:10px;
+              padding:13px 15px}
+  ul.cross strong{display:block;font-size:14.5px;margin-bottom:2px}
+  ul.cross span{font-size:14px;color:var(--muted)}
+
+  footer{border-top:1px solid var(--line);padding-top:18px;font-size:13.5px;
+         color:var(--faint);max-width:80ch}
+</style>
+
+<div class="wrap">
+
+<header>
+  <h1>OptiStock, one scan at a time</h1>
+  <p class="thesis">Every stock movement is written exactly once. Everything that reacts to it &mdash;
+     alerts, dashboards, forecasts &mdash; runs afterwards, so nothing that reacts can ever make the
+     scanner wait.</p>
+  <div class="legend">
+    <span class="chip c-ppl"><span class="dot" style="background:var(--ppl-b)"></span>People &amp; devices</span>
+    <span class="chip c-api"><span class="dot" style="background:var(--api-b)"></span>Way in</span>
+    <span class="chip c-rul"><span class="dot" style="background:var(--rul-b)"></span>Business rules</span>
+    <span class="chip c-wrk"><span class="dot" style="background:var(--wrk-b)"></span>Background workers</span>
+    <span class="chip c-sto"><span class="dot" style="background:var(--sto-b)"></span>Stores data</span>
+    <p class="legend-note">Two codes, and they never mean the same thing: the pale <strong>band</strong>
+      tells you which layer you are in, the <strong>box outline</strong> tells you what kind of thing it is.
+      The single bold line is one scan travelling through the system.</p>
+  </div>
+</header>
+
+<figure>
+  <div class="scroller">
+  <svg class="chart" viewBox="0 0 1520 840" role="img"
+       aria-label="A seven-layer diagram of OptiStock. A scan enters through nginx and FastAPI, changes the stock level and writes an outbox row in a single database commit, and the device is answered immediately. A relay worker then publishes the outbox row to a Redis stream, consumers read it back out and raise alerts, and everything lands in one PostgreSQL database. Separate columns show the dashboard read path, the Gemini assistant, and a nightly analytics job started by a clock.">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+      </marker>
+    </defs>
+
+    <!-- ═══ layer bands ═══ -->
+    <rect x="184" y="16"  width="1318" height="104" rx="12" fill="var(--b1)"/>
+    <rect x="184" y="130" width="1318" height="138" rx="12" fill="var(--b2)"/>
+    <rect x="184" y="278" width="1318" height="146" rx="12" fill="var(--b3)"/>
+    <rect x="184" y="434" width="1318" height="112" rx="12" fill="var(--b4)"/>
+    <rect x="184" y="556" width="1318" height="94"  rx="12" fill="var(--b5)"/>
+    <rect x="184" y="660" width="1318" height="80"  rx="12" fill="var(--b6)"/>
+    <rect x="184" y="750" width="1318" height="74"  rx="12" fill="var(--b7)"/>
+
+    <!-- ═══ layer names: the plain name, and the textbook one ═══ -->
+    <rect x="24" y="16" width="146" height="104" rx="10" fill="var(--b1)"/>
+    <text x="38" y="58" class="tier-n">WHO STARTS</text>
+    <text x="38" y="76" class="tier-n">IT</text>
+    <text x="38" y="98" class="tier-t">access tier</text>
+
+    <rect x="24" y="130" width="146" height="138" rx="10" fill="var(--b2)"/>
+    <text x="38" y="186" class="tier-n">THE WAY IN</text>
+    <text x="38" y="208" class="tier-t">api interface</text>
+
+    <rect x="24" y="278" width="146" height="146" rx="10" fill="var(--b3)"/>
+    <text x="38" y="336" class="tier-n">BUSINESS</text>
+    <text x="38" y="354" class="tier-n">RULES</text>
+    <text x="38" y="376" class="tier-t">business logic</text>
+
+    <rect x="24" y="434" width="146" height="112" rx="10" fill="var(--b4)"/>
+    <text x="38" y="482" class="tier-n">BACKGROUND</text>
+    <text x="38" y="500" class="tier-n">WORKERS</text>
+    <text x="38" y="522" class="tier-t">service tier</text>
+
+    <rect x="24" y="556" width="146" height="94" rx="10" fill="var(--b5)"/>
+    <text x="38" y="598" class="tier-n">DATA</text>
+    <text x="38" y="620" class="tier-t">queue + lake</text>
+
+    <rect x="24" y="660" width="146" height="80" rx="10" fill="var(--b6)"/>
+    <text x="38" y="698" class="tier-n">DATABASE</text>
+    <text x="38" y="720" class="tier-t">persistence</text>
+
+    <rect x="24" y="750" width="146" height="74" rx="10" fill="var(--b7)"/>
+    <text x="38" y="786" class="tier-n">WHERE IT</text>
+    <text x="38" y="804" class="tier-n">RUNS</text>
+
+    <!-- ═══ arrows, drawn first so the nginx strip covers the parts that
+             genuinely pass THROUGH nginx ═══ -->
+    <g color="var(--ink)">
+      <path d="M313 108 V 190" class="artery" marker-end="url(#ah)"/>
+      <path d="M313 258 V 286" class="artery" marker-end="url(#ah)"/>
+      <path d="M313 412 V 442" class="artery" marker-end="url(#ah)"/>
+      <path d="M313 534 V 564" class="artery" marker-end="url(#ah)"/>
+      <path d="M578 568 V 538" class="artery" marker-end="url(#ah)"/>
+      <path d="M700 490 H 711 V 668" class="artery" marker-end="url(#ah)"/>
+    </g>
+    <g color="var(--ppl-b)">
+      <path d="M435 350 H 446 V 68 H 439" class="back" marker-end="url(#ah)"/>
+    </g>
+    <g color="var(--faint)">
+      <path d="M843 108 V 190"  class="thin" marker-end="url(#ah)"/>
+      <path d="M843 258 V 286"  class="thin" marker-end="url(#ah)"/>
+      <path d="M843 412 V 668"  class="thin" marker-end="url(#ah)"/>
+      <path d="M1108 108 V 190" class="thin" marker-end="url(#ah)"/>
+      <path d="M1108 258 V 286" class="thin" marker-end="url(#ah)"/>
+      <path d="M1108 412 V 668" class="thin" marker-end="url(#ah)"/>
+      <path d="M1373 108 V 190" class="thin" marker-end="url(#ah)"/>
+      <path d="M1373 258 V 286" class="thin" marker-end="url(#ah)"/>
+      <path d="M1330 412 V 564" class="thin" marker-end="url(#ah)"/>
+      <path d="M1455 412 V 668" class="thin" marker-end="url(#ah)"/>
+    </g>
+
+    <!-- ═══ WHO STARTS IT ═══ -->
+    <rect x="192" y="28" width="243" height="80" rx="11" fill="var(--ppl-f)" stroke="var(--ppl-b)" stroke-width="1.8"/>
+    <text x="208" y="56" class="b-t">Scan client</text>
+    <text x="208" y="78" class="b-s">a barcode or RFID reader</text>
+    <text x="208" y="97" class="b-m">sends a device_id</text>
+
+    <rect x="722" y="28" width="243" height="80" rx="11" fill="var(--ppl-f)" stroke="var(--ppl-b)" stroke-width="1.8"/>
+    <text x="738" y="56" class="b-t">Operator panel</text>
+    <text x="738" y="78" class="b-s">the React app, in a browser</text>
+
+    <rect x="987" y="28" width="243" height="80" rx="11" fill="var(--ppl-f)" stroke="var(--ppl-b)" stroke-width="1.8"/>
+    <text x="1003" y="56" class="b-t">A question</text>
+    <text x="1003" y="78" class="b-s">&#8220;what runs out first?&#8221;</text>
+
+    <rect x="1252" y="28" width="243" height="80" rx="11" fill="none" stroke="var(--faint)" stroke-width="1.6" stroke-dasharray="6 5"/>
+    <text x="1268" y="56" class="b-t" style="fill:var(--faint)">No one is here</text>
+    <text x="1268" y="78" class="b-s">a clock starts this one</text>
+    <text x="1268" y="97" class="b-m">01:00, every night</text>
+
+    <!-- ═══ THE WAY IN ═══ -->
+    <rect x="192" y="142" width="1038" height="42" rx="9" fill="var(--api-f)" stroke="var(--api-b)" stroke-width="1.8"/>
+    <text x="208" y="169" class="b-t">nginx</text>
+    <text x="278" y="169" class="b-s">terminates HTTPS &#183; serves the React app &#183; passes the caller&#8217;s real IP to the API as X-Real-IP</text>
+
+    <rect x="192" y="194" width="243" height="64" rx="11" fill="var(--api-f)" stroke="var(--api-b)" stroke-width="1.8"/>
+    <text x="208" y="217" class="b-m" style="fill:var(--api)">/api/v1/ingest/scan</text>
+    <text x="208" y="237" class="b-s">the same scan sent twice</text>
+    <text x="208" y="253" class="b-s">gives the same answer back</text>
+
+    <rect x="722" y="194" width="243" height="64" rx="11" fill="var(--api-f)" stroke="var(--api-b)" stroke-width="1.8"/>
+    <text x="738" y="217" class="b-m" style="fill:var(--api)">/api/v1/dashboard/*</text>
+    <text x="738" y="237" class="b-s">stock levels, alerts and</text>
+    <text x="738" y="253" class="b-s">totals for the screen</text>
+
+    <rect x="987" y="194" width="243" height="64" rx="11" fill="var(--api-f)" stroke="var(--api-b)" stroke-width="1.8"/>
+    <text x="1003" y="217" class="b-m" style="fill:var(--api)">/api/v1/assistant/ask</text>
+    <text x="1003" y="237" class="b-s">the answer streams back</text>
+    <text x="1003" y="253" class="b-s">as it is being written</text>
+
+    <rect x="1252" y="194" width="243" height="64" rx="11" fill="var(--wrk-f)" stroke="var(--wrk-b)" stroke-width="1.8"/>
+    <text x="1268" y="216" class="b-t" style="font-size:15px">APScheduler</text>
+    <text x="1268" y="236" class="b-m">cron &#183; 01:00 daily</text>
+    <text x="1268" y="253" class="b-s">runs inside the API process</text>
+
+    <!-- ═══ BUSINESS RULES ═══ -->
+    <rect x="192" y="290" width="243" height="122" rx="12" fill="none"
+          stroke="var(--rul-b)" stroke-width="2" stroke-dasharray="7 5"/>
+    <rect x="204" y="300" width="219" height="42" rx="8" fill="var(--sto-f)" stroke="var(--sto-b)" stroke-width="1.6"/>
+    <text x="216" y="320" class="b-t" style="font-size:15px">stock level changes</text>
+    <text x="216" y="335" class="b-m">locked while it changes</text>
+    <rect x="204" y="348" width="219" height="42" rx="8" fill="var(--sto-f)" stroke="var(--sto-b)" stroke-width="1.6"/>
+    <text x="216" y="368" class="b-t" style="font-size:15px">outbox rows written</text>
+    <text x="216" y="383" class="b-m">stock.moved &#183; scan.recorded</text>
+    <text x="216" y="405" class="b-s" style="fill:var(--rul);font-weight:600">both land, or neither does</text>
+    <!-- the pill sits on the dashed edge, like a fieldset legend -->
+    <rect x="214" y="281" width="84" height="18" rx="9" fill="var(--b3)"/>
+    <text x="222" y="294" class="b-m" style="fill:var(--rul);font-weight:500">ONE COMMIT</text>
+
+    <text x="457" y="318" class="b-s" style="fill:var(--rul);font-weight:600">The scanner already has</text>
+    <text x="457" y="336" class="b-s" style="fill:var(--rul);font-weight:600">its answer by this point.</text>
+    <text x="457" y="364" class="b-s">Everything lower down runs</text>
+    <text x="457" y="382" class="b-s">afterwards, and none of it</text>
+    <text x="457" y="400" class="b-s">can make a scan wait.</text>
+
+    <rect x="722" y="290" width="243" height="122" rx="11" fill="var(--rul-f)" stroke="var(--rul-b)" stroke-width="1.8"/>
+    <text x="738" y="318" class="b-t">Query services</text>
+    <text x="738" y="342" class="b-s">they read, and never write</text>
+    <text x="738" y="362" class="b-s">every query is filtered by</text>
+    <text x="738" y="380" class="b-s">the company in your token</text>
+    <text x="738" y="401" class="b-m">/dashboard &#183; /alerts &#183; /insights</text>
+
+    <rect x="987" y="290" width="243" height="122" rx="11" fill="var(--rul-f)" stroke="var(--rul-b)" stroke-width="1.8"/>
+    <text x="1003" y="318" class="b-t">Gemini assistant</text>
+    <text x="1003" y="342" class="b-s">9 tools, each one bound to</text>
+    <text x="1003" y="360" class="b-s">a single company. It reads</text>
+    <text x="1003" y="378" class="b-s">the ledger. Its only write is</text>
+    <text x="1003" y="396" class="b-s">a proposal a person approves.</text>
+
+    <rect x="1252" y="290" width="243" height="122" rx="11" fill="var(--rul-f)" stroke="var(--rul-b)" stroke-width="1.8"/>
+    <text x="1268" y="318" class="b-t">Nightly analytics</text>
+    <text x="1268" y="342" class="b-s">ABC &#8594; forecast &#8594; EOQ</text>
+    <text x="1268" y="360" class="b-s">chained, not three jobs</text>
+    <text x="1268" y="380" class="b-s">no ML library at all: moving</text>
+    <text x="1268" y="398" class="b-s">averages and EOQ formulas</text>
+
+    <!-- ═══ BACKGROUND WORKERS ═══ -->
+    <rect x="192" y="446" width="243" height="88" rx="11" fill="var(--wrk-f)" stroke="var(--wrk-b)" stroke-width="1.8"/>
+    <text x="208" y="476" class="b-t">Relay worker</text>
+    <text x="208" y="500" class="b-s">publish, THEN mark it done</text>
+    <text x="208" y="521" class="b-m">FOR UPDATE SKIP LOCKED</text>
+
+    <rect x="457" y="446" width="243" height="88" rx="11" fill="var(--wrk-f)" stroke="var(--wrk-b)" stroke-width="1.8"/>
+    <text x="473" y="476" class="b-t">Consumers</text>
+    <text x="473" y="500" class="b-s">commit, THEN acknowledge</text>
+    <text x="473" y="520" class="b-s">raise alerts, refresh views</text>
+
+    <!-- ═══ DATA ═══ -->
+    <rect x="192" y="568" width="508" height="70" rx="11" fill="var(--sto-f)" stroke="var(--sto-b)" stroke-width="1.8"/>
+    <text x="208" y="596" class="b-t">Redis Stream</text>
+    <text x="348" y="596" class="b-m" style="fill:var(--sto)">optistock:events</text>
+    <text x="208" y="620" class="b-s">one consumer group &#183; the server remembers who has read what</text>
+
+    <rect x="1252" y="568" width="148" height="70" rx="11" fill="var(--sto-f)" stroke="var(--sto-b)" stroke-width="1.8"/>
+    <text x="1266" y="596" class="b-t">Parquet files</text>
+    <text x="1266" y="618" class="b-m">columns, not rows</text>
+
+    <!-- ═══ DATABASE ═══ -->
+    <rect x="192" y="672" width="1303" height="58" rx="11" fill="var(--sto-f)" stroke="var(--sto-b)" stroke-width="2.4"/>
+    <text x="208" y="699" class="b-t">PostgreSQL</text>
+    <text x="330" y="699" class="b-s">one source of truth &#8212; every row in it carries the company it belongs to</text>
+    <text x="208" y="720" class="b-m">inventory &#183; inventory_movements &#183; event_outbox &#183; alerts &#183; recommendations &#183; assistant_actions &#183; audit_logs</text>
+
+    <!-- ═══ WHERE IT RUNS ═══ -->
+    <rect x="192" y="760" width="1303" height="54" rx="11" fill="var(--card)" stroke="var(--line)" stroke-width="1.6"/>
+    <text x="208" y="784" class="b-s">One AWS EC2 machine &#183; Docker Compose &#183; 6 containers: nginx &#183; api &#183; relay &#183; consumers &#183; postgres &#183; redis</text>
+    <text x="208" y="805" class="b-m">23 Alembic migrations, run by the api container only &#183; HTTPS from Let&#8217;s Encrypt, renewed automatically &#183; optistock.duckdns.org</text>
+
+    <!-- ═══ arrow labels, on top so they stay readable ═══ -->
+    <text x="323" y="557" class="a-l" style="fill:var(--ink)">XADD</text>
+    <text x="588" y="557" class="a-l" style="fill:var(--ink)">XREADGROUP</text>
+    <text x="853" y="640" class="a-l">no queue in between</text>
+    <text x="1118" y="640" class="a-l">reads, never writes</text>
+    <text x="1340" y="445" class="a-l">nightly extract</text>
+    <text x="1440" y="660" class="a-l" transform="rotate(-90 1440 660)">recommendations written back</text>
+    <text x="466" y="240" class="a-l" style="fill:var(--ppl)">200 OK</text>
+    <text x="466" y="256" class="a-l" style="fill:var(--ppl)">about 200 ms</text>
+
+    <!-- ═══ step markers for the walkthrough below ═══ -->
+    <g>
+      <circle cx="192" cy="28"  r="12" fill="var(--ink)"/><text x="192" y="32.5" class="num" text-anchor="middle">1</text>
+      <circle cx="192" cy="194" r="12" fill="var(--ink)"/><text x="192" y="198.5" class="num" text-anchor="middle">2</text>
+      <circle cx="192" cy="290" r="12" fill="var(--ink)"/><text x="192" y="294.5" class="num" text-anchor="middle">3</text>
+      <circle cx="446" cy="212" r="12" fill="var(--ppl)"/><text x="446" y="216.5" class="num" text-anchor="middle">4</text>
+      <circle cx="192" cy="446" r="12" fill="var(--ink)"/><text x="192" y="450.5" class="num" text-anchor="middle">5</text>
+      <circle cx="192" cy="568" r="12" fill="var(--ink)"/><text x="192" y="572.5" class="num" text-anchor="middle">6</text>
+      <circle cx="457" cy="446" r="12" fill="var(--ink)"/><text x="457" y="450.5" class="num" text-anchor="middle">7</text>
+      <circle cx="192" cy="672" r="12" fill="var(--ink)"/><text x="192" y="676.5" class="num" text-anchor="middle">8</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption>Seven layers, read downwards: each one asks only the layer beneath it. The four
+    columns are four independent journeys through those layers. Only one path goes down and
+    comes back up &mdash; the queue, at steps 6 and 7 &mdash; and that shape is the whole point of it.</figcaption>
+</figure>
+
+<section>
+  <h2>Follow one scan, in eight steps</h2>
+  <p class="lede">The numbers on the diagram are in the order things actually happen. Notice that
+    step 4 &mdash; answering the device &mdash; comes <em>before</em> steps 5 to 8.</p>
+  <ol class="steps">
+    <li><span class="marker">1</span><span><span class="step-h">Somebody scans a carton</span>
+      <span class="step-b">A reader sends the SKU, the warehouse, in-or-out, and a quantity.</span></span></li>
+    <li><span class="marker">2</span><span><span class="step-h">It arrives at one endpoint</span>
+      <span class="step-b">Through <code>nginx</code>, then <code>/api/v1/ingest/scan</code>. The token
+        says which company this is, and it is checked against the live database row, not just trusted.</span></span></li>
+    <li><span class="marker">3</span><span><span class="step-h">One commit changes two things</span>
+      <span class="step-b">The stock level changes <em>and</em> an outbox row is written, inside a single
+        database transaction. Both land, or neither does. There is no moment where stock has moved but
+        nobody was told.</span></span></li>
+    <li><span class="marker">4</span><span><span class="step-h">The device is answered and let go</span>
+      <span class="step-b">About 200&nbsp;ms. Everything after this happens with nobody waiting on it.</span></span></li>
+    <li><span class="marker">5</span><span><span class="step-h">A separate worker picks the row up</span>
+      <span class="step-b">The relay claims unpublished outbox rows with <code>FOR UPDATE SKIP LOCKED</code>,
+        so two copies of it never grab the same row. It publishes first and marks the row done second &mdash;
+        that order is deliberate.</span></span></li>
+    <li><span class="marker">6</span><span><span class="step-h">The event goes onto the queue</span>
+      <span class="step-b">An <code>XADD</code> into the Redis stream <code>optistock:events</code>.</span></span></li>
+    <li><span class="marker">7</span><span><span class="step-h">Consumers read it back out</span>
+      <span class="step-b">An <code>XREADGROUP</code> from the consumer group. They commit their work first
+        and acknowledge second, so a crash in between simply redelivers the message.</span></span></li>
+    <li><span class="marker">8</span><span><span class="step-h">The alert lands in the database</span>
+      <span class="step-b">And the next dashboard read &mdash; the third column &mdash; shows it on the screen.</span></span></li>
+  </ol>
+</section>
+
+<section>
+  <h2>Three questions worth being ready for</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>Why not just send the alert directly?</h3>
+      <p>Because then a slow or broken alert would hold up the scan. Worse, if the alert failed after
+        the stock had already changed, the two would silently disagree forever. Writing the outbox row
+        in the same commit makes that impossible: they succeed together or fail together.</p>
+      <p class="ask">This pattern has a name &mdash; the transactional outbox.</p>
+    </div>
+    <div class="card">
+      <h3>What if the same event is delivered twice?</h3>
+      <p>It will be, eventually &mdash; the relay can crash after publishing but before marking the row
+        done. That is why the guarantee is <em>at least once</em>, not exactly once, and why every
+        handler is written to tolerate seeing an event it has already handled.</p>
+      <p class="ask">The same idea protects the device: replaying a scan returns the original answer.</p>
+    </div>
+    <div class="card">
+      <h3>Where is the machine learning?</h3>
+      <p>There isn&rsquo;t any, on purpose. The forecast is a moving average and the reorder maths is the
+        textbook EOQ, safety-stock and reorder-point formulas. They are explainable, they need no
+        training data, and on this dataset they are hard to beat.</p>
+      <p class="ask">The assistant uses a language model, but only to read and explain &mdash; never to decide.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>True at every layer</h2>
+  <ul class="cross">
+    <li><strong>One tenant at a time</strong><span>The company comes from the token and is re-checked
+      against the live row. Every query, every event and every assistant tool is scoped to it.</span></li>
+    <li><strong>Nothing is anonymous</strong><span>A JWT is required at the edge. There is no unauthenticated
+      way in.</span></li>
+    <li><strong>Requests are counted per caller</strong><span>Rate limiting keys on the real client address,
+      not on the proxy in front of it &mdash; otherwise every user shares one bucket.</span></li>
+    <li><strong>Handlers expect repeats</strong><span>At-least-once delivery means doing the same work twice
+      must be harmless.</span></li>
+    <li><strong>Every change leaves a trace</strong><span>Writes are recorded in <code>audit_logs</code>,
+      so any number on a screen can be traced back to what caused it.</span></li>
+  </ul>
+</section>
+
+<footer>Every name, path, table and count on this page was read straight out of the codebase rather
+  than remembered &mdash; the endpoint paths, the stream key, the table names, the container count and the
+  migration count all match what is deployed. The one figure that is <em>not</em> from the code is the
+  &asymp;200&nbsp;ms response time; time a scan yourself before you quote that one.</footer>
+
+</div>
