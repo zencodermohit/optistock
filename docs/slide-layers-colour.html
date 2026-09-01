@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>OptiStock — layer by layer</title>
+<style>
+  /* ------------------------------------------------------------------
+     The colour-banded treatment, done so the bands do not fight the
+     boxes.
+
+     The objection to coloured tiers was never the colour. It was that a
+     row wash at the same saturation as the boxes sitting on it makes
+     both illegible -- a pink box on a pink band has no edge. So the row
+     wash here is a 5-6% tint and the boxes are ~20% with a saturated
+     1.8px border. Same hues, same friendly feel, but the box always
+     wins, which means box colour can still carry meaning.
+
+     The legend is obeyed by every single box. Five categories, and
+     every box on the canvas is exactly one of them. If a box could not
+     be honestly categorised it would not be here.
+
+     nginx is a full-width bar rather than a box in a column, because
+     every request crosses it. The request arrows are drawn AFTER it, so
+     they pass over it -- the bar reads as a gate, which is what it is,
+     and it needs no arrows of its own.
+     ------------------------------------------------------------------ */
+  :root{
+    --bg:#ffffff; --panel:#f7f8fb; --ink:#14181f; --muted:#46526b; --faint:#6b7688;
+    --line:#dde2ea; --band:#f4f6fa;
+
+    /* row washes, then the gutter cell for that row */
+    --w1:#eef8f2; --g1:#c3e7d5; --gb1:#4f9d78;
+    --w2:#fdf6ea; --g2:#f6dfb2; --gb2:#b5822b;
+    --w3:#fdf0f1; --g3:#f6cdd2; --gb3:#b45a70;
+    --w4:#f0f7ec; --g4:#d2e8c4; --gb4:#5f8f47;
+    --w5:#fdf7e4; --g5:#f2dd97; --gb5:#a5851a;
+    --w6:#f5f1fa; --g6:#ded2ee; --gb6:#7a5eab;
+    --w7:#eef4fb; --g7:#cbdef2; --gb7:#4f7fae;
+
+    /* the five legend categories */
+    --entry:#d9f2e4;   --entry-b:#3f9d72;
+    --svc:#fbdfe4;     --svc-b:#c25a72;
+    --store:#fbe8c8;   --store-b:#c0821c;
+    --comp:#e6dcf7;    --comp-b:#7b58c4;
+    --out:#d8e8f8;     --out-b:#3d7fbf;
+
+    --hot:#c2405f;   /* the artery, taken from the service hue */
+    --ret:#0b7a57;   /* the response coming back */
+
+    --sans:"Segoe UI",Roboto,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  }
+  body.dark{
+    --bg:#0b0f18; --panel:#151b28; --ink:#eef1f7; --muted:#aab4c6; --faint:#7d8798;
+    --line:#2a3342; --band:#101725;
+
+    --w1:#0d1a15; --g1:#1c3a2e; --gb1:#3fa07a;
+    --w2:#181510; --g2:#3a3018; --gb2:#c08a2e;
+    --w3:#191114; --g3:#3b2028; --gb3:#c05c72;
+    --w4:#101810; --g4:#22341a; --gb4:#6f9e56;
+    --w5:#18160e; --g5:#393214; --gb5:#c0a022;
+    --w6:#14111b; --g6:#2c2340; --gb6:#8e70bf;
+    --w7:#0d131b; --g7:#1d2c40; --gb7:#5b8ac0;
+
+    --entry:#0e2c23;  --entry-b:#3fc79a;
+    --svc:#31191d;    --svc-b:#e08496;
+    --store:#2f2410;  --store-b:#e0a35c;
+    --comp:#241a44;   --comp-b:#b49bff;
+    --out:#12233a;    --out-b:#7db0e8;
+
+    --hot:#f0839a;
+    --ret:#3fc79a;
+  }
+  html,body{margin:0;padding:0;background:var(--bg)}
+  #slide{width:1600px;height:900px;background:var(--bg)}
+  svg{display:block;width:1600px;height:900px}
+  svg text{font-family:var(--sans);fill:var(--ink)}
+  .t     {font-size:29px;font-weight:700;letter-spacing:-.4px}
+  .tsub  {font-size:14.5px;fill:var(--muted)}
+  .tier  {font-size:13.5px;font-weight:700;letter-spacing:.4px}
+  .tsm   {font-size:11px;fill:var(--faint);font-family:var(--mono)}
+  .band  {font-size:13.5px;font-weight:700;letter-spacing:.5px}
+  .lg    {font-size:11.5px;font-weight:600}
+  .l     {font-size:16px;font-weight:600}
+  .l2    {font-size:15px;font-weight:600}
+  .s     {font-size:12.5px;fill:var(--muted)}
+  .f     {font-family:var(--mono);font-size:11.5px;fill:var(--faint)}
+  .entry {fill:var(--entry); stroke:var(--entry-b); stroke-width:1.8}
+  .svc   {fill:var(--svc);   stroke:var(--svc-b);   stroke-width:1.8}
+  .store {fill:var(--store); stroke:var(--store-b); stroke-width:1.8}
+  .comp  {fill:var(--comp);  stroke:var(--comp-b);  stroke-width:1.8}
+  .out   {fill:var(--out);   stroke:var(--out-b);   stroke-width:1.8}
+  /* One artery heavier than everything else, so the eye has one thing
+     to follow rather than eight equal candidates. */
+  .main  {stroke:var(--hot);stroke-width:3.2;fill:none}
+  .side  {stroke:var(--faint);stroke-width:1.8;fill:none}
+  .back  {stroke:var(--ret);stroke-width:2.6;fill:none}
+</style>
+</head>
+<body>
+<div id="slide">
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--hot)"/>
+    </marker>
+    <marker id="s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--faint)"/>
+    </marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--ret)"/>
+    </marker>
+  </defs>
+  <rect width="1600" height="900" fill="var(--bg)"/>
+
+  <!-- ── header ─────────────────────────────────────────────── -->
+  <text x="40" y="48" class="t">OptiStock — layer by layer</text>
+  <text x="40" y="74" class="tsub">Down is dependency: every layer asks only the one beneath it. One path goes down and comes back up, and that path is the queue.</text>
+
+  <!-- legend. Every box on this canvas is exactly one of these five. -->
+  <rect x="1156" y="28" width="84" height="23" rx="6" class="entry"/>
+  <text x="1198" y="44" class="lg" text-anchor="middle">Entry point</text>
+  <rect x="1248" y="28" width="66" height="23" rx="6" class="svc"/>
+  <text x="1281" y="44" class="lg" text-anchor="middle">Service</text>
+  <rect x="1322" y="28" width="68" height="23" rx="6" class="store"/>
+  <text x="1356" y="44" class="lg" text-anchor="middle">Storage</text>
+  <rect x="1398" y="28" width="92" height="23" rx="6" class="comp"/>
+  <text x="1444" y="44" class="lg" text-anchor="middle">Computation</text>
+  <rect x="1498" y="28" width="62" height="23" rx="6" class="out"/>
+  <text x="1529" y="44" class="lg" text-anchor="middle">Output</text>
+
+  <line x1="40" y1="94" x2="1560" y2="94" stroke="var(--line)" stroke-width="1.5"/>
+
+  <!-- ════════ row washes ════════ -->
+  <rect x="40" y="108" width="1292" height="98"  rx="10" fill="var(--w1)"/>
+  <rect x="40" y="256" width="1292" height="96"  rx="10" fill="var(--w2)"/>
+  <rect x="40" y="360" width="1292" height="142" rx="10" fill="var(--w3)"/>
+  <rect x="40" y="510" width="1292" height="98"  rx="10" fill="var(--w4)"/>
+  <rect x="40" y="616" width="1292" height="84"  rx="10" fill="var(--w5)"/>
+  <rect x="40" y="708" width="1292" height="78"  rx="10" fill="var(--w6)"/>
+  <rect x="40" y="794" width="1520" height="68"  rx="10" fill="var(--w7)"/>
+
+  <!-- ════════ tier labels ════════ -->
+  <rect x="40" y="108" width="150" height="98" rx="10" fill="var(--g1)" stroke="var(--gb1)" stroke-width="1.4"/>
+  <text x="56" y="146" class="tier">ACCESS</text>
+  <text x="56" y="164" class="tier">TERMINAL</text>
+  <text x="56" y="185" class="tsm">who starts it</text>
+
+  <rect x="40" y="256" width="150" height="96" rx="10" fill="var(--g2)" stroke="var(--gb2)" stroke-width="1.4"/>
+  <text x="56" y="292" class="tier">API</text>
+  <text x="56" y="310" class="tier">INTERFACE</text>
+  <text x="56" y="331" class="tsm">FastAPI</text>
+
+  <rect x="40" y="360" width="150" height="142" rx="10" fill="var(--g3)" stroke="var(--gb3)" stroke-width="1.4"/>
+  <text x="56" y="416" class="tier">BUSINESS</text>
+  <text x="56" y="434" class="tier">SERVICE</text>
+  <text x="56" y="455" class="tsm">the rules</text>
+
+  <rect x="40" y="510" width="150" height="98" rx="10" fill="var(--g4)" stroke="var(--gb4)" stroke-width="1.4"/>
+  <text x="56" y="548" class="tier">BASIC</text>
+  <text x="56" y="566" class="tier">SERVICE</text>
+  <text x="56" y="587" class="tsm">workers</text>
+
+  <rect x="40" y="616" width="150" height="84" rx="10" fill="var(--g5)" stroke="var(--gb5)" stroke-width="1.4"/>
+  <text x="56" y="654" class="tier">DATA</text>
+  <text x="56" y="675" class="tsm">queue and lake</text>
+
+  <rect x="40" y="708" width="150" height="78" rx="10" fill="var(--g6)" stroke="var(--gb6)" stroke-width="1.4"/>
+  <text x="56" y="744" class="tier">DATABASE</text>
+  <text x="56" y="765" class="tsm">the ledger</text>
+
+  <rect x="40" y="794" width="150" height="68" rx="10" fill="var(--g7)" stroke="var(--gb7)" stroke-width="1.4"/>
+  <text x="56" y="824" class="tier">RUNNING</text>
+  <text x="56" y="842" class="tier">ENVIRONMENT</text>
+
+  <!-- ════════ ACCESS TERMINAL ════════ -->
+  <rect x="212" y="118" width="206" height="78" rx="11" class="entry"/>
+  <text x="230" y="150" class="l">Scan client</text>
+  <text x="230" y="174" class="s">barcode · RFID</text>
+
+  <rect x="440" y="118" width="206" height="78" rx="11" class="out"/>
+  <text x="458" y="150" class="l">200 OK</text>
+  <text x="458" y="174" class="s">the device is released</text>
+
+  <rect x="668" y="118" width="206" height="78" rx="11" class="entry"/>
+  <text x="686" y="150" class="l">Operator panel</text>
+  <text x="686" y="174" class="s">React, in a browser</text>
+
+  <rect x="896" y="118" width="206" height="78" rx="11" class="entry"/>
+  <text x="914" y="150" class="l">A typed question</text>
+  <text x="914" y="174" class="s">&#8220;what runs out first?&#8221;</text>
+
+  <rect x="1124" y="118" width="206" height="78" rx="11" fill="none" stroke="var(--faint)" stroke-width="1.6" stroke-dasharray="6 5"/>
+  <text x="1142" y="150" class="l2" style="fill:var(--faint)">No one is here</text>
+  <text x="1142" y="174" class="s">a clock starts this one</text>
+
+  <!-- ════════ API INTERFACE ════════ -->
+  <rect x="212" y="266" width="206" height="78" rx="11" class="svc"/>
+  <text x="230" y="292" class="l">Ingest</text>
+  <text x="230" y="314" class="f">/api/v1/ingest/scan</text>
+  <text x="230" y="334" class="s">sent twice, same answer</text>
+
+  <rect x="668" y="266" width="206" height="78" rx="11" class="svc"/>
+  <text x="686" y="292" class="l">Reads</text>
+  <text x="686" y="314" class="f">/api/v1/dashboard/*</text>
+  <text x="686" y="334" class="s">stock · alerts · KPIs</text>
+
+  <rect x="896" y="266" width="206" height="78" rx="11" class="svc"/>
+  <text x="914" y="292" class="l">Assistant</text>
+  <text x="914" y="314" class="f">/api/v1/assistant/ask</text>
+  <text x="914" y="334" class="s">streams as it thinks</text>
+
+  <rect x="1124" y="266" width="206" height="78" rx="11" class="svc"/>
+  <text x="1142" y="292" class="l">APScheduler</text>
+  <text x="1142" y="314" class="f">cron · 01:00 daily</text>
+  <text x="1142" y="334" class="s">in the API process</text>
+
+  <!-- ════════ BUSINESS SERVICE ════════ -->
+  <!-- No arrow between the two rows. An arrow would mean "then", and the
+       guarantee is precisely that there is no "then": one commit. -->
+  <text x="336" y="368" class="f" style="fill:var(--hot);font-weight:700;font-size:11px">ONE TRANSACTION</text>
+  <rect x="212" y="374" width="206" height="120" rx="12" fill="none"
+        stroke="var(--hot)" stroke-width="2.4" stroke-dasharray="7 5"/>
+  <rect x="222" y="386" width="186" height="40" rx="8" class="store"/>
+  <text x="236" y="411" class="l2">stock level changes</text>
+  <rect x="222" y="432" width="186" height="40" rx="8" class="store"/>
+  <text x="236" y="457" class="l2">outbox rows written</text>
+  <text x="236" y="486" class="f" style="fill:var(--hot)">both land, or neither</text>
+
+  <text x="440" y="418" class="s" style="fill:var(--hot);font-weight:600">The device has already</text>
+  <text x="440" y="436" class="s" style="fill:var(--hot);font-weight:600">been answered by here.</text>
+  <text x="440" y="464" class="s">Nothing below this point</text>
+  <text x="440" y="482" class="s">can slow a scan down.</text>
+
+  <rect x="668" y="378" width="206" height="112" rx="11" class="svc"/>
+  <text x="686" y="406" class="l">Query services</text>
+  <text x="686" y="430" class="s">stock · alerts · KPIs</text>
+  <text x="686" y="450" class="s">filtered by company_id</text>
+  <text x="686" y="470" class="s">reads only</text>
+
+  <rect x="896" y="378" width="206" height="112" rx="11" class="comp"/>
+  <text x="914" y="406" class="l">Gemini · 9 tools</text>
+  <text x="914" y="428" class="s">each tool bound to one</text>
+  <text x="914" y="446" class="s">company. Reads the ledger.</text>
+  <text x="914" y="466" class="s">Its one write is a proposal</text>
+  <text x="914" y="484" class="f">a human has to approve</text>
+
+  <rect x="1124" y="378" width="206" height="112" rx="11" class="comp"/>
+  <text x="1142" y="406" class="l">ABC → forecast → EOQ</text>
+  <text x="1142" y="428" class="s">chained, not three jobs</text>
+  <text x="1142" y="446" class="s">four years of history</text>
+  <text x="1142" y="466" class="s">no ML library at all</text>
+  <text x="1142" y="484" class="f">moving average, EOQ</text>
+
+  <!-- ════════ BASIC SERVICE ════════ -->
+  <rect x="212" y="520" width="206" height="78" rx="11" class="svc"/>
+  <text x="230" y="548" class="l">Relay worker</text>
+  <text x="230" y="570" class="s">publish, THEN mark</text>
+  <text x="230" y="590" class="f">FOR UPDATE SKIP LOCKED</text>
+
+  <rect x="440" y="520" width="206" height="78" rx="11" class="svc"/>
+  <text x="458" y="548" class="l">Consumers</text>
+  <text x="458" y="570" class="s">commit, THEN ack</text>
+  <text x="458" y="590" class="f">alerts · read models</text>
+
+  <text x="1190" y="562" class="f">nightly extract</text>
+
+  <!-- ════════ DATA ════════ -->
+  <rect x="212" y="626" width="434" height="64" rx="11" class="store"/>
+  <text x="232" y="654" class="l">Redis Stream</text>
+  <text x="372" y="654" class="f">optistock:events</text>
+  <text x="232" y="677" class="s">one consumer group · server-side offsets · capped at 10,000</text>
+
+  <rect x="1124" y="626" width="150" height="64" rx="11" class="store"/>
+  <text x="1140" y="654" class="l">Parquet lake</text>
+  <text x="1140" y="676" class="f">columnar files</text>
+
+  <!-- ════════ DATABASE ════════ -->
+  <rect x="212" y="718" width="1118" height="60" rx="11" class="store"/>
+  <text x="232" y="745" class="l">PostgreSQL</text>
+  <text x="356" y="745" class="s">the one source of truth — every row in it carries company_id</text>
+  <text x="232" y="769" class="f">inventory · inventory_movements · event_outbox · alerts · recommendations · assistant_actions · audit_logs</text>
+
+  <!-- ════════ RUNNING ENVIRONMENT ════════ -->
+  <rect x="212" y="802" width="1348" height="52" rx="11" fill="var(--panel)" stroke="var(--line)" stroke-width="1.6"/>
+  <text x="232" y="825" class="s">AWS EC2, one host · Docker Compose · 6 containers: nginx · api · relay · consumers · postgres · redis</text>
+  <text x="232" y="845" class="f">23 Alembic migrations, run by the api container only · TLS from Let&#39;s Encrypt, renewed on a timer · optistock.duckdns.org</text>
+
+  <!-- ════════ ARROWS ════════ -->
+  <!-- the scan artery. These cross the nginx bar, which is the point:
+       the bar is a gate, not a stop. -->
+  <path d="M315 196 V 264" class="main" marker-end="url(#m)"/>
+  <path d="M315 344 V 372" class="main" marker-end="url(#m)"/>
+  <path d="M315 494 V 518" class="main" marker-end="url(#m)"/>
+
+  <!-- the U through the data layer. Consumers never read the relay;
+       they read the stream. -->
+  <path d="M315 598 V 624" class="main" marker-end="url(#m)"/>
+  <text x="325" y="617" class="f" style="fill:var(--hot)">XADD</text>
+  <path d="M543 626 V 600" class="main" marker-end="url(#m)"/>
+  <text x="553" y="617" class="f" style="fill:var(--hot)">XREADGROUP</text>
+
+  <!-- consumers write down into the ledger -->
+  <path d="M646 559 H 657 V 716" class="main" marker-end="url(#m)"/>
+
+  <!-- the response, back out through the edge to the device -->
+  <path d="M418 390 H 480 V 198" class="back" marker-end="url(#r)"/>
+  <text x="490" y="300" class="s" style="fill:var(--ret);font-weight:600">about 200 ms</text>
+  <text x="490" y="318" class="s">and the scan is done</text>
+
+  <!-- read paths: long, direct, nothing in between -->
+  <path d="M771 196 V 264" class="side" marker-end="url(#s)"/>
+  <path d="M771 344 V 376" class="side" marker-end="url(#s)"/>
+  <path d="M771 490 V 716" class="side" marker-end="url(#s)"/>
+  <text x="781" y="612" class="f">no queue, no cache</text>
+
+  <path d="M999 196 V 264" class="side" marker-end="url(#s)"/>
+  <path d="M999 344 V 376" class="side" marker-end="url(#s)"/>
+  <path d="M999 490 V 716" class="side" marker-end="url(#s)"/>
+  <text x="1009" y="612" class="f">reads, never writes</text>
+
+  <!-- nightly -->
+  <path d="M1227 196 V 264" class="side" marker-end="url(#s)"/>
+  <path d="M1227 344 V 376" class="side" marker-end="url(#s)"/>
+  <path d="M1180 490 V 624" class="side" marker-end="url(#s)"/>
+  <path d="M1302 490 V 716" class="side" marker-end="url(#s)"/>
+  <text x="1330" y="712" class="f" transform="rotate(-90 1330 712)">recommendations written back</text>
+
+  <!-- ════════ the edge, as a gate every request crosses, drawn last so the arrows do not cut its text ════════ -->
+  <rect x="40" y="214" width="1292" height="34" rx="9" class="svc"/>
+  <text x="56" y="236" class="l2">nginx</text>
+  <text x="132" y="236" class="s">terminates TLS (Let&#39;s Encrypt) · reverse proxy · serves the React build · overwrites X-Real-IP, which is what the limiter counts</text>
+
+  <!-- ════════ CROSS-CUTTING BAND ════════ -->
+  <rect x="1348" y="108" width="212" height="678" rx="12" fill="var(--band)" stroke="var(--line)" stroke-width="1.4"/>
+  <text x="1368" y="140" class="band">AT EVERY LAYER</text>
+  <line x1="1368" y1="152" x2="1540" y2="152" stroke="var(--line)" stroke-width="1.4"/>
+
+  <text x="1368" y="182" class="l2">Tenant isolation</text>
+  <text x="1368" y="204" class="s">company_id comes from</text>
+  <text x="1368" y="222" class="s">the token and is checked</text>
+  <text x="1368" y="240" class="s">against the live row</text>
+
+  <text x="1368" y="309" class="l2">Authentication</text>
+  <text x="1368" y="331" class="s">JWT at the edge.</text>
+  <text x="1368" y="349" class="s">No anonymous path in.</text>
+
+  <text x="1368" y="436" class="l2">Rate limiting</text>
+  <text x="1368" y="458" class="s">counted per client,</text>
+  <text x="1368" y="476" class="s">not per proxy</text>
+
+  <text x="1368" y="563" class="l2">At-least-once</text>
+  <text x="1368" y="585" class="s">an event may arrive</text>
+  <text x="1368" y="603" class="s">twice. Handlers are</text>
+  <text x="1368" y="621" class="s">built to expect it.</text>
+
+  <text x="1368" y="690" class="l2">Audit trail</text>
+  <text x="1368" y="712" class="s">every write leaves</text>
+  <text x="1368" y="730" class="s">a row behind it</text>
+</svg>
+</div>
+</body>
+</html>
