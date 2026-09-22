@@ -43,14 +43,40 @@ from app.modules.inventory.models import Inventory, InventoryMovement  # noqa: E
 REFERENCE = "prep:empty-warehouse"
 
 
-def empty(session: Session, warehouse_name: str, apply: bool) -> dict:
-    row = session.execute(
-        text("SELECT id FROM warehouses WHERE name = :n"),
-        {"n": warehouse_name},
-    ).first()
-    if row is None:
-        return {"error": f"no warehouse named {warehouse_name!r}"}
-    (warehouse_id,) = row
+def empty(
+    session: Session, warehouse_name: str, company_name: str | None, apply: bool
+) -> dict:
+    # A warehouse name is NOT an identifier here. Every tenant names its sites
+    # for the cities it ships from, so two companies both having a "Mumbai
+    # Central Hub" is the normal case rather than a collision. The first
+    # version of this took `.first()` and silently emptied whichever row the
+    # planner happened to return -- on a multi-tenant database, the one bug
+    # this script must not have.
+    matches = session.execute(
+        text(
+            """
+            SELECT w.id, c.name
+            FROM warehouses w
+            JOIN companies c ON c.id = w.company_id
+            WHERE w.name = :n AND (:company IS NULL OR c.name = :company)
+            ORDER BY c.name
+            """
+        ),
+        {"n": warehouse_name, "company": company_name},
+    ).all()
+
+    if not matches:
+        return {"error": f"no warehouse named {warehouse_name!r} for that company"}
+    if len(matches) > 1:
+        owners = ", ".join(sorted(owner for _, owner in matches))
+        return {
+            "error": (
+                f"{warehouse_name!r} exists for {len(matches)} companies "
+                f"({owners}). Name one with --company."
+            )
+        }
+
+    warehouse_id, owner = matches[0]
 
     lines = (
         session.query(Inventory)
@@ -61,11 +87,12 @@ def empty(session: Session, warehouse_name: str, apply: bool) -> dict:
         .all()
     )
     if not lines:
-        return {"warehouse": warehouse_name, "note": "already empty"}
+        return {"warehouse": warehouse_name, "company": owner, "note": "already empty"}
 
     units = sum(line.quantity for line in lines)
     summary = {
         "warehouse": warehouse_name,
+        "company": owner,
         "stock_lines": len(lines),
         "units_removed": units,
     }
@@ -105,13 +132,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("warehouse", help="exact warehouse name")
     parser.add_argument(
+        "--company", help="required when two tenants share the warehouse name"
+    )
+    parser.add_argument(
         "--apply", action="store_true", help="write; without it, report only"
     )
     args = parser.parse_args()
 
     engine = create_engine(settings.DATABASE_URL)
     with Session(engine) as session:
-        result = empty(session, args.warehouse, args.apply)
+        result = empty(session, args.warehouse, args.company, args.apply)
         for key, value in result.items():
             print(
                 f"  {key:18} {value:,}"
