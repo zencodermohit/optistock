@@ -371,6 +371,18 @@ def procurement(db: Session, company_id: UUID) -> Dict[str, Any]:
             {
                 "id": str(rec.id),
                 "product_id": str(row.product_id),
+                # The three fields below are what turns this card from advice
+                # into something actionable. Creating a purchase order needs
+                # ids, and this row used to publish only names -- both of these
+                # were already in hand here and thrown away a line later, so
+                # the button that was meant to act on the advice had nothing
+                # valid to send.
+                "warehouse_id": str(row.warehouse_id),
+                "supplier_id": str(supplier["id"]) if supplier else None,
+                # Per unit, because a PO line is priced per unit while the card
+                # shows the total. Dividing the total back out invites a
+                # rounding error into money.
+                "unit_cost": float(row.unit_cost or 0),
                 "sku": row.sku,
                 "name": row.product_name,
                 "category": row.category,

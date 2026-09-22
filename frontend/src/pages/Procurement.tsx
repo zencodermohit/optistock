@@ -20,6 +20,7 @@ import { Band } from "@/components/ui/Band";
 import { ErrorState, Skeleton } from "@/components/ui/states";
 import { count, currencyCompact, percent } from "@/lib/format";
 import {
+  useCreatePurchaseOrder,
   useProcurement,
   type Procurement as ProcurementData,
 } from "@/lib/queries";
@@ -294,12 +295,7 @@ function Recommendations({
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent transition-colors hover:bg-accent-hover"
-                >
-                  Raise order
-                </button>
+                <RaiseOrder row={row} />
               </div>
 
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
@@ -392,6 +388,82 @@ function Recommendations({
         </p>
       )}
     </Band>
+  );
+}
+
+/**
+ * The button that turns advice into an order.
+ *
+ * Its own mutation per row rather than one shared by the list: a single hook
+ * would report `isPending` for every card at once, so raising one order would
+ * grey out all of them and the person clicking would have no idea which one
+ * they had actually sent.
+ *
+ * A product with no supplier cannot have a purchase order raised for it -- a
+ * PO is addressed TO somebody. Rather than fail on submit, the button says so
+ * up front; the supplier here is inferred from who last supplied the product,
+ * so a line nobody has ever ordered has nothing to infer from.
+ */
+function RaiseOrder({
+  row,
+}: {
+  row: NonNullable<ProcurementData["recommendations"]>[number];
+}) {
+  const create = useCreatePurchaseOrder();
+
+  if (!row.supplier_id) {
+    return (
+      <button
+        type="button"
+        disabled
+        title="No supplier on record for this product, so there is nobody to order from."
+        className="cursor-not-allowed rounded-xl border border-border px-4 py-2 text-sm font-bold text-ink-subtle"
+      >
+        No supplier
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={create.isPending || create.isSuccess}
+        onClick={() =>
+          create.mutate({
+            supplier_id: row.supplier_id!,
+            destination_warehouse_id: row.warehouse_id,
+            items: [
+              {
+                product_id: row.product_id,
+                quantity: row.recommended_quantity,
+                unit_price: row.unit_cost,
+              },
+            ],
+          })
+        }
+        className={cn(
+          "rounded-xl px-4 py-2 text-sm font-bold transition-colors",
+          create.isSuccess
+            ? "bg-success-soft text-success"
+            : "bg-accent text-on-accent hover:bg-accent-hover",
+          create.isPending && "opacity-60",
+        )}
+      >
+        {create.isPending
+          ? "Raising…"
+          : create.isSuccess
+            ? "Raised"
+            : "Raise order"}
+      </button>
+      {create.isError && (
+        <span className="max-w-[14rem] text-right text-2xs text-danger">
+          {create.error instanceof Error
+            ? create.error.message
+            : "Could not raise that order."}
+        </span>
+      )}
+    </div>
   );
 }
 

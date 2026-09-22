@@ -431,6 +431,36 @@ export function useLinkBarcode() {
   });
 }
 
+export interface PurchaseOrderCreate {
+  supplier_id: string;
+  destination_warehouse_id: string;
+  items: { product_id: string; quantity: number; unit_price: number }[];
+}
+
+/**
+ * Turn a reorder recommendation into a draft purchase order.
+ *
+ * The procurement list hides any product that already has an open order for
+ * that warehouse, so a successful create makes the card disappear rather than
+ * leaving it there to be raised a second time. That is why this invalidates
+ * the procurement query and not just the purchase-order list.
+ */
+export function useCreatePurchaseOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (order: PurchaseOrderCreate) =>
+      // Underscore: the router prefix is /api/v1/purchase_orders. The cache
+      // keys below use a hyphen, which is unrelated to the URL and only has to
+      // agree with the other purchase-order queries.
+      api<{ id: string }>("/purchase_orders/", { method: "POST", body: order }),
+    onSuccess: () => {
+      for (const key of ["purchase-orders", "procurement", "recommendations"]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+  });
+}
+
 /** Relay lag. A backlog that grows means the relay has stopped. */
 export function useOutboxHealth() {
   return useQuery({
@@ -1349,6 +1379,10 @@ export interface Procurement {
   recommendations: {
     id: string;
     product_id: string;
+    warehouse_id: string;
+    /** Null when this product has never been ordered from anyone. */
+    supplier_id: string | null;
+    unit_cost: number;
     sku: string;
     name: string;
     category: string | null;
