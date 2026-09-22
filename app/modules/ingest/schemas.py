@@ -1,7 +1,7 @@
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ScanCreate(BaseModel):
@@ -13,7 +13,16 @@ class ScanCreate(BaseModel):
     catalogue to every device.
     """
 
-    sku: str = Field(..., min_length=1, max_length=100)
+    # Exactly one of these identifies the product, enforced below.
+    #
+    # A barcode gun bolted to a bench is configured with our SKUs and sends
+    # `sku`. A phone camera reads whatever the manufacturer printed and sends
+    # `barcode`. Accepting both in one request rather than adding a lookup
+    # endpoint keeps a scan a single round trip, which matters because the
+    # second call is a second thing that can fail on warehouse wifi -- and it
+    # would fail AFTER the client had already decided the scan was good.
+    sku: Optional[str] = Field(None, min_length=1, max_length=100)
+    barcode: Optional[str] = Field(None, min_length=1, max_length=64)
     warehouse_id: UUID
     direction: Literal["in", "out"]
     quantity: int = Field(1, gt=0, le=10_000)
@@ -27,6 +36,20 @@ class ScanCreate(BaseModel):
         description="Device-generated id. Repeating it makes the scan a no-op.",
     )
     device_id: Optional[str] = Field(None, max_length=100)
+
+    @model_validator(mode="after")
+    def _one_identifier(self) -> "ScanCreate":
+        """Exactly one of sku or barcode, never both and never neither.
+
+        Both is refused rather than resolved by precedence. If a device sends
+        a SKU and a barcode that disagree, any rule for picking a winner is a
+        guess about which one the operator meant, and the wrong guess moves
+        stock on the wrong product silently. Refusing is the only answer that
+        cannot be quietly wrong.
+        """
+        if (self.sku is None) == (self.barcode is None):
+            raise ValueError("Send exactly one of sku or barcode.")
+        return self
 
 
 class ScanResponse(BaseModel):

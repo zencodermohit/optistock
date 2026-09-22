@@ -280,10 +280,21 @@ def analyst_headers(db_session, company):
 # ---------------------------------------------------------------------------
 @pytest.fixture
 def make_product(db_session):
-    def _make(company, sku=None, name="Test Widget", unit_cost=10, selling_price=25):
+    def _make(
+        company,
+        sku=None,
+        name="Test Widget",
+        unit_cost=10,
+        selling_price=25,
+        barcode=None,
+    ):
         product = Product(
             company_id=company.id,
             sku=sku or f"SKU-{_short_id()}",
+            # Left null unless a test asks for one, which mirrors production:
+            # a barcode exists only once somebody has physically scanned the
+            # article, so null is the ordinary state and the default here.
+            barcode=barcode,
             name=name,
             category="test",
             unit_cost=unit_cost,

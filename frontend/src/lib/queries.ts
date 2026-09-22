@@ -32,6 +32,8 @@ export interface Product {
   status: string;
   /** Path on this origin, or null when the product has no photograph. */
   image_url: string | null;
+  /** The manufacturer's number, once somebody has scanned the article. */
+  barcode: string | null;
   abc_class: string | null;
   abc_calculated_at: string | null;
   created_at: string;
@@ -353,6 +355,79 @@ export function useRecentEvents(limit = 50) {
       api<Paginated<import("@/lib/useEventStream").DomainEvent>>(
         `/events/?limit=${limit}`,
       ),
+  });
+}
+
+export interface ScanPayload {
+  /**
+   * Exactly one of `sku` or `barcode`, which the server enforces and refuses
+   * rather than resolving by precedence. A gun on a bench was configured with
+   * our codes and sends the SKU; a phone reads whatever the manufacturer
+   * printed and sends the barcode.
+   */
+  sku?: string;
+  barcode?: string;
+  warehouse_id: string;
+  direction: "in" | "out";
+  quantity: number;
+  /** Repeating one makes the scan a no-op, so a retry is always safe. */
+  scan_reference?: string;
+  device_id?: string;
+}
+
+export interface ScanResult {
+  accepted: boolean;
+  sku: string;
+  quantity_after: number;
+  duplicate: boolean;
+}
+
+/**
+ * One read from a scanner, sent to the same endpoint a barcode gun would use.
+ *
+ * The browser is the device here, which is why this needs no credential of its
+ * own: `api()` already attaches the operator's token. That is the whole reason
+ * the phone route is simpler than firmware -- a token expiring after sixty
+ * minutes is somebody else's problem when the session already refreshes it.
+ */
+export function useRecordScan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (scan: ScanPayload) =>
+      api<ScanResult>("/ingest/scan", { method: "POST", body: scan }),
+    onSuccess: (result) => {
+      // A duplicate moved nothing, so there is nothing stale to refetch.
+      if (result.duplicate) return;
+      for (const key of ["inventory", "alerts", "events", "dashboard"]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+  });
+}
+
+/**
+ * Teach the catalogue what a barcode means.
+ *
+ * Reachable from the scanner rather than a script, because the moment it is
+ * needed is the moment somebody is holding an article the system has never
+ * seen -- and walking back to a terminal to fix that is how a feature stops
+ * being used.
+ */
+export function useLinkBarcode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      productId,
+      barcode,
+    }: {
+      productId: string;
+      barcode: string | null;
+    }) =>
+      api<Product>(`/products/${productId}/barcode`, {
+        method: "PATCH",
+        body: { barcode },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   });
 }
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
@@ -11,11 +12,13 @@ import io
 from app.core.database import get_db
 from app.core.exceptions import OptiStockException, ResourceNotFoundError
 from app.modules.products.schemas import (
+    BarcodeLink,
     ProductCreate,
     ProductUpdate,
     ProductResponse,
     PaginatedProductsResponse,
 )
+from app.modules.products.models import Product
 from app.modules.products.service import ProductService
 
 from app.modules.products.intelligence import product_intelligence
@@ -238,6 +241,68 @@ def update_product(
     except Exception as e:
         db.rollback()
         raise e
+
+
+@router.patch("/{product_id}/barcode", response_model=ProductResponse)
+def link_barcode(
+    product_id: UUID,
+    link: BarcodeLink,
+    db: Session = Depends(get_db),
+    # Staff scan; binding a barcode to a catalogue row is a supervisor's act.
+    # It is also reversible -- sending null unlinks -- so this is about who
+    # decides what a product IS, not about damage control.
+    current_user: dict = Depends(RequireRole(["admin", "manager", "supply_chain"])),
+):
+    """Teach the catalogue what the number on this article means.
+
+    The alternative was a script run from a laptop, which fails in the one
+    situation the feature exists for: somebody standing at a shelf holding an
+    article the system has never seen. So this is reachable from the scanner.
+
+    Uniqueness is checked here rather than left to the database constraint
+    alone, because a caught IntegrityError cannot say WHICH product already
+    owns the barcode, and "that belongs to Instant Noodles 70g" is the only
+    response that lets the operator fix it without leaving the shelf. The
+    constraint stays as the backstop for the race between the check and the
+    commit.
+    """
+    company_id = UUID(current_user["company_id"])
+
+    product = (
+        db.query(Product)
+        .filter(Product.id == product_id, Product.company_id == company_id)
+        .first()
+    )
+    if product is None:
+        raise HTTPException(status_code=404, detail="No such product.")
+
+    if link.barcode is not None:
+        clash = (
+            db.query(Product)
+            .filter(
+                Product.company_id == company_id,
+                Product.barcode == link.barcode,
+                Product.id != product_id,
+            )
+            .first()
+        )
+        if clash is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"That barcode is already on {clash.name} ({clash.sku}).",
+            )
+
+    product.barcode = link.barcode
+    try:
+        db.commit()
+    except IntegrityError:
+        # The constraint caught what the check above raced past.
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="That barcode was just taken by another product."
+        )
+    db.refresh(product)
+    return product
 
 
 @router.delete("/{product_id}", response_model=ProductResponse)

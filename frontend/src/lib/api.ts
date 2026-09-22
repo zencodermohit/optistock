@@ -136,7 +136,13 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, await readErrorMessage(response));
+    // The parsed detail travels with the error, not just its prose. Some
+    // failures are ones the UI can act on rather than merely report -- an
+    // unrecognised barcode is the scanner's cue to offer to link it -- and
+    // branching on that needs the structured body, because matching on a
+    // sentence breaks the moment anyone rewords it.
+    const { message, detail } = await readError(response);
+    throw new ApiError(response.status, message, detail);
   }
 
   return response.status === 204
@@ -149,23 +155,48 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
  * HTTPExceptions, and `{detail: [{loc, msg, ...}]}` for validation failures.
  * Flatten both into something a human can read.
  */
-async function readErrorMessage(response: Response): Promise<string> {
+/**
+ * FastAPI's three shapes of `detail`, plus the one we add.
+ *
+ * A string for a plain refusal, a list for validation errors, and — where a
+ * failure is something the UI can DO something about — an object carrying a
+ * `reason` the caller can switch on and a `message` for the human.
+ */
+async function readError(
+  response: Response
+): Promise<{ message: string; detail?: unknown }> {
   try {
     const body = await response.json();
     const detail = body?.detail;
 
-    if (typeof detail === "string") return detail;
+    if (typeof detail === "string") return { message: detail, detail };
 
     if (Array.isArray(detail)) {
-      return detail
+      const message = detail
         .map((item) => {
           const field = Array.isArray(item.loc) ? item.loc.at(-1) : null;
           return field ? `${field}: ${item.msg}` : item.msg;
         })
         .join(", ");
+      return { message, detail };
+    }
+
+    if (detail && typeof detail === "object") {
+      const spoken = (detail as { message?: unknown }).message;
+      return {
+        message:
+          typeof spoken === "string"
+            ? spoken
+            : `Request failed (${response.status})`,
+        detail,
+      };
     }
   } catch {
     /* fall through to the generic message */
   }
-  return `Request failed (${response.status})`;
+  return { message: `Request failed (${response.status})` };
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  return (await readError(response)).message;
 }

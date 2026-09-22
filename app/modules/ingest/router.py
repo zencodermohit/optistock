@@ -35,10 +35,17 @@ def record_scan(
     trusted more than a browser: it gets its own account and the narrowest role
     that can move stock.
     """
+    # Whichever identifier the device sent. The schema has already guaranteed
+    # exactly one of them is set, so there is no precedence to get wrong here.
+    identifies = (
+        Product.barcode == scan.barcode
+        if scan.barcode is not None
+        else Product.sku == scan.sku
+    )
     product = (
         db.query(Product)
         .filter(
-            Product.sku == scan.sku,
+            identifies,
             Product.company_id == UUID(current_user["company_id"]),
         )
         .first()
@@ -47,6 +54,20 @@ def record_scan(
         # 422, not 404: the request was well-formed but names something this
         # tenant does not stock, and a scanner should log that differently from
         # a bad URL.
+        if scan.barcode is not None:
+            # Structured, because this is the one failure the client can fix
+            # without leaving the shelf: an unrecognised barcode means "nobody
+            # has told us what this article is yet", and the scanner answers
+            # that by offering to link it. A bare sentence would force the
+            # client to match on prose to tell this apart from a real error.
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "reason": "unknown_barcode",
+                    "barcode": scan.barcode,
+                    "message": "Nothing in this catalogue carries that barcode yet.",
+                },
+            )
         raise HTTPException(
             status_code=422, detail=f"No product with SKU '{scan.sku}' in this company."
         )
@@ -71,7 +92,7 @@ def record_scan(
         if already:
             return ScanResponse(
                 accepted=True,
-                sku=scan.sku,
+                sku=product.sku,
                 quantity_after=already.quantity_after,
                 duplicate=True,
             )
@@ -101,7 +122,7 @@ def record_scan(
             aggregate_type=event_types.AGGREGATE_INVENTORY,
             aggregate_id=inventory.id,
             payload={
-                "sku": scan.sku,
+                "sku": product.sku,
                 "product_name": product.name,
                 "direction": scan.direction,
                 "quantity": scan.quantity,
@@ -111,7 +132,7 @@ def record_scan(
         db.commit()
         return ScanResponse(
             accepted=True,
-            sku=scan.sku,
+            sku=product.sku,
             quantity_after=inventory.quantity,
             duplicate=False,
         )

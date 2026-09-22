@@ -203,8 +203,15 @@ The following capabilities are within the scope of the OptiStock platform:
 
 The following are explicitly excluded from the current version but may be considered for future releases:
 
-- Real-time streaming data ingestion (e.g., Kafka)
-- IoT device integration (barcode scanners, RFID)
+- ~~Real-time streaming data ingestion (e.g., Kafka)~~ — **delivered**, as Redis
+  Streams rather than the Kafka named here: a transactional outbox relayed to a
+  consumer group, which gives the same at-least-once guarantee without a second
+  piece of infrastructure to run.
+- ~~IoT device integration (barcode scanners, RFID)~~ — **partially delivered**.
+  The ingest endpoint (`POST /api/v1/ingest/scan`) and a camera-based scanner
+  client at `/scanner` are built and tested; a product can be resolved by the
+  manufacturer's barcode as well as by our SKU. No dedicated hardware reader
+  has been built — the phone is the device.
 - Mobile application
 - ERP/SAP integration
 - Multi-currency and multi-language support

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      user-scalable=no and viewport-fit=cover, which index.html does not set.
+      A scanner is held one-handed and aimed: a stray pinch that zooms the page
+      mid-scan is a nuisance rather than a feature, and the camera view wants
+      the whole screen including whatever sits behind a notch.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0a1020" />
+    <title>OptiStock Scanner</title>
+    <meta
+      name="description"
+      content="Scan stock in and out with a phone camera."
+    />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <!-- Saved to a home screen this opens without browser chrome, which is the
+         closest a web page gets to feeling like the handheld it replaces. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <script>
+      /*
+        Same pre-paint theme resolution as index.html, and the same reasoning:
+        the bundle arrives after the first paint, so deciding this in React
+        means a flash. Duplicated rather than imported for that exact reason.
+
+        The scanner leans dark by default even when the system says light. It
+        is used in a warehouse with the camera open, where a white page is a
+        lamp pointed at the person holding it.
+      */
+      (function () {
+        try {
+          var saved = localStorage.getItem("optistock:theme");
+          document.documentElement.dataset.theme =
+            saved === "light" ? "light" : "dark";
+        } catch (e) {
+          document.documentElement.dataset.theme = "dark";
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/scanner/main.tsx"></script>
+  </body>
+</html>

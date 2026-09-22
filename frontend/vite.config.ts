@@ -10,6 +10,27 @@ export default defineConfig({
     // "@/components/..." rather than "../../../components/..."
     alias: { "@": path.resolve(__dirname, "./src") },
   },
+  build: {
+    rollupOptions: {
+      // TWO APPS, ONE ORIGIN.
+      //
+      // The dashboard is 2.2 MB: three.js, a postprocessing pipeline, a chart
+      // library, a markdown renderer. All of it earns its place on a desk and
+      // none of it earns its place on a phone held over a carton, where the
+      // job is to read a barcode and post three fields.
+      //
+      // A separate entry rather than a separate SITE, which is the part worth
+      // keeping straight. Same origin means the scanner shares localStorage
+      // with the dashboard, so it shares the token; it needs no CORS policy,
+      // no second certificate and no second deployment. What it gets is its
+      // own bundle and its own full-screen UI, which is all that was actually
+      // wrong with serving it as a route.
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        scanner: path.resolve(__dirname, "scanner.html"),
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

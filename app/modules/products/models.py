@@ -18,6 +18,18 @@ class Product(Base):
     # Indexed but NOT globally unique: uniqueness is per tenant, enforced by the
     # composite constraint in __table_args__ below.
     sku = Column(String(50), index=True, nullable=False)
+
+    # The number printed on the physical article, as a scanner reads it: EAN-13,
+    # UPC-A and friends. Distinct from the SKU on purpose -- the SKU is ours and
+    # every product has one, whereas this belongs to whoever manufactured the
+    # thing and most rows will never carry it. Hence nullable.
+    #
+    # Unique per company rather than globally, for the same reason the SKU is:
+    # two tenants stocking the same tin of paint both have a right to its
+    # barcode. Postgres allows repeated NULLs under a unique constraint, so the
+    # unmapped majority costs nothing.
+    barcode = Column(String(64), index=True, nullable=True)
+
     name = Column(String(255), nullable=False)
     category = Column(String(100))
 
@@ -48,4 +60,5 @@ class Product(Base):
 
     __table_args__ = (
         UniqueConstraint("company_id", "sku", name="uix_product_company_sku"),
+        UniqueConstraint("company_id", "barcode", name="uix_product_company_barcode"),
     )

@@ -58,11 +58,48 @@ class ProductUpdate(BaseModel):
 
 
 # What the API returns to the client
+class BarcodeLink(BaseModel):
+    """Attach the number printed on the article to this product.
+
+    Null is a legitimate value: it unlinks, which is how you recover from
+    scanning the wrong packet onto the wrong row without needing a second
+    endpoint to undo it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    barcode: Optional[str] = Field(None, min_length=6, max_length=64)
+
+    @field_validator("barcode")
+    @classmethod
+    def _plausible_symbol(cls, value: Optional[str]) -> Optional[str]:
+        """Reject what no scanner could have produced.
+
+        Deliberately loose. This accepts EAN-13, UPC-A, EAN-8 and the
+        alphanumeric Code 128 a warehouse prints for itself, because rejecting
+        anything a real scanner can read would make the feature useless in the
+        one situation it exists for. It refuses whitespace and control
+        characters, which is all that separates a scan from a paste.
+        """
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        if any(character.isspace() for character in cleaned):
+            raise ValueError("A barcode contains no spaces.")
+        if not cleaned.isprintable():
+            raise ValueError("That is not a readable barcode.")
+        return cleaned
+
+
 class ProductResponse(ProductBase):
     id: UUID
     sku: str
     company_id: UUID
     status: str
+    # The manufacturer's number, once somebody has physically scanned the
+    # article. Null for almost every row, and that is the resting state.
+    barcode: Optional[str] = None
     # A path under this origin, or null. Null is an ordinary state -- a product
     # without a photograph is still a product -- so the client renders a
     # lettered tile rather than treating it as an error.
