@@ -10,7 +10,9 @@ from app.modules.inventory.models import Inventory
 from app.modules.products.models import Product
 
 
-def _scan_barcode(client, barcode, warehouse, direction="out", quantity=1, reference=None):
+def _scan_barcode(
+    client, barcode, warehouse, direction="out", quantity=1, reference=None
+):
     body = {
         "barcode": barcode,
         "warehouse_id": str(warehouse.id),
@@ -185,11 +187,7 @@ def test_a_repeated_barcode_scan_reference_is_still_a_no_op(
     assert second.json()["duplicate"] is True
     assert second.json()["quantity_after"] == 15
 
-    stock = (
-        db_session.query(Inventory)
-        .filter(Inventory.product_id == product.id)
-        .one()
-    )
+    stock = db_session.query(Inventory).filter(Inventory.product_id == product.id).one()
     db_session.refresh(stock)
     assert stock.quantity == 15
 
@@ -205,7 +203,10 @@ def test_linking_a_barcode_makes_the_next_scan_work(
     product = make_product(company, sku="LEARN-1")
     make_stock(product, warehouse, quantity=10)
 
-    assert _scan_barcode(authenticated_client, "8712345678905", warehouse).status_code == 422
+    assert (
+        _scan_barcode(authenticated_client, "8712345678905", warehouse).status_code
+        == 422
+    )
 
     linked = authenticated_client.patch(
         f"/api/v1/products/{product.id}/barcode",
@@ -222,7 +223,7 @@ def test_linking_a_barcode_makes_the_next_scan_work(
 def test_linking_a_barcode_twice_names_the_product_that_has_it(
     authenticated_client, company, make_product
 ):
-    """"Taken" is useless; "taken by Instant Noodles" can be acted on.
+    """ "Taken" is useless; "taken by Instant Noodles" can be acted on.
 
     The operator is standing at a shelf. Telling them which row already owns
     the code is the difference between fixing it there and walking back to a
