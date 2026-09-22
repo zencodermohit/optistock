@@ -589,7 +589,7 @@
     <tr><td class="k">At-least-once delivery</td><td>A duplicate can be spotted by its id and thrown away. A lost event leaves no trace to spot.</td></tr>
     <tr><td class="k">Redis Stream, not a plain list</td><td>A consumer group tracks what each worker has acknowledged, so a crash mid-work does not lose the item.</td></tr>
     <tr><td class="k">One <code>company_id</code> on every row</td><td>One database serves many companies. The id comes from the verified token, never from the request body.</td></tr>
-    <tr><td class="k">Parquet for history</td><td>Stored column by column, so "sum this one field across three years" reads only that field.</td></tr>
+    <tr><td class="k">Parquet for history</td><td>Stored column by column, so "sum this one field across a year" reads only that field.</td></tr>
     <tr><td class="k">Averages, not machine learning</td><td>Every number on screen must be explainable to the person acting on it. A black box that says "order 400" is not usable advice.</td></tr>
     <tr><td class="k">The assistant proposes,<br>never acts</td><td>A wrong purchase order costs real money. A human approves on the Approvals screen.</td></tr>
     <tr><td class="k">Scanner uses its own reference</td><td>Radio links retry. The reference makes a repeated scan harmless.</td></tr>
